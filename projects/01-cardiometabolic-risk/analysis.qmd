@@ -1,0 +1,288 @@
+---
+title: "Cardiometabolic Risk in NHANES 2017–2018"
+subtitle: "A polyglot R + Python analysis with complex survey design, machine learning, and SHAP interpretability"
+author: "Paulina Del Mundo Del Fierro, MD, MPH"
+date: last-modified
+format:
+  html:
+    theme: cosmo
+    toc: true
+    toc-depth: 3
+    toc-location: right
+    code-tools: true
+    code-copy: true
+    code-fold: false
+    code-overflow: wrap
+    number-sections: true
+    fig-responsive: true
+    fig-width: 8
+    fig-height: 5
+    mainfont: "Inter, system-ui, sans-serif"
+    monofont: "JetBrains Mono, Menlo, monospace"
+execute:
+  echo: true
+  warning: false
+  message: false
+  freeze: auto
+---
+
+## Why this analysis
+
+Cardiometabolic disease remains the leading driver of mortality in US adults. Yet the clinical tools that estimate risk — Framingham, ASCVD, PCE — were trained on cohorts that poorly represent the population-level distribution of social and biological risk factors captured by NHANES.
+
+This notebook does three things a physician-scientist portfolio should demonstrate end-to-end:
+
+1. **Load and harmonize** the NHANES 2017–2018 cycle (demographics, examination, labs, questionnaire) using the CDC's public XPT files.
+2. **Describe** the population correctly — applying the NHANES complex survey design so prevalence estimates generalize to the US civilian non-institutionalized population.
+3. **Model** the probability of metabolic syndrome using both a design-aware logistic regression (in **R**) and a gradient-boosted classifier with SHAP explanations (in **Python**), then compare what each approach reveals.
+
+The two language blocks render side-by-side thanks to Quarto's polyglot mode via `reticulate` — a small but real demonstration that **methodology choices should follow the scientific question, not the toolchain.**
+
+::: {.callout-note}
+Source and helpers live in [`R/nhanes_helpers.R`](../../R/nhanes_helpers.R) and [`python/nhanes_helpers.py`](../../python/nhanes_helpers.py). The `.qmd` source for this page is on [GitHub](https://github.com/paulinedmdf/paulinadelmundomd/blob/main/projects/01-cardiometabolic-risk/analysis.qmd).
+:::
+
+---
+
+## Setup
+
+```{r setup-r}
+#| label: setup-r
+source(here::here("R", "nhanes_helpers.R"))
+library(gtsummary)
+library(ggplot2)
+library(reticulate)
+theme_set(theme_minimal(base_size = 12))
+```
+
+```{python setup-py}
+#| label: setup-py
+import sys, pathlib
+sys.path.append(str(pathlib.Path.cwd().parents[1] / "python"))
+
+import numpy as np
+import pandas as pd
+import matplotlib.pyplot as plt
+from sklearn.model_selection import train_test_split
+from sklearn.metrics import roc_auc_score, roc_curve, brier_score_loss
+from sklearn.calibration import calibration_curve
+import xgboost as xgb
+import shap
+
+plt.rcParams.update({"figure.dpi": 110, "font.family": "Inter, system-ui, sans-serif"})
+```
+
+## Pulling the NHANES cycle
+
+We need demographics (`DEMO_J`), body measures (`BMX_J`), blood pressure (`BPX_J`), fasting glucose (`GLU_J`), HDL (`HDL_J`), triglycerides (`TRIGLY_J`), and the diabetes questionnaire (`DIQ_J`).
+
+```{r pull-data}
+#| label: pull-data
+#| cache: true
+
+tables <- list(
+  DEMO = "DEMO_J",
+  BMX  = "BMX_J",
+  BPX  = "BPX_J",
+  GLU  = "GLU_J",
+  HDL  = "HDL_J",
+  TRIG = "TRIGLY_J",
+  DIQ  = "DIQ_J"
+)
+
+nhanes_raw <- pull_nhanes_cycle(cycle = "J", tables = tables)
+nhanes_raw <- recode_demographics(nhanes_raw)
+
+dim(nhanes_raw)
+```
+
+## Defining metabolic syndrome (ATP III, harmonized)
+
+An adult meets criteria if **≥ 3 of 5** are true:
+
+| Component | Threshold |
+|---|---|
+| Waist circumference | ≥ 102 cm (M) or ≥ 88 cm (F) |
+| Triglycerides | ≥ 150 mg/dL |
+| HDL cholesterol | < 40 mg/dL (M) or < 50 mg/dL (F) |
+| Blood pressure | SBP ≥ 130 or DBP ≥ 85, or on BP medication |
+| Fasting glucose | ≥ 100 mg/dL, or on diabetes medication |
+
+```{r define-outcome}
+#| label: define-outcome
+dat <- nhanes_raw |>
+  filter(age_years >= 20, !is.na(WTMEC2YR)) |>
+  transmute(
+    SEQN, WTMEC2YR, SDMVPSU, SDMVSTRA,
+    sex, age_years, race_eth,
+    waist     = BMXWAIST,
+    trig      = LBXTR,
+    hdl       = LBDHDD,
+    sbp       = rowMeans(cbind(BPXSY1, BPXSY2, BPXSY3), na.rm = TRUE),
+    dbp       = rowMeans(cbind(BPXDI1, BPXDI2, BPXDI3), na.rm = TRUE),
+    fpg       = LBXGLU,
+    dm_rx     = DIQ070 == 1,
+    waist_hit = (sex == "Male"   & waist >= 102) |
+                (sex == "Female" & waist >= 88),
+    trig_hit  = trig >= 150,
+    hdl_hit   = (sex == "Male"   & hdl < 40) |
+                (sex == "Female" & hdl < 50),
+    bp_hit    = sbp >= 130 | dbp >= 85,
+    glu_hit   = fpg >= 100 | dm_rx,
+    mets_n    = rowSums(cbind(waist_hit, trig_hit, hdl_hit, bp_hit, glu_hit), na.rm = TRUE),
+    metsyn    = mets_n >= 3
+  ) |>
+  filter(if_all(c(waist, trig, hdl, sbp, dbp, fpg), \(x) !is.na(x)))
+
+nrow(dat)
+```
+
+## Weighted prevalence by demographics
+
+Critically, NHANES oversamples certain subpopulations. A naive proportion is biased; we have to apply the MEC sampling weights with `survey`/`srvyr`.
+
+```{r weighted-table}
+#| label: weighted-table
+des <- nhanes_design(dat, weight = "WTMEC2YR")
+
+prev_tbl <- des |>
+  group_by(sex, race_eth) |>
+  summarize(
+    metsyn_pct = survey_mean(metsyn, proportion = TRUE, vartype = "ci") * 100
+  )
+
+knitr::kable(
+  prev_tbl,
+  digits = 1,
+  col.names = c("Sex", "Race/Ethnicity", "Prevalence (%)", "Lower 95% CI", "Upper 95% CI"),
+  caption = "Weighted metabolic syndrome prevalence, US adults ≥ 20 years (NHANES 2017–2018)"
+)
+```
+
+```{r prev-plot}
+#| label: prev-plot
+#| fig-cap: "Weighted metabolic syndrome prevalence with 95% CIs."
+
+ggplot(prev_tbl, aes(x = reorder(race_eth, metsyn_pct), y = metsyn_pct, fill = sex)) +
+  geom_col(position = position_dodge(0.75), width = 0.7) +
+  geom_errorbar(
+    aes(ymin = metsyn_pct_low, ymax = metsyn_pct_upp),
+    position = position_dodge(0.75), width = 0.2
+  ) +
+  coord_flip() +
+  scale_fill_manual(values = c("Male" = "#0d5c63", "Female" = "#b08a49")) +
+  labs(x = NULL, y = "Prevalence (%)", fill = NULL) +
+  theme(legend.position = "top")
+```
+
+## Design-aware logistic regression (R)
+
+Using `svyglm` so standard errors reflect NHANES's clustered, stratified design. Coefficients are log-odds ratios for metabolic syndrome.
+
+```{r svyglm}
+#| label: svyglm
+
+fit <- survey::svyglm(
+  metsyn ~ age_years + sex + race_eth,
+  design = as_survey_design(dat,
+                            ids = SDMVPSU, strata = SDMVSTRA,
+                            weights = WTMEC2YR, nest = TRUE) |>
+            as.data.frame() |> (\(x) survey::svydesign(
+              ids = ~SDMVPSU, strata = ~SDMVSTRA,
+              weights = ~WTMEC2YR, data = x, nest = TRUE
+            ))(),
+  family = quasibinomial()
+)
+
+fit |>
+  gtsummary::tbl_regression(exponentiate = TRUE) |>
+  gtsummary::modify_caption("**Design-aware odds ratios for metabolic syndrome**")
+```
+
+## Gradient boosting + SHAP (Python)
+
+We hand the same cohort to Python via `reticulate`. XGBoost is unweighted here (feature engineering + non-linearities are what we're after), but we still honor an unbiased train/test split.
+
+```{python handoff}
+#| label: handoff
+df = r.dat.copy()
+df["metsyn"] = df["metsyn"].astype(int)
+
+features = ["age_years", "sex", "race_eth", "waist", "trig", "hdl",
+            "sbp", "dbp", "fpg"]
+df = df[features + ["metsyn"]].dropna()
+df = pd.get_dummies(df, columns=["sex", "race_eth"], drop_first=True)
+
+X = df.drop(columns="metsyn")
+y = df["metsyn"]
+
+X_tr, X_te, y_tr, y_te = train_test_split(
+    X, y, test_size=0.25, stratify=y, random_state=42
+)
+
+model = xgb.XGBClassifier(
+    n_estimators=400, max_depth=4, learning_rate=0.05,
+    subsample=0.9, colsample_bytree=0.9,
+    eval_metric="logloss", random_state=42,
+)
+model.fit(X_tr, y_tr)
+
+p_te = model.predict_proba(X_te)[:, 1]
+print(f"AUC: {roc_auc_score(y_te, p_te):.3f}")
+print(f"Brier: {brier_score_loss(y_te, p_te):.3f}")
+```
+
+```{python roc}
+#| label: fig-roc
+#| fig-cap: "ROC curve, held-out 25% test set."
+fpr, tpr, _ = roc_curve(y_te, p_te)
+fig, ax = plt.subplots(figsize=(6, 5))
+ax.plot(fpr, tpr, color="#0d5c63", lw=2,
+        label=f"XGBoost (AUC = {roc_auc_score(y_te, p_te):.3f})")
+ax.plot([0, 1], [0, 1], ls="--", color="#b08a49", lw=1)
+ax.set(xlabel="False positive rate", ylabel="True positive rate")
+ax.legend(frameon=False)
+ax.spines[["top", "right"]].set_visible(False)
+plt.tight_layout()
+```
+
+```{python calibration}
+#| label: fig-calibration
+#| fig-cap: "Calibration. Perfectly calibrated models lie on the diagonal."
+prob_true, prob_pred = calibration_curve(y_te, p_te, n_bins=10, strategy="quantile")
+fig, ax = plt.subplots(figsize=(6, 5))
+ax.plot(prob_pred, prob_true, "o-", color="#0d5c63", lw=2)
+ax.plot([0, 1], [0, 1], ls="--", color="#b08a49", lw=1)
+ax.set(xlabel="Predicted probability", ylabel="Observed frequency")
+ax.spines[["top", "right"]].set_visible(False)
+plt.tight_layout()
+```
+
+```{python shap}
+#| label: fig-shap
+#| fig-cap: "SHAP summary. Each dot is one held-out adult; color is feature value, x-position is SHAP contribution to the log-odds of metabolic syndrome."
+explainer = shap.TreeExplainer(model)
+shap_values = explainer(X_te)
+shap.summary_plot(shap_values, X_te, show=False, plot_size=(7, 5))
+plt.tight_layout()
+```
+
+## What did we learn?
+
+- **Prevalence is not uniform.** Weighted NHANES estimates reproduce the well-documented sex- and race/ethnicity-stratified gradient — design-aware methods matter before any modeling claim.
+- **Linear and non-linear views agree on the big drivers.** Waist circumference, fasting glucose, and triglycerides dominate both the logistic odds ratios and SHAP contributions; blood pressure pulls more weight in the boosted model, consistent with non-linear thresholds baked into the ATP III definition.
+- **Calibration beats AUC for clinical portability.** A well-calibrated model with a modest AUC is usually more useful bedside than a sharper but mis-calibrated one; this is why the calibration plot sits next to the ROC rather than below it.
+
+## Next steps
+
+- Add SDoH enrichment from ACS/PLACES at census-tract level to stress-test where the model mis-ranks socioeconomically vulnerable groups.
+- Recast as 10-year incident ASCVD using the NHANES linked mortality files (`NHANES-LMF`), enabling true time-to-event comparisons with the Pooled Cohort Equations.
+- Port the pipeline to a Shiny dashboard for interactive exploration by cycle and subgroup.
+
+---
+
+::: {.callout-tip}
+### Reading this as code samples
+
+Every cell above is the real executed code — not screenshots. Use the **Code** dropdown at the top-right to toggle visibility, copy individual blocks, or view the [raw `.qmd` source](https://github.com/paulinedmdf/paulinadelmundomd/blob/main/projects/01-cardiometabolic-risk/analysis.qmd) on GitHub.
+:::

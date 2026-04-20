@@ -1,0 +1,283 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Projects · Paulina Del Mundo Del Fierro, MD, MPH</title>
+  <meta name="description" content="Reproducible R + Python analyses of public health datasets — NHANES, CDC, and beyond." />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,wght@0,400;0,600;0,700&family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="../styles.css" />
+  <style>
+    .projects-hero {
+      padding: 5rem 0 3rem;
+      border-bottom: 1px solid var(--line);
+      background:
+        radial-gradient(900px 400px at 90% -10%, rgba(13, 92, 99, 0.1), transparent 60%),
+        var(--paper);
+    }
+    .projects-hero h1 {
+      font-family: var(--font-serif);
+      font-size: clamp(2rem, 4vw, 3rem);
+      margin: 0.4rem 0 1rem;
+    }
+    .projects-hero p {
+      color: var(--ink-soft);
+      max-width: 42rem;
+      font-size: 1.05rem;
+    }
+    .project-list {
+      list-style: none;
+      padding: 0;
+      margin: 0;
+      display: grid;
+      gap: 1.25rem;
+    }
+    .project-card {
+      display: grid;
+      grid-template-columns: 110px 1fr auto;
+      gap: 1.5rem;
+      align-items: center;
+      padding: 1.75rem;
+      background: var(--white);
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      box-shadow: var(--shadow-sm);
+      transition: transform 0.2s ease, box-shadow 0.2s ease, border-color 0.2s ease;
+    }
+    .project-card:hover {
+      transform: translateY(-2px);
+      box-shadow: var(--shadow-md);
+      border-color: var(--accent);
+    }
+    .project-num {
+      font-family: var(--font-serif);
+      font-size: 2.4rem;
+      color: var(--accent);
+      line-height: 1;
+    }
+    .project-title {
+      font-family: var(--font-serif);
+      font-size: 1.25rem;
+      margin: 0 0 0.35rem;
+      color: var(--ink);
+    }
+    .project-blurb {
+      margin: 0 0 0.6rem;
+      color: var(--ink-soft);
+      font-size: 0.95rem;
+    }
+    .project-tags {
+      list-style: none;
+      padding: 0;
+      margin: 0;
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.4rem;
+    }
+    .project-tags li {
+      font-size: 0.75rem;
+      padding: 0.2rem 0.6rem;
+      border-radius: 999px;
+      background: var(--accent-soft);
+      color: var(--accent);
+      font-weight: 600;
+      letter-spacing: 0.04em;
+    }
+    .project-tags li.py { background: #fdf1e0; color: #8a6a33; }
+    .project-tags li.r  { background: #e6f1f2; color: #0d5c63; }
+    .project-cta {
+      font-weight: 600;
+      color: var(--accent);
+      white-space: nowrap;
+    }
+    .project-cta::after {
+      content: " →";
+      transition: transform 0.2s ease;
+      display: inline-block;
+    }
+    .project-card:hover .project-cta::after { transform: translateX(4px); }
+    .project-status {
+      display: inline-block;
+      font-size: 0.7rem;
+      text-transform: uppercase;
+      letter-spacing: 0.12em;
+      padding: 0.15rem 0.5rem;
+      border-radius: 4px;
+      background: var(--paper-2);
+      color: var(--muted);
+      margin-left: 0.5rem;
+      vertical-align: middle;
+      font-weight: 600;
+    }
+    .project-status.live { background: var(--accent-soft); color: var(--accent); }
+    .back-link {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.4rem;
+      color: var(--muted);
+      font-size: 0.9rem;
+      text-transform: uppercase;
+      letter-spacing: 0.1em;
+      font-weight: 600;
+    }
+    .back-link:hover { color: var(--accent); }
+
+    @media (max-width: 640px) {
+      .project-card {
+        grid-template-columns: 1fr;
+        gap: 0.5rem;
+      }
+      .project-num { font-size: 1.8rem; }
+      .project-cta { justify-self: start; }
+    }
+  </style>
+</head>
+<body>
+  <header class="site-header">
+    <div class="container nav">
+      <a href="../index.html" class="brand">
+        <span class="brand-mark">PDM</span>
+        <span class="brand-name">Paulina Del Mundo, MD, MPH</span>
+      </a>
+      <nav aria-label="Primary">
+        <ul class="nav-links">
+          <li><a href="../index.html#about">About</a></li>
+          <li><a href="../index.html#experience">Experience</a></li>
+          <li><a href="./">Projects</a></li>
+          <li><a href="../index.html#publications">Publications</a></li>
+          <li><a href="../index.html#contact">Contact</a></li>
+        </ul>
+      </nav>
+      <button class="nav-toggle" aria-label="Open navigation" aria-expanded="false">
+        <span></span><span></span><span></span>
+      </button>
+    </div>
+  </header>
+
+  <main>
+    <section class="projects-hero">
+      <div class="container">
+        <a href="../index.html" class="back-link">&larr; Back to home</a>
+        <h1>Projects &amp; case studies</h1>
+        <p>
+          Reproducible analyses of publicly available health datasets — NHANES, CDC WONDER,
+          SEER, openFDA — written in a mix of <strong>R</strong> and <strong>Python</strong> and
+          rendered with Quarto so the full code, outputs, and figures sit on a single page.
+          Every project links to its GitHub source.
+        </p>
+      </div>
+    </section>
+
+    <section class="section">
+      <div class="container">
+        <ul class="project-list">
+          <li>
+            <a class="project-card" href="https://github.com/paulinedmdf/paulinadelmundomd/blob/main/projects/01-cardiometabolic-risk/analysis.qmd">
+              <span class="project-num">01</span>
+              <div>
+                <h2 class="project-title">
+                  Cardiometabolic Risk in NHANES 2017–2018
+                  <span class="project-status">Source</span>
+                </h2>
+                <p class="project-blurb">
+                  A polyglot walk through complex survey design, weighted prevalence,
+                  design-aware logistic regression, and gradient-boosted risk prediction
+                  with SHAP interpretability — on the same cohort, in the same document.
+                  Rendered HTML will live at <code>01-cardiometabolic-risk/analysis.html</code>
+                  once Quarto is run locally and pushed.
+                </p>
+                <ul class="project-tags">
+                  <li class="r">R · survey · srvyr</li>
+                  <li class="py">Python · scikit-learn · XGBoost · SHAP</li>
+                  <li>NHANES</li>
+                  <li>Metabolic syndrome</li>
+                </ul>
+              </div>
+              <span class="project-cta">View .qmd</span>
+            </a>
+          </li>
+
+          <li>
+            <div class="project-card" style="cursor: default;">
+              <span class="project-num" style="color: var(--muted);">02</span>
+              <div>
+                <h2 class="project-title">
+                  US County SDoH Mortality Atlas
+                  <span class="project-status">Planned</span>
+                </h2>
+                <p class="project-blurb">
+                  Merge CDC WONDER all-cause and cause-specific mortality with ACS 5-year
+                  and CDC PLACES to build a PCA-based SDoH composite; model disparities
+                  with negative binomial regression; ship a Leaflet county map.
+                </p>
+                <ul class="project-tags">
+                  <li class="r">R · tidycensus · sf · leaflet</li>
+                  <li>CDC WONDER</li>
+                  <li>SDoH</li>
+                </ul>
+              </div>
+              <span class="project-cta" style="color: var(--muted);">Coming soon</span>
+            </div>
+          </li>
+
+          <li>
+            <div class="project-card" style="cursor: default;">
+              <span class="project-num" style="color: var(--muted);">03</span>
+              <div>
+                <h2 class="project-title">
+                  openFDA Pharmacovigilance Signal Detection
+                  <span class="project-status">Planned</span>
+                </h2>
+                <p class="project-blurb">
+                  Disproportionality analysis (PRR, ROR, IC) on FAERS adverse-event reports,
+                  aggregated by RxNorm drug class — with an interactive signal explorer.
+                </p>
+                <ul class="project-tags">
+                  <li class="py">Python · pandas · plotly</li>
+                  <li>openFDA FAERS</li>
+                  <li>RxNorm</li>
+                </ul>
+              </div>
+              <span class="project-cta" style="color: var(--muted);">Coming soon</span>
+            </div>
+          </li>
+
+          <li>
+            <div class="project-card" style="cursor: default;">
+              <span class="project-num" style="color: var(--muted);">04</span>
+              <div>
+                <h2 class="project-title">
+                  TCGA Somatic Mutations &amp; Survival
+                  <span class="project-status">Planned</span>
+                </h2>
+                <p class="project-blurb">
+                  Integrate TCGA somatic mutation data with clinical outcomes for a solid-tumor
+                  cohort; fit Cox proportional hazards and differential expression; stratify
+                  Kaplan–Meier curves by mutation status.
+                </p>
+                <ul class="project-tags">
+                  <li class="r">R · TCGAbiolinks · DESeq2 · survival</li>
+                  <li>TCGA</li>
+                  <li>Genomics</li>
+                </ul>
+              </div>
+              <span class="project-cta" style="color: var(--muted);">Coming soon</span>
+            </div>
+          </li>
+        </ul>
+      </div>
+    </section>
+  </main>
+
+  <footer class="site-footer">
+    <div class="container footer-inner">
+      <p>&copy; <span id="year"></span> Paulina Del Mundo Del Fierro, MD, MPH</p>
+      <p class="footer-tag">Physician &middot; Clinical Data Scientist &middot; Public Health Researcher</p>
+    </div>
+  </footer>
+
+  <script src="../script.js"></script>
+</body>
+</html>

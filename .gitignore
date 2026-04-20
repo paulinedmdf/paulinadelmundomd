@@ -205,3 +205,26 @@ cython_debug/
 marimo/_static/
 marimo/_lsp/
 __marimo__/
+
+# ---------- Quarto ----------
+/.quarto/
+_freeze/
+*_files/
+*_cache/
+
+# ---------- R ----------
+.Rhistory
+.Rapp.history
+.RData
+.Ruserdata
+.Rproj.user/
+*.Rproj
+renv/library/
+renv/local/
+renv/cellar/
+renv/staging/
+
+# ---------- NHANES & derived data ----------
+# Analyses re-download from the CDC on render — never commit raw downloads
+projects/**/data/
+!projects/**/data/.gitkeep
