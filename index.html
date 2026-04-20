@@ -1,0 +1,489 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Paulina Del Mundo Del Fierro, MD, MPH — Physician & Clinical Data Scientist</title>
+  <meta name="description" content="Physician and clinical data scientist working at the intersection of real-world evidence, health equity, and digital health. MD, MPH (Johns Hopkins)." />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,wght@0,400;0,600;0,700;1,400&family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <header class="site-header">
+    <div class="container nav">
+      <a href="#top" class="brand">
+        <span class="brand-mark">PDM</span>
+        <span class="brand-name">Paulina Del Mundo, MD, MPH</span>
+      </a>
+      <nav aria-label="Primary">
+        <ul class="nav-links">
+          <li><a href="#about">About</a></li>
+          <li><a href="#experience">Experience</a></li>
+          <li><a href="#education">Education</a></li>
+          <li><a href="#publications">Publications</a></li>
+          <li><a href="#leadership">Leadership</a></li>
+          <li><a href="#contact">Contact</a></li>
+        </ul>
+      </nav>
+      <button class="nav-toggle" aria-label="Open navigation" aria-expanded="false">
+        <span></span><span></span><span></span>
+      </button>
+    </div>
+  </header>
+
+  <main id="top">
+    <section class="hero">
+      <div class="container hero-grid">
+        <div class="hero-copy">
+          <p class="eyebrow">Physician &middot; Clinical Data Scientist &middot; Public Health Researcher</p>
+          <h1>Paulina Del Mundo<br /><span class="hero-accent">Del Fierro, MD, MPH</span></h1>
+          <p class="lede">
+            I work at the intersection of medicine, real-world evidence, and health equity —
+            turning EHR, claims, and social-determinants data into decisions that shape
+            care, policy, and outcomes across millions of patients.
+          </p>
+          <div class="hero-cta">
+            <a class="btn btn-primary" href="#experience">View experience</a>
+            <a class="btn btn-ghost" href="#contact">Get in touch</a>
+          </div>
+          <dl class="hero-stats">
+            <div>
+              <dt>Patient encounters analyzed</dt>
+              <dd>24.6M+</dd>
+            </div>
+            <div>
+              <dt>Community hospitals</dt>
+              <dd>50+</dd>
+            </div>
+            <div>
+              <dt>First-author publications</dt>
+              <dd>2</dd>
+            </div>
+            <div>
+              <dt>MPH GPA, Johns Hopkins</dt>
+              <dd>3.90</dd>
+            </div>
+          </dl>
+        </div>
+        <aside class="hero-card" aria-label="At a glance">
+          <h2 class="card-title">At a glance</h2>
+          <ul class="card-list">
+            <li><strong>Credentials</strong><span>MD &middot; MPH Epi &amp; Biostats &middot; USMLE 1/2/3</span></li>
+            <li><strong>Based in</strong><span>Audubon, New Jersey &middot; US Permanent Resident</span></li>
+            <li><strong>Currently</strong><span>Clinical Data Scientist, Institute for Health Metrics</span></li>
+            <li><strong>Focus</strong><span>Real-world evidence, SDoH, predictive modeling, health equity</span></li>
+            <li><strong>Toolkit</strong><span>R &middot; Python &middot; SQL (AWS) &middot; Stata &middot; Shiny &middot; Tableau</span></li>
+          </ul>
+        </aside>
+      </div>
+    </section>
+
+    <section id="about" class="section">
+      <div class="container section-grid">
+        <div class="section-intro">
+          <p class="section-kicker">About</p>
+          <h2>Bridging the clinic, the dataset, and the policy brief.</h2>
+        </div>
+        <div class="section-body">
+          <p>
+            I'm a physician trained in general and occupational medicine with a Master of Public Health
+            in Epidemiology &amp; Biostatistics from Johns Hopkins. My work sits where clinical care,
+            computational methods, and policy meet: designing real-world evidence studies, building
+            predictive models on EHR and claims data, and translating findings for pharma, biotech,
+            and federal-grant audiences.
+          </p>
+          <p>
+            Before moving into data science full-time, I practiced in hospital, outpatient, and
+            telehealth settings; led systematic reviews that shaped national oncology guidelines in the
+            Philippines; and drove policy work integrating accurate cause-of-death certification into
+            medical education nationwide. I keep one foot in each world on purpose — the questions
+            worth modeling are the ones clinicians and patients actually live.
+          </p>
+          <ul class="pillars">
+            <li>
+              <h3>Real-world evidence</h3>
+              <p>EHR, claims, and SDoH pipelines benchmarked against the National Inpatient Sample; cohort analyses for pharma and biotech consulting clients.</p>
+            </li>
+            <li>
+              <h3>Methods &amp; modeling</h3>
+              <p>Predictive modeling of mortality and readmission risk, PCA-based SDoH composites, k-means clustering, regression-based imputation, LLM-assisted analytics.</p>
+            </li>
+            <li>
+              <h3>Evidence &amp; policy</h3>
+              <p>PICO-framed systematic reviews, GRADE evidence synthesis, NIH and AHRQ grant writing, and legislative advocacy that changes what gets taught and paid for.</p>
+            </li>
+          </ul>
+        </div>
+      </div>
+    </section>
+
+    <section id="skills" class="section section-muted">
+      <div class="container">
+        <p class="section-kicker">Capabilities</p>
+        <h2 class="section-title">What I bring to a team</h2>
+        <div class="skills-grid">
+          <article class="skill-card">
+            <h3>Clinical data engineering</h3>
+            <p>EHR and claims pipelines with ICD-10, RxNorm, LOINC, and SNOMED-CT; anonymization, classification, imputation, and harmonization across heterogeneous sources.</p>
+          </article>
+          <article class="skill-card">
+            <h3>Statistical &amp; ML methods</h3>
+            <p>Negative binomial and ordinal logistic regression, Markov models for ICERs, k-means clustering, PCA, and predictive modeling for patient outcomes.</p>
+          </article>
+          <article class="skill-card">
+            <h3>Social determinants &amp; equity</h3>
+            <p>Composite SDoH indices merging ACS and CDC data with clinical records; geocoding and spatial analysis of healthcare access patterns.</p>
+          </article>
+          <article class="skill-card">
+            <h3>Evidence synthesis</h3>
+            <p>PICO-framed systematic reviews, GRADE evidence ratings, expert-consensus methods, and guideline development for national clinical practice.</p>
+          </article>
+          <article class="skill-card">
+            <h3>Grant &amp; scientific writing</h3>
+            <p>NIH and AHRQ proposals for health equity, peer-reviewed first-author publications, and ISPOR poster presentation.</p>
+          </article>
+          <article class="skill-card">
+            <h3>Clinical practice</h3>
+            <p>General and occupational medicine across hospital, outpatient, and telehealth settings; COVID-19 response and workplace safety protocol design.</p>
+          </article>
+        </div>
+
+        <div class="toolkit">
+          <div>
+            <h4>Languages &amp; stacks</h4>
+            <ul class="tags">
+              <li>R (tidyverse, data.table, ggplot2, survminer, officer, Shiny)</li>
+              <li>Python</li>
+              <li>SQL (AWS)</li>
+              <li>Stata</li>
+            </ul>
+          </div>
+          <div>
+            <h4>Clinical terminologies</h4>
+            <ul class="tags">
+              <li>ICD-10</li>
+              <li>RxNorm</li>
+              <li>LOINC</li>
+              <li>SNOMED-CT</li>
+            </ul>
+          </div>
+          <div>
+            <h4>Methods</h4>
+            <ul class="tags">
+              <li>RWE study design</li>
+              <li>NIS benchmarking</li>
+              <li>SDoH composite indexing</li>
+              <li>Predictive modeling</li>
+              <li>Geospatial analytics</li>
+              <li>LLM-based analytics</li>
+              <li>PICO &middot; GRADE</li>
+            </ul>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section id="experience" class="section">
+      <div class="container">
+        <p class="section-kicker">Experience</p>
+        <h2 class="section-title">Selected professional experience</h2>
+        <ol class="timeline">
+          <li>
+            <div class="timeline-meta">
+              <time>Jan 2024 &ndash; Present</time>
+              <p class="timeline-org">Institute for Health Metrics &middot; Manchester, MA</p>
+            </div>
+            <div class="timeline-body">
+              <h3>Clinical Data Scientist</h3>
+              <ul>
+                <li>Processed and analyzed real-world data — EMR, claims, and SDoH measures spanning 24.6M+ patient encounters across 50+ community hospitals — using ICD-10, RxNorm, LOINC, and SNOMED-CT for cleaning, anonymization, classification, imputation, analysis, visualization, and interactive dashboards.</li>
+                <li>Built R and Python machine-learning pipelines for predictive modeling of mortality and readmission risk, comorbidity analysis, LLM-based SDoH analysis, and geocoding for spatial analysis of access patterns.</li>
+                <li>Merged ACS and CDC datasets with clinical data into composite SDoH indices via PCA to enrich predictive models with community-level variables.</li>
+                <li>Benchmarked a proprietary EHR database against the National Inpatient Sample to assess representativeness; performed k-means clustering and regression-based imputation to preserve dataset integrity.</li>
+                <li>Supported 5+ pharma, biotech, and research consulting clients via cohort analyses; authored NIH and AHRQ grant proposals for health equity projects.</li>
+              </ul>
+            </div>
+          </li>
+
+          <li>
+            <div class="timeline-meta">
+              <time>Oct 2023 &ndash; Mar 2024</time>
+              <p class="timeline-org">Johns Hopkins Center for Communication Programs &middot; Baltimore, MD</p>
+            </div>
+            <div class="timeline-body">
+              <h3>Graduate Research Data Analyst</h3>
+              <ul>
+                <li>Evaluated USAID-funded ReachHealth Philippines and Philippine DOH COVID-19 campaigns using Stata and Python regression analyses within public-health communication frameworks to inform campaign strategy.</li>
+              </ul>
+            </div>
+          </li>
+
+          <li>
+            <div class="timeline-meta">
+              <time>Oct 2022 &ndash; May 2023</time>
+              <p class="timeline-org">Philippine Children's Medical Center &middot; Quezon City</p>
+            </div>
+            <div class="timeline-body">
+              <h3>Evidence Review Expert</h3>
+              <ul>
+                <li>Conducted a systematic review establishing DOH-supported Oncology CPGs for Wilms tumor; achieved expert consensus on loss-of-heterozygosity 1p/16q testing, influencing national chemotherapy protocols and insurer coverage discussions.</li>
+              </ul>
+            </div>
+          </li>
+
+          <li>
+            <div class="timeline-meta">
+              <time>Jun 2020 &ndash; Aug 2022</time>
+              <p class="timeline-org">University of the Philippines &middot; Manila</p>
+            </div>
+            <div class="timeline-body">
+              <h3>Advocacy Officer &amp; Policy Consultant</h3>
+              <ul>
+                <li>Secured legislative integration of Medical Certification of Cause of Death (MCCOD) into national medical education standards, with endorsements from APMC, PRC, and CHED — improving mortality data accuracy across 30 medical schools.</li>
+                <li>Designed a DOH-funded stakeholder engagement program committing 108 deans and faculty nationwide; published PRECEDE-PROCEED research on implementation outcomes.</li>
+                <li>Developed telemedicine policy recommendations and organized an FMEA workshop producing Tableau sentiment dashboards on national telehealth implementation risks.</li>
+              </ul>
+            </div>
+          </li>
+
+          <li>
+            <div class="timeline-meta">
+              <time>Nov 2020 &ndash; Jun 2022</time>
+              <p class="timeline-org">Docquity, Inc. &middot; Pasig City</p>
+            </div>
+            <div class="timeline-body">
+              <h3>Medical Consultant &amp; Writer</h3>
+              <ul>
+                <li>Cross-border health-system analysis across the Philippines, Singapore, India, and Indonesia; developed CME content for the Philippine Pediatric Society and Philippine College of Surgeons.</li>
+              </ul>
+            </div>
+          </li>
+
+          <li>
+            <div class="timeline-meta">
+              <time>Mar 2020 &ndash; Nov 2020</time>
+              <p class="timeline-org">Enago &middot; New York, NY</p>
+            </div>
+            <div class="timeline-body">
+              <h3>Medical Editor</h3>
+              <ul>
+                <li>Elevated medical writing across clinical, pharmaceutical, and molecular medicine domains, ensuring publishable quality in international peer-reviewed journals.</li>
+              </ul>
+            </div>
+          </li>
+
+          <li>
+            <div class="timeline-meta">
+              <time>Oct 2019 &ndash; Sep 2020</time>
+              <p class="timeline-org">Unilever &middot; Pasig City</p>
+            </div>
+            <div class="timeline-body">
+              <h3>Occupational Medicine Physician</h3>
+              <ul>
+                <li>Supervised occupational health for 300 employees; implemented COVID-19 safety protocols in partnership with OSH and HR teams.</li>
+              </ul>
+            </div>
+          </li>
+
+          <li>
+            <div class="timeline-meta">
+              <time>Apr 2019 &ndash; Oct 2019</time>
+              <p class="timeline-org">Manila, Philippines</p>
+            </div>
+            <div class="timeline-body">
+              <h3>General Practice Locum Tenens &middot; Consultant</h3>
+            </div>
+          </li>
+
+          <li>
+            <div class="timeline-meta">
+              <time>Jul 2017 &ndash; Jun 2018</time>
+              <p class="timeline-org">Amang Rodriguez Memorial Medical Center &middot; Marikina</p>
+            </div>
+            <div class="timeline-body">
+              <h3>Post-Graduate Medical Intern</h3>
+              <ul>
+                <li>Diagnosed and treated patients across high-volume medical, surgical, obstetric, and pediatric inpatient, outpatient, emergency, and community settings.</li>
+              </ul>
+            </div>
+          </li>
+
+          <li>
+            <div class="timeline-meta">
+              <time>Mar 2015 &ndash; May 2015</time>
+              <p class="timeline-org">University of the Philippines, National Telehealth Center &middot; Manila</p>
+            </div>
+            <div class="timeline-body">
+              <h3>Research Assistant</h3>
+            </div>
+          </li>
+        </ol>
+      </div>
+    </section>
+
+    <section id="education" class="section section-muted">
+      <div class="container">
+        <p class="section-kicker">Education &amp; licensure</p>
+        <h2 class="section-title">Training</h2>
+        <div class="edu-grid">
+          <article class="edu-card">
+            <h3>Master of Public Health &mdash; Epidemiology &amp; Biostatistics</h3>
+            <p class="edu-school">Johns Hopkins Bloomberg School of Public Health &middot; Baltimore, MD</p>
+            <p class="edu-dates">Jun 2022 &ndash; Dec 2023</p>
+            <ul>
+              <li>GPA 3.90; Public Health Economics Graduate Certificate.</li>
+              <li>Capstone: Factors Associated with the Retention of Medical Graduates in Clinical Practice in the Philippines — novel social-media survey methods, statistical sampling design, regression model refinement, IRB approval.</li>
+              <li>Modeled ACS, HRSA, and CDC data with negative binomial regression on healthcare worker shortage and ICD-10 mortality rates; ordinal logistic regression on MEPS data; Markov models for digital-health ICERs.</li>
+            </ul>
+          </article>
+          <article class="edu-card">
+            <h3>Doctor of Medicine</h3>
+            <p class="edu-school">University of Perpetual Help &middot; Ateneo School of Medicine &amp; Public Health, Las Piñas, Philippines</p>
+            <p class="edu-dates">Jun 2011 &ndash; May 2017</p>
+            <ul>
+              <li>GPA 3.03; Top 13.</li>
+              <li>First place, Annual Clinico-Pathologic Conference diagnostic competition, 2016.</li>
+              <li>5th place poster, Predictors of Newborn Screening Utilization in Quezon City.</li>
+            </ul>
+          </article>
+          <article class="edu-card">
+            <h3>BS in Health Sciences</h3>
+            <p class="edu-school">Ateneo de Manila University &middot; Quezon City</p>
+            <p class="edu-dates">Jun 2007 &ndash; Apr 2011</p>
+            <ul>
+              <li>GPA 3.24; full-tuition college scholarship; dean's list 2008&ndash;2010.</li>
+            </ul>
+          </article>
+          <article class="edu-card edu-card-licensure">
+            <h3>Medical licensures</h3>
+            <ul>
+              <li>United States Medical Licensure Examinations &mdash; Steps 1, 2, and 3.</li>
+              <li>Philippine Physician Licensure Exam &mdash; 84.92nd percentile.</li>
+            </ul>
+          </article>
+        </div>
+      </div>
+    </section>
+
+    <section id="publications" class="section">
+      <div class="container section-grid">
+        <div class="section-intro">
+          <p class="section-kicker">Publications &amp; presentations</p>
+          <h2>Peer-reviewed &amp; conference work</h2>
+        </div>
+        <div class="section-body">
+          <h3 class="subhead">First-author peer-reviewed publications</h3>
+          <ol class="pub-list">
+            <li>
+              <p class="pub-title">A PRECEDE-PROCEED Approach in the Advocacy for Computer-based Education on Correct Medical Certification of Cause of Death among Physician-Learners.</p>
+              <p class="pub-meta">Del Mundo MPFA, et al. &middot; <em>Acta Medica Philippina</em> 2023; 57(8).</p>
+              <p class="pub-doi"><a href="https://doi.org/10.47895/amp.vi0.4639" target="_blank" rel="noopener">doi:10.47895/amp.vi0.4639</a></p>
+            </li>
+            <li>
+              <p class="pub-title">Predictors of Newborn Screening Utilization in Quezon City, Philippines.</p>
+              <p class="pub-meta">Del Mundo MPFA, et al. &middot; <em>International Journal of Health, Wellness and Society</em> 2022; 10(4).</p>
+              <p class="pub-doi"><a href="https://doi.org/10.18848/2156-8960/CGP/v10i04/61-76" target="_blank" rel="noopener">doi:10.18848/2156-8960/CGP/v10i04/61-76</a></p>
+            </li>
+          </ol>
+
+          <h3 class="subhead">Conference presentations</h3>
+          <ul class="pub-list">
+            <li>
+              <p class="pub-title">Characterizing Cardiovascular Disease Patients in US Community Hospitals Using insightsDB.</p>
+              <p class="pub-meta">Borda H, Zolotor A, Del Mundo P. &middot; Poster, ISPOR 2024, Atlanta, GA.</p>
+            </li>
+          </ul>
+
+          <h3 class="subhead">Contract speaking engagements</h3>
+          <ul class="pub-list">
+            <li><p class="pub-title">Public Health and Education Data Analytics Online Course</p><p class="pub-meta">RTI International / USAID &middot; May&ndash;Sep 2022</p></li>
+            <li><p class="pub-title">International &amp; Country-Specific Strategies in eHealth &amp; Public Health Informatics</p><p class="pub-meta">Riverside College &middot; Apr 2022</p></li>
+            <li><p class="pub-title">COVID-19 Updates</p><p class="pub-meta">White Cloak Technologies Inc. &middot; May 2021</p></li>
+            <li><p class="pub-title">Digital Healthcare in the Philippines: Are We Ready?</p><p class="pub-meta">CareGo Vaccination Booking Platform &middot; Sep 2020</p></li>
+          </ul>
+        </div>
+      </div>
+    </section>
+
+    <section id="leadership" class="section section-muted">
+      <div class="container">
+        <p class="section-kicker">Leadership &amp; service</p>
+        <h2 class="section-title">Professional organizations and roles</h2>
+
+        <div class="leadership-grid">
+          <article class="lead-card">
+            <p class="lead-dates">Dec 2021 &ndash; Present</p>
+            <h3>Technical &amp; Policy Committee Member</h3>
+            <p class="lead-org">Philippine Society of Public Health Physicians &middot; Manila</p>
+            <p>Led the Digital Health Technical Working Group, increasing peer involvement in digital health advancements and fostering cross-organization collaboration.</p>
+          </article>
+          <article class="lead-card">
+            <p class="lead-dates">Mar 2023 &ndash; Aug 2023</p>
+            <h3>Communications &amp; Collaborations Committee Co-Lead</h3>
+            <p class="lead-org">HealthAI Switzerland &middot; Geneva</p>
+            <p>Co-led a WHO initiative to develop a global digital-health and AI capacity-building framework for course creators, employers, and learners.</p>
+          </article>
+          <article class="lead-card">
+            <p class="lead-dates">Jun 2013 &ndash; Apr 2014</p>
+            <h3>Co-Founder &amp; President, Think Tank ASMPH</h3>
+            <p class="lead-org">Ateneo School of Medicine &amp; Public Health &middot; Manila</p>
+            <p>Founded the first health-research student organization at ASMPH; won Best Organization Project for the High5Life Forum, connecting NGO and government health experts to 150+ attendees.</p>
+          </article>
+        </div>
+
+        <div class="memberships">
+          <h3 class="subhead">Professional memberships</h3>
+          <ul>
+            <li>International Society for Pharmacoeconomics &amp; Outcomes Research &mdash; Real-World Evidence Special Interest Group</li>
+            <li>American Medical Informatics Association</li>
+            <li>Philippine Society of Public Health Physicians &mdash; Digital Health Committee Head; Technical &amp; Policy Committee Member</li>
+            <li>Philippine College of Occupational Medicine</li>
+          </ul>
+        </div>
+      </div>
+    </section>
+
+    <section id="contact" class="section section-contact">
+      <div class="container contact-grid">
+        <div>
+          <p class="section-kicker">Contact</p>
+          <h2>Let's talk about evidence that moves care forward.</h2>
+          <p class="contact-lede">
+            Open to conversations on real-world evidence, health-equity research, digital health, and
+            physician-scientist collaborations. I reply within a few business days.
+          </p>
+        </div>
+        <ul class="contact-list">
+          <li>
+            <span class="contact-label">Email</span>
+            <a href="mailto:pauline.del.mundo@gmail.com">pauline.del.mundo@gmail.com</a>
+          </li>
+          <li>
+            <span class="contact-label">Phone</span>
+            <a href="tel:+16095092411">+1 (609) 509-2411</a>
+          </li>
+          <li>
+            <span class="contact-label">LinkedIn</span>
+            <a href="https://linkedin.com/in/paulinedelmundo" target="_blank" rel="noopener">linkedin.com/in/paulinedelmundo</a>
+          </li>
+          <li>
+            <span class="contact-label">Location</span>
+            <span>Audubon, New Jersey</span>
+          </li>
+        </ul>
+      </div>
+    </section>
+  </main>
+
+  <footer class="site-footer">
+    <div class="container footer-inner">
+      <p>&copy; <span id="year"></span> Paulina Del Mundo Del Fierro, MD, MPH</p>
+      <p class="footer-tag">Physician &middot; Clinical Data Scientist &middot; Public Health Researcher</p>
+    </div>
+  </footer>
+
+  <script src="script.js"></script>
+</body>
+</html>
