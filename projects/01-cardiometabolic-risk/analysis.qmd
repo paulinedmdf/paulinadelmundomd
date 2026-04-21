@@ -74,7 +74,7 @@ from sklearn.calibration import calibration_curve
 import xgboost as xgb
 import shap
 
-plt.rcParams.update({"figure.dpi": 110, "font.family": "Inter, system-ui, sans-serif"})
+plt.rcParams.update({"figure.dpi": 110})
 ```
 
 ## Pulling the NHANES cycle
@@ -120,6 +120,7 @@ dat <- nhanes_raw |>
   transmute(
     SEQN, WTMEC2YR, SDMVPSU, SDMVSTRA,
     sex, age_years, race_eth,
+    bmi       = BMXBMI,
     waist     = BMXWAIST,
     trig      = LBXTR,
     hdl       = LBDHDD,
@@ -215,15 +216,16 @@ fit |>
 
 ## Gradient boosting + SHAP (Python)
 
-We hand the same cohort to Python via `reticulate`. XGBoost is unweighted here (feature engineering + non-linearities are what we're after), but we still honor an unbiased train/test split.
+We hand the same cohort to Python via `reticulate`. Critically, we **do not** use the five ATP III components (waist, triglycerides, HDL, blood pressure, fasting glucose) as predictors — those define the outcome, so including them yields a tautological AUC ≈ 1.0. A physician-scientist's first job with any black-box model is to catch that kind of leakage before the output looks impressive.
+
+Instead we ask a more interesting question: *how far can basic demographics and adiposity alone carry us toward identifying people at elevated metabolic-syndrome risk?* The answer is a useful screening tool — not a replacement for labs.
 
 ```{python handoff}
 #| label: handoff
 df = r.dat.copy()
 df["metsyn"] = df["metsyn"].astype(int)
 
-features = ["age_years", "sex", "race_eth", "waist", "trig", "hdl",
-            "sbp", "dbp", "fpg"]
+features = ["age_years", "sex", "race_eth", "bmi"]
 df = df[features + ["metsyn"]].dropna()
 df = pd.get_dummies(df, columns=["sex", "race_eth"], drop_first=True)
 
@@ -242,34 +244,36 @@ model = xgb.XGBClassifier(
 model.fit(X_tr, y_tr)
 
 p_te = model.predict_proba(X_te)[:, 1]
-print(f"AUC: {roc_auc_score(y_te, p_te):.3f}")
+print(f"AUC:   {roc_auc_score(y_te, p_te):.3f}")
 print(f"Brier: {brier_score_loss(y_te, p_te):.3f}")
 ```
 
 ```{python roc}
 #| label: fig-roc
-#| fig-cap: "ROC curve, held-out 25% test set."
+#| fig-cap: "ROC curve, held-out 25% test set. Demographics + BMI alone achieve useful discrimination — well below the perfect AUC that including ATP III components would falsely produce."
 fpr, tpr, _ = roc_curve(y_te, p_te)
 fig, ax = plt.subplots(figsize=(6, 5))
-ax.plot(fpr, tpr, color="#0d5c63", lw=2,
-        label=f"XGBoost (AUC = {roc_auc_score(y_te, p_te):.3f})")
-ax.plot([0, 1], [0, 1], ls="--", color="#b08a49", lw=1)
-ax.set(xlabel="False positive rate", ylabel="True positive rate")
-ax.legend(frameon=False)
-ax.spines[["top", "right"]].set_visible(False)
+_ = ax.plot(fpr, tpr, color="#0d5c63", lw=2,
+            label=f"XGBoost (AUC = {roc_auc_score(y_te, p_te):.3f})")
+_ = ax.plot([0, 1], [0, 1], ls="--", color="#b08a49", lw=1)
+_ = ax.set(xlabel="False positive rate", ylabel="True positive rate")
+_ = ax.legend(frameon=False)
+_ = ax.spines[["top", "right"]].set_visible(False)
 plt.tight_layout()
+plt.show()
 ```
 
 ```{python calibration}
 #| label: fig-calibration
-#| fig-cap: "Calibration. Perfectly calibrated models lie on the diagonal."
+#| fig-cap: "Calibration. Perfectly calibrated models lie on the diagonal; dots above the line mean the model under-estimates true risk in that decile."
 prob_true, prob_pred = calibration_curve(y_te, p_te, n_bins=10, strategy="quantile")
 fig, ax = plt.subplots(figsize=(6, 5))
-ax.plot(prob_pred, prob_true, "o-", color="#0d5c63", lw=2)
-ax.plot([0, 1], [0, 1], ls="--", color="#b08a49", lw=1)
-ax.set(xlabel="Predicted probability", ylabel="Observed frequency")
-ax.spines[["top", "right"]].set_visible(False)
+_ = ax.plot(prob_pred, prob_true, "o-", color="#0d5c63", lw=2)
+_ = ax.plot([0, 1], [0, 1], ls="--", color="#b08a49", lw=1)
+_ = ax.set(xlabel="Predicted probability", ylabel="Observed frequency")
+_ = ax.spines[["top", "right"]].set_visible(False)
 plt.tight_layout()
+plt.show()
 ```
 
 ```{python shap}
@@ -279,12 +283,13 @@ explainer = shap.TreeExplainer(model)
 shap_values = explainer(X_te)
 shap.summary_plot(shap_values, X_te, show=False, plot_size=(7, 5))
 plt.tight_layout()
+plt.show()
 ```
 
 ## What did we learn?
 
 - **Prevalence is not uniform.** Weighted NHANES estimates reproduce the well-documented sex- and race/ethnicity-stratified gradient — design-aware methods matter before any modeling claim.
-- **Linear and non-linear views agree on the big drivers.** Waist circumference, fasting glucose, and triglycerides dominate both the logistic odds ratios and SHAP contributions; blood pressure pulls more weight in the boosted model, consistent with non-linear thresholds baked into the ATP III definition.
+- **Leakage is the first bug to rule out.** Feeding the ATP III components back as predictors produces AUC ≈ 1.0 — not because the model is brilliant, but because the outcome is definitionally derived from those inputs. Demographics + BMI alone land at a realistic, defensible discrimination.
 - **Calibration beats AUC for clinical portability.** A well-calibrated model with a modest AUC is usually more useful bedside than a sharper but mis-calibrated one; this is why the calibration plot sits next to the ROC rather than below it.
 
 ## Next steps
