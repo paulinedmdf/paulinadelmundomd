@@ -9,13 +9,17 @@ Run this once locally after placing the raw files under ``data/raw/``:
     python prep.py
 
 Outputs (committed to git; each under GitHub's 100 MB push limit):
+    data/processed/state_group_atlas.parquet  - state x disease group with
+        total paid, total beneficiaries, paid-per-beneficiary, provider count,
+        and within-group quintile rank for choropleth shading.
+    data/processed/group_totals.parquet       - national rollup per disease group.
+    data/processed/group_top_codes.parquet    - top 5 HCPCS codes by paid
+        within each disease group, with descriptions.
     data/processed/outliers.parquet           - NPI x HCPCS rows with robust_z >= 2
-        OR within the top 20 HCPCS codes by spend (for isolation-forest fodder).
-        Trimmed columns for size.
+        OR within the top 20 HCPCS codes by spend. Kept for one deep-dive map.
     data/processed/hcpcs_summary.parquet      - HCPCS-level totals + median/MAD.
-    data/processed/state_summary.parquet      - state-level providers, paid,
-        excess paid, and flag counts.
-    data/processed/specialty_summary.parquet  - specialty quantiles for boxplots.
+    data/processed/state_summary.parquet      - state-level aggregates.
+    data/processed/specialty_summary.parquet  - specialty quantiles.
     data/processed/taxonomy.parquet           - NUCC taxonomy code -> specialty.
     data/processed/zip_centroids.parquet      - ZCTA -> lat/lon (US Census).
 
@@ -47,6 +51,10 @@ NUCC_URL = "https://www.nucc.org/images/stories/CSV/nucc_taxonomy_250.csv"
 CENSUS_ZCTA_URL = (
     "https://www2.census.gov/geo/docs/maps-data/data/gazetteer/2020_Gazetteer/"
     "2020_Gaz_zcta_national.zip"
+)
+CENSUS_ZCTA_COUNTY_URL = (
+    "https://www2.census.gov/geo/docs/maps-data/data/rel2020/zcta520/"
+    "tab20_zcta520_county20_natl.txt"
 )
 
 
@@ -194,6 +202,82 @@ def join_taxonomy_and_geo(con: duckdb.DuckDBPyConnection, nucc_csv: pathlib.Path
     )
 
 
+def join_county_and_disease_group(con: duckdb.DuckDBPyConnection,
+                                   zcta_county_file: pathlib.Path) -> None:
+    """Add a ZIP -> county_fips mapping (Census 2020 ZCTA relationship file) and
+    a rule-based HCPCS -> disease_group mapping, then attach both to
+    provider_full so downstream aggregates can roll up by county × group."""
+    print("Attaching ZIP -> county and HCPCS -> disease group ...")
+
+    con.execute(
+        f"""
+        CREATE OR REPLACE TABLE zcta_to_county AS
+        WITH raw AS (
+          SELECT
+            GEOID_ZCTA5_20::VARCHAR                   AS zip,
+            GEOID_COUNTY_20::VARCHAR                  AS county_fips,
+            NAMELSAD_COUNTY_20                        AS county_name,
+            AREALAND_PART                             AS area_part,
+            ROW_NUMBER() OVER (
+              PARTITION BY GEOID_ZCTA5_20
+              ORDER BY AREALAND_PART DESC
+            )                                         AS rn
+          FROM read_csv_auto('{zcta_county_file.as_posix()}', sep='|', sample_size=-1)
+        )
+        SELECT zip, county_fips, county_name
+        FROM raw
+        WHERE rn = 1
+        """
+    )
+
+    con.execute(
+        """
+        CREATE OR REPLACE TABLE hcpcs_group AS
+        SELECT DISTINCT hcpcs,
+          CASE
+            WHEN hcpcs LIKE 'J%' THEN 'Prescription Drugs & Biologics'
+            WHEN hcpcs LIKE 'D%' THEN 'Dental'
+            WHEN hcpcs LIKE 'H%' THEN 'Behavioral Health'
+            WHEN hcpcs LIKE 'E%' OR hcpcs LIKE 'K%' OR hcpcs LIKE 'L%'
+              THEN 'Durable Medical Equipment & Supplies'
+            WHEN regexp_matches(hcpcs, '^T(20|21|22|51)')
+              OR hcpcs LIKE 'A04%' THEN 'Transportation'
+            WHEN hcpcs LIKE 'T%' THEN 'Long-Term Services & Supports'
+            WHEN hcpcs IN ('G0257','G0323','G0324','G0325','G0326','G0327')
+              THEN 'Dialysis & ESRD'
+            WHEN regexp_matches(hcpcs, '^[0-9]{5}$') THEN
+              CASE
+                WHEN CAST(hcpcs AS INTEGER) BETWEEN 90791 AND 90899
+                  THEN 'Behavioral Health'
+                WHEN CAST(hcpcs AS INTEGER) BETWEEN 90935 AND 90999
+                  THEN 'Dialysis & ESRD'
+                WHEN CAST(hcpcs AS INTEGER) BETWEEN 99201 AND 99499
+                  THEN 'Evaluation & Management'
+                WHEN CAST(hcpcs AS INTEGER) BETWEEN 10021 AND 69990
+                  THEN 'Surgery & Outpatient Procedures'
+                WHEN CAST(hcpcs AS INTEGER) BETWEEN 70010 AND 79999
+                  THEN 'Radiology & Imaging'
+                WHEN CAST(hcpcs AS INTEGER) BETWEEN 80047 AND 89398
+                  THEN 'Laboratory & Diagnostics'
+                ELSE 'Other Medical Services'
+              END
+            ELSE 'Other Medical Services'
+          END AS disease_group
+        FROM provider_full
+        """
+    )
+
+    con.execute(
+        """
+        CREATE OR REPLACE TABLE provider_atlas AS
+        SELECT p.*, c.county_fips, c.county_name, g.disease_group
+        FROM provider_full p
+        LEFT JOIN zcta_to_county c USING (zip)
+        LEFT JOIN hcpcs_group    g USING (hcpcs)
+        """
+    )
+
+
 def write_outputs(con: duckdb.DuckDBPyConnection) -> None:
     """Emit several small Parquet files rather than one big one, so each fits
     under GitHub's 100 MB push limit. The qmd reads the aggregates for the
@@ -290,6 +374,57 @@ def write_outputs(con: duckdb.DuckDBPyConnection) -> None:
     print(f"Writing {OUT / 'zip_centroids.parquet'} ...")
     con.execute(f"COPY zip_centroids TO '{(OUT / 'zip_centroids.parquet').as_posix()}' (FORMAT PARQUET)")
 
+    print(f"Writing {OUT / 'county_group_atlas.parquet'} ...")
+    con.execute(
+        f"""
+        COPY (
+          WITH base AS (
+            SELECT county_fips, county_name, state, disease_group,
+                   SUM(paid)          AS total_paid,
+                   SUM(beneficiaries) AS total_bene,
+                   COUNT(DISTINCT npi) AS providers_n
+            FROM provider_atlas
+            WHERE county_fips IS NOT NULL
+              AND disease_group IS NOT NULL
+            GROUP BY 1, 2, 3, 4
+          )
+          SELECT
+            county_fips,
+            county_name,
+            state,
+            disease_group,
+            total_paid,
+            total_bene,
+            providers_n,
+            total_paid / NULLIF(total_bene, 0)                              AS paid_per_bene,
+            NTILE(5) OVER (
+              PARTITION BY disease_group
+              ORDER BY total_paid / NULLIF(total_bene, 0)
+            )                                                               AS quintile_ppb
+          FROM base
+        )
+        TO '{(OUT / "county_group_atlas.parquet").as_posix()}' (FORMAT PARQUET, COMPRESSION ZSTD)
+        """
+    )
+
+    print(f"Writing {OUT / 'group_totals.parquet'} ...")
+    con.execute(
+        f"""
+        COPY (
+          SELECT disease_group,
+                 SUM(paid)            AS total_paid,
+                 SUM(beneficiaries)   AS total_bene,
+                 COUNT(DISTINCT npi)  AS providers_n,
+                 COUNT(DISTINCT hcpcs) AS hcpcs_n,
+                 SUM(paid) / NULLIF(SUM(beneficiaries), 0) AS paid_per_bene
+          FROM provider_atlas
+          WHERE disease_group IS NOT NULL
+          GROUP BY disease_group
+        )
+        TO '{(OUT / "group_totals.parquet").as_posix()}' (FORMAT PARQUET, COMPRESSION ZSTD)
+        """
+    )
+
 
 def main() -> None:
     ap = argparse.ArgumentParser(description=__doc__)
@@ -325,6 +460,8 @@ def main() -> None:
                     sys.exit("Census ZCTA zip did not contain a .txt file")
                 zcta_tsv.write_bytes(zf.read(members[0]))
 
+    zcta_county_file = download(CENSUS_ZCTA_COUNTY_URL, RAW / "zcta_county_relationship.txt")
+
     print(f"Medicaid : {medicaid_csv}")
     print(f"NPPES    : {nppes_csv}")
     print(f"NUCC     : {nucc_csv}")
@@ -338,6 +475,7 @@ def main() -> None:
     add_robust_z(con)
     join_nppes(con, nppes_csv)
     join_taxonomy_and_geo(con, nucc_csv, zcta_tsv)
+    join_county_and_disease_group(con, zcta_county_file)
     write_outputs(con)
 
     print("Done.")

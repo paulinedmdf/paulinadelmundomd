@@ -231,43 +231,77 @@ plt.tight_layout()
 plt.show()
 ```
 
-## Where are the outliers?
+## Where does the dollar go? A disease-group cost atlas
 
-```{r map}
-#| fig-cap: "Interactive map of the top 200 peer-group outliers. Marker size encodes robust z-score; color encodes specialty group."
+A provider-outlier list is a fraud-review input. Most policy audiences, though, want the opposite question: **which disease categories cost the most, and where do those costs concentrate geographically?** Switching from "who" to "what and where" requires three pieces we've now built upstream in [`prep.py`](prep.py):
 
-map_df <- outliers |>
-  filter(robust_z >= 5,
-         beneficiaries >= 30,
-         !is.na(lat), !is.na(lon)) |>
-  arrange(desc(robust_z)) |>
-  slice_head(n = 200) |>
-  mutate(
-    popup = sprintf(
-      "<b>NPI:</b> %s<br/><b>State:</b> %s<br/><b>Specialty:</b> %s<br/><b>HCPCS:</b> %s<br/><b>Per beneficiary:</b> $%s<br/><b>Robust z:</b> %.1f",
-      npi, state, specialty_name, hcpcs,
-      format(round(paid / beneficiaries), big.mark = ","),
-      robust_z
-    )
-  )
+1. A rule-based **HCPCS → disease-group** classifier that buckets every procedure, drug, DME, and Medicaid-specific T-code into one of 12 clinical service groups.
+2. A **Census 2020 ZCTA → county** crosswalk so every provider's practice ZIP resolves to a county FIPS.
+3. A county × disease-group aggregate with **within-group quintile rankings** so a single color scale reads consistently across panels: darker = this county is in the top 20% of cost-per-beneficiary for *that* disease group.
 
-pal <- leaflet::colorFactor(
-  palette = c("#0d5c63", "#b08a49", "#4b7f52", "#8a3b3b", "#3b5998", "#6a4c93"),
-  domain  = map_df$specialty_class
-)
+::: {.callout-note}
+## Why county, not HSA or ZIP3?
 
-leaflet::leaflet(map_df, width = "100%") |>
-  leaflet::addProviderTiles(leaflet::providers$CartoDB.Positron) |>
-  leaflet::addCircleMarkers(
-    lng = ~lon, lat = ~lat,
-    radius = ~pmin(3 + (robust_z - 5) / 2, 14),
-    color = ~pal(specialty_class),
-    stroke = FALSE, fillOpacity = 0.7,
-    popup = ~popup
-  ) |>
-  leaflet::addLegend(
-    pal = pal, values = ~specialty_class,
-    title = "Specialty group", opacity = 0.8
+For a Medicaid cost atlas, counties are the defensible middle path — clean TIGER polygons, HUD/Census maintained crosswalks, and the unit most federal-agency publications (MACPAC, KFF, Urban Institute) use. HSAs (Dartmouth Atlas) are the gold standard for *Medicare* market analysis but were built from Medicare patient flows, so they're slightly miscalibrated for Medicaid. ZIP3 is tempting because it's one `LEFT(zip, 3)` away, but ZIP3 boundaries are USPS logistics geography — a high Modifiable-Areal-Unit-Problem exposure for a spatial-stats story.
+:::
+
+```{r cost-atlas-setup}
+county_atlas <- arrow::read_parquet(file.path(data_dir, "county_group_atlas.parquet"))
+group_totals <- arrow::read_parquet(file.path(data_dir, "group_totals.parquet"))
+
+top_groups <- group_totals |>
+  arrange(desc(total_paid)) |>
+  slice_head(n = 9) |>
+  pull(disease_group)
+```
+
+```{r group-bar}
+#| fig-cap: "Total national Medicaid paid by disease group, 2024. 'Other Medical Services' captures 99000-series codes our rule-based classifier doesn't yet disambiguate."
+#| fig-width: 9
+#| fig-height: 4.5
+
+group_totals |>
+  mutate(disease_group = fct_reorder(disease_group, total_paid)) |>
+  ggplot(aes(disease_group, total_paid)) +
+  geom_col(fill = "#0d5c63") +
+  coord_flip() +
+  scale_y_continuous(labels = format_money) +
+  labs(x = NULL, y = "Total paid (USD)")
+```
+
+```{r county-choropleth}
+#| fig-cap: "County-level cost atlas: Medicaid paid per beneficiary ranked into within-group quintiles (darker = higher cost *relative to other counties for that same group*). Each panel is its own choropleth so coloring is comparable within group, not across groups. Alaska, Hawaii, and territories omitted for contiguous-US framing; grey counties have no Medicaid providers billing that category in the dataset."
+#| fig-width: 11
+#| fig-height: 9
+
+options(tigris_use_cache = TRUE)
+counties_sf <- tigris::counties(year = 2020, cb = TRUE, progress_bar = FALSE) |>
+  dplyr::select(GEOID, geometry) |>
+  dplyr::filter(!stringr::str_detect(GEOID, "^(02|15|60|66|69|72|78)"))
+
+atlas_sub <- county_atlas |>
+  filter(disease_group %in% top_groups) |>
+  mutate(disease_group = fct_relevel(disease_group, top_groups))
+
+map_df <- counties_sf |>
+  dplyr::inner_join(atlas_sub, by = c("GEOID" = "county_fips"))
+
+ggplot(map_df) +
+  geom_sf(aes(fill = factor(quintile_ppb)), color = NA, linewidth = 0) +
+  facet_wrap(~ disease_group, ncol = 3) +
+  scale_fill_viridis_d(
+    option = "viridis",
+    na.value = "grey92",
+    name = "Quintile of paid\nper beneficiary",
+    labels = c("1 (lowest)", "2", "3", "4", "5 (highest)")
+  ) +
+  coord_sf(crs = 5070, datum = NA) +
+  theme_void(base_size = 11) +
+  theme(
+    strip.text = element_text(face = "bold", size = 10),
+    legend.position = "bottom",
+    legend.key.width = unit(1.4, "cm"),
+    panel.spacing = unit(0.3, "lines")
   )
 ```
 
