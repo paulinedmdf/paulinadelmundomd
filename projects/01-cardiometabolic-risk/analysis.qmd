@@ -20,6 +20,12 @@ format:
     mainfont: "Inter, system-ui, sans-serif"
     monofont: "JetBrains Mono, Menlo, monospace"
     embed-resources: true
+    include-in-header:
+      text: |
+        <script>
+          window.va = window.va || function () { (window.vaq = window.vaq || []).push(arguments); };
+        </script>
+        <script defer src="/_vercel/insights/script.js"></script>
 execute:
   echo: true
   warning: false
