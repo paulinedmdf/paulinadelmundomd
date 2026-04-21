@@ -225,8 +225,7 @@ renv/cellar/
 renv/staging/
 
 # ---------- Raw + derived data ----------
-# Raw downloads stay local; processed Parquets (small, curated) are committed.
-projects/**/data/
-!projects/**/data/.gitkeep
-!projects/**/data/processed/
-!projects/**/data/processed/**
+# Raw downloads stay local; small processed Parquets are committed.
+projects/**/data/raw/**
+!projects/**/data/raw/.gitkeep
+projects/**/_prep.log

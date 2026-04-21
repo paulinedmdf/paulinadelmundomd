@@ -8,9 +8,14 @@ Run this once locally after placing the raw files under ``data/raw/``:
 
     python prep.py
 
-Outputs (committed to git, small):
-    data/processed/medicaid_outliers.parquet  - one row per NPI x HCPCS with
-        aggregates, MAD-based robust z-score, state, specialty, zip, lat/lon.
+Outputs (committed to git; each under GitHub's 100 MB push limit):
+    data/processed/outliers.parquet           - NPI x HCPCS rows with robust_z >= 2
+        OR within the top 20 HCPCS codes by spend (for isolation-forest fodder).
+        Trimmed columns for size.
+    data/processed/hcpcs_summary.parquet      - HCPCS-level totals + median/MAD.
+    data/processed/state_summary.parquet      - state-level providers, paid,
+        excess paid, and flag counts.
+    data/processed/specialty_summary.parquet  - specialty quantiles for boxplots.
     data/processed/taxonomy.parquet           - NUCC taxonomy code -> specialty.
     data/processed/zip_centroids.parquet      - ZCTA -> lat/lon (US Census).
 
@@ -190,27 +195,100 @@ def join_taxonomy_and_geo(con: duckdb.DuckDBPyConnection, nucc_csv: pathlib.Path
 
 
 def write_outputs(con: duckdb.DuckDBPyConnection) -> None:
+    """Emit several small Parquet files rather than one big one, so each fits
+    under GitHub's 100 MB push limit. The qmd reads the aggregates for the
+    Pareto / state / specialty views and the filtered detail for the map."""
     OUT.mkdir(parents=True, exist_ok=True)
 
-    out_main = OUT / "medicaid_outliers.parquet"
-    print(f"Writing {out_main} ...")
+    print(f"Writing {OUT / 'hcpcs_summary.parquet'} ...")
     con.execute(
         f"""
         COPY (
-          SELECT * FROM provider_full
+          SELECT hcpcs,
+                 ANY_VALUE(hcpcs_peer_n)          AS peer_n,
+                 SUM(beneficiaries)               AS total_bene,
+                 SUM(paid)                        AS total_paid,
+                 ANY_VALUE(hcpcs_median_ppb)      AS median_ppb,
+                 ANY_VALUE(hcpcs_mad_ppb)         AS mad_ppb
+          FROM provider_full
           WHERE robust_z IS NOT NULL
+          GROUP BY hcpcs
         )
-        TO '{out_main.as_posix()}' (FORMAT PARQUET, COMPRESSION ZSTD)
+        TO '{(OUT / "hcpcs_summary.parquet").as_posix()}' (FORMAT PARQUET, COMPRESSION ZSTD)
         """
     )
 
-    out_tax = OUT / "taxonomy.parquet"
-    print(f"Writing {out_tax} ...")
-    con.execute(f"COPY taxonomy TO '{out_tax.as_posix()}' (FORMAT PARQUET)")
+    print(f"Writing {OUT / 'state_summary.parquet'} ...")
+    con.execute(
+        f"""
+        COPY (
+          SELECT state,
+                 COUNT(DISTINCT npi)                                    AS providers_n,
+                 SUM(paid)                                              AS total_paid,
+                 SUM(GREATEST(paid_per_bene - hcpcs_median_ppb, 0)
+                     * beneficiaries)                                   AS excess_paid,
+                 MEDIAN(robust_z)                                       AS median_z,
+                 QUANTILE(robust_z, 0.95)                               AS q95_z,
+                 SUM(CASE WHEN robust_z >= 5 THEN 1 ELSE 0 END)         AS flagged_ge_5
+          FROM provider_full
+          WHERE robust_z IS NOT NULL AND state IS NOT NULL
+          GROUP BY state
+        )
+        TO '{(OUT / "state_summary.parquet").as_posix()}' (FORMAT PARQUET, COMPRESSION ZSTD)
+        """
+    )
 
-    out_zip = OUT / "zip_centroids.parquet"
-    print(f"Writing {out_zip} ...")
-    con.execute(f"COPY zip_centroids TO '{out_zip.as_posix()}' (FORMAT PARQUET)")
+    print(f"Writing {OUT / 'specialty_summary.parquet'} ...")
+    con.execute(
+        f"""
+        COPY (
+          SELECT specialty_name,
+                 specialty_class,
+                 COUNT(*)                                               AS rows_n,
+                 SUM(CASE WHEN robust_z >= 5 THEN 1 ELSE 0 END)         AS flagged_ge_5,
+                 QUANTILE(paid_per_bene, 0.05)                          AS p05,
+                 QUANTILE(paid_per_bene, 0.25)                          AS p25,
+                 MEDIAN(paid_per_bene)                                  AS p50,
+                 QUANTILE(paid_per_bene, 0.75)                          AS p75,
+                 QUANTILE(paid_per_bene, 0.95)                          AS p95
+          FROM provider_full
+          WHERE robust_z IS NOT NULL AND specialty_name IS NOT NULL
+          GROUP BY 1, 2
+        )
+        TO '{(OUT / "specialty_summary.parquet").as_posix()}' (FORMAT PARQUET, COMPRESSION ZSTD)
+        """
+    )
+
+    print(f"Writing {OUT / 'outliers.parquet'} ...")
+    con.execute(
+        f"""
+        COPY (
+          SELECT npi, hcpcs, state, specialty_name, specialty_class,
+                 beneficiaries, claims, paid, months_active,
+                 paid_per_bene, hcpcs_median_ppb, robust_z,
+                 lat, lon
+          FROM provider_full
+          WHERE robust_z IS NOT NULL
+            AND (robust_z >= 2
+                 OR hcpcs IN (
+                   SELECT hcpcs FROM (
+                     SELECT hcpcs, SUM(paid) AS p
+                     FROM provider_full
+                     GROUP BY hcpcs
+                     ORDER BY p DESC
+                     LIMIT 20
+                   )
+                 ))
+        )
+        TO '{(OUT / "outliers.parquet").as_posix()}' (FORMAT PARQUET, COMPRESSION ZSTD)
+        """
+    )
+
+    print(f"Writing {OUT / 'taxonomy.parquet'} ...")
+    con.execute(f"COPY taxonomy TO '{(OUT / 'taxonomy.parquet').as_posix()}' (FORMAT PARQUET)")
+
+    print(f"Writing {OUT / 'zip_centroids.parquet'} ...")
+    con.execute(f"COPY zip_centroids TO '{(OUT / 'zip_centroids.parquet').as_posix()}' (FORMAT PARQUET)")
 
 
 def main() -> None:
