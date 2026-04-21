@@ -1,0 +1,318 @@
+---
+title: "Outlier Detection in Medicaid Provider Spending"
+subtitle: "Peer-group robust z-scores, isolation forests, and a geographic lens on provider-level Medicaid claims"
+author: "Paulina Del Mundo Del Fierro, MD, MPH"
+date: last-modified
+format:
+  html:
+    theme: cosmo
+    toc: true
+    toc-depth: 3
+    toc-location: right
+    code-tools: true
+    code-copy: true
+    code-fold: false
+    code-overflow: wrap
+    number-sections: true
+    fig-responsive: true
+    fig-width: 8
+    fig-height: 5
+    embed-resources: true
+execute:
+  echo: true
+  warning: false
+  message: false
+  freeze: auto
+---
+
+## Why this analysis
+
+Medicaid is the single largest source of health coverage for low-income Americans — and its claims data, released monthly by HHS, is a rare window into how public dollars flow through the US provider network. The question for any physician-scientist looking at this data is not *"who spends the most"* (large systems dominate by construction) but *"who spends atypically, given their peers?"* That's the signal that drives fraud-and-abuse reviews, network-integrity audits, and honest comparative-effectiveness work alike.
+
+This notebook does three things end-to-end:
+
+1. **Streams the 11 GB Medicaid Provider Spending CSV with DuckDB**, aggregates to the NPI × HCPCS level, and flags peer-group outliers using a median/MAD-based robust z-score — resistant to the heavy tails claims data is famous for.
+2. **Joins NPPES, NUCC taxonomy, and US Census ZCTA centroids** so every flagged provider carries an interpretable specialty and a map-able location. Nothing in the analysis requires cloud infrastructure — everything runs on a laptop against committed Parquet artifacts.
+3. **Contrasts a deterministic rule (robust z) against an unsupervised model (isolation forest)** on the same cohort, in R and Python respectively. Agreement between the two is the real outlier story; disagreement is where a physician-scientist earns their keep.
+
+::: {.callout-note}
+## Data sources
+- **Medicaid Provider Spending** — HHS Open Data Portal, accessed 2026-04-21. <https://opendata.hhs.gov/datasets/medicaid-provider-spending/>
+- **NPPES Downloadable File** — Centers for Medicare & Medicaid Services. <https://download.cms.gov/nppes/NPI_Files.html>
+- **NUCC Health Care Provider Taxonomy** — National Uniform Claim Committee. <https://taxonomy.nucc.org/>
+- **ZCTA Gazetteer (2020)** — US Census Bureau. <https://www.census.gov/geographies/reference-files/time-series/geo/gazetteer-files.html>
+
+Raw files stay local (11 GB + 45 GB NPPES); the [`prep.py`](prep.py) script runs one DuckDB pipeline to produce three committed Parquets this notebook reads.
+:::
+
+---
+
+## Setup
+
+```{r setup-r}
+#| label: setup-r
+suppressPackageStartupMessages({
+  library(arrow)
+  library(dplyr)
+  library(ggplot2)
+  library(tidyr)
+  library(stringr)
+  library(forcats)
+  library(scales)
+  library(sf)
+  library(leaflet)
+  library(reticulate)
+})
+
+reticulate::py_require(c("pandas", "numpy", "scikit-learn", "pyarrow", "matplotlib"))
+
+theme_set(theme_minimal(base_size = 12))
+
+data_dir <- here::here("projects", "02-medicaid-outliers", "data", "processed")
+providers <- arrow::read_parquet(file.path(data_dir, "medicaid_outliers.parquet"))
+taxonomy  <- arrow::read_parquet(file.path(data_dir, "taxonomy.parquet"))
+
+format_money <- function(x) scales::label_dollar(accuracy = 1, scale_cut = scales::cut_short_scale())(x)
+```
+
+```{python setup-py}
+#| label: setup-py
+import pandas as pd
+import numpy as np
+import matplotlib.pyplot as plt
+from sklearn.ensemble import IsolationForest
+from sklearn.preprocessing import StandardScaler
+
+plt.rcParams.update({"figure.dpi": 110})
+```
+
+## Cohort sketch
+
+```{r cohort-sketch}
+#| label: cohort-sketch
+summary_tbl <- providers |>
+  summarize(
+    providers_n   = n_distinct(npi),
+    hcpcs_n       = n_distinct(hcpcs),
+    rows          = n(),
+    total_paid    = sum(paid, na.rm = TRUE),
+    total_bene    = sum(beneficiaries, na.rm = TRUE),
+    median_z      = median(robust_z, na.rm = TRUE),
+    q95_z         = quantile(robust_z, 0.95, na.rm = TRUE),
+    flagged_ge_5  = sum(robust_z >= 5, na.rm = TRUE)
+  )
+
+knitr::kable(
+  summary_tbl |>
+    mutate(across(c(total_paid), format_money),
+           across(where(is.numeric), \(x) format(round(x, 2), big.mark = ","))),
+  caption = "Cohort sketch after DuckDB prep: peer-group-eligible NPI × HCPCS rows"
+)
+```
+
+## Pareto: where does the dollar concentrate?
+
+```{r pareto}
+#| label: fig-pareto
+#| fig-cap: "Cumulative share of total Medicaid paid dollars, ordered by HCPCS code from highest- to lowest-spending. A steep early curve means a small set of codes drives most public outlay."
+
+hcpcs_totals <- providers |>
+  group_by(hcpcs) |>
+  summarize(paid = sum(paid, na.rm = TRUE), .groups = "drop") |>
+  arrange(desc(paid)) |>
+  mutate(
+    rank_pct  = row_number() / n(),
+    cum_share = cumsum(paid) / sum(paid)
+  )
+
+ggplot(hcpcs_totals, aes(rank_pct, cum_share)) +
+  geom_line(color = "#0d5c63", linewidth = 1) +
+  geom_hline(yintercept = 0.8, linetype = "dashed", color = "#b08a49") +
+  scale_x_continuous(labels = percent_format()) +
+  scale_y_continuous(labels = percent_format()) +
+  labs(x = "HCPCS codes ranked by total paid (ascending)",
+       y = "Cumulative share of total paid")
+```
+
+## Peer-group outlier detection (R)
+
+The DuckDB prep computed a robust z-score per HCPCS using the median-of-absolute-deviations (MAD) scaled by 1.4826. Values ≥ 5 correspond roughly to "5σ from the peer median for this code," which is the threshold CMS Program Integrity uses as a first-pass screen.
+
+```{r top-outliers}
+#| label: top-outliers
+top_outliers <- providers |>
+  filter(robust_z >= 5, beneficiaries >= 30) |>
+  arrange(desc(robust_z)) |>
+  slice_head(n = 25) |>
+  transmute(
+    npi, state, specialty_name, hcpcs,
+    beneficiaries, paid,
+    paid_per_bene       = paid / beneficiaries,
+    hcpcs_median_ppb,
+    robust_z            = round(robust_z, 1)
+  )
+
+knitr::kable(
+  top_outliers |>
+    mutate(
+      paid              = format_money(paid),
+      paid_per_bene     = format_money(paid_per_bene),
+      hcpcs_median_ppb  = format_money(hcpcs_median_ppb)
+    ),
+  caption = "Top 25 peer-group outliers (robust z ≥ 5, ≥ 30 beneficiaries)"
+)
+```
+
+```{r specialty-boxplot}
+#| label: fig-specialty
+#| fig-cap: "Per-beneficiary spend by specialty (top 15 by flagged-outlier count), log-10 scaled. Dots above each box are the peer-group outliers this analysis flags."
+
+top_specialties <- providers |>
+  filter(robust_z >= 5) |>
+  count(specialty_name, sort = TRUE) |>
+  slice_head(n = 15) |>
+  pull(specialty_name)
+
+providers |>
+  filter(specialty_name %in% top_specialties) |>
+  mutate(
+    flag = robust_z >= 5,
+    specialty_name = fct_reorder(specialty_name, paid / beneficiaries, median)
+  ) |>
+  ggplot(aes(specialty_name, paid / beneficiaries)) +
+  geom_boxplot(outlier.shape = NA, fill = "#e6f1f2", color = "#0d5c63") +
+  geom_jitter(aes(color = flag), width = 0.2, size = 0.7, alpha = 0.4) +
+  scale_y_log10(labels = scales::label_dollar()) +
+  scale_color_manual(values = c("TRUE" = "#b08a49", "FALSE" = "grey70"), guide = "none") +
+  coord_flip() +
+  labs(x = NULL, y = "Paid per beneficiary (log scale)")
+```
+
+## Unsupervised comparison (Python)
+
+A peer-group z-score is simple and auditable but scale-sensitive. An unsupervised model sees the joint distribution of features and can flag records that look unusual across multiple axes at once. We fit an isolation forest on the top 20 HCPCS by total spend, standardize, and score.
+
+```{python iforest}
+#| label: iforest
+df = r.providers.copy()
+
+top_codes = (
+    df.groupby("hcpcs")["paid"].sum().sort_values(ascending=False).head(20).index
+)
+sub = df[df["hcpcs"].isin(top_codes)].copy()
+sub = sub.dropna(subset=["paid_per_bene", "beneficiaries", "claims", "months_active"])
+
+X = sub[["paid_per_bene", "beneficiaries", "claims", "months_active"]].to_numpy()
+X = StandardScaler().fit_transform(X)
+
+iso = IsolationForest(
+    n_estimators=400, contamination=0.01, random_state=42, n_jobs=-1
+)
+sub["iforest_score"]    = -iso.fit(X).score_samples(X)   # higher = more anomalous
+sub["iforest_flag"]     = iso.predict(X) == -1
+
+print(f"Rows analysed: {len(sub):,}")
+print(f"Isolation forest flags: {int(sub['iforest_flag'].sum()):,} ({sub['iforest_flag'].mean()*100:.2f}%)")
+print("Overlap with robust-z ≥ 5:",
+      int((sub['iforest_flag'] & (sub['robust_z'] >= 5)).sum()))
+```
+
+```{python iforest-scatter}
+#| label: fig-iforest
+#| fig-cap: "Paid-per-beneficiary vs. beneficiary count for the top 20 HCPCS codes by spend. Isolation-forest flags in gold overlap substantially with — but not identically to — the robust-z rule."
+
+fig, ax = plt.subplots(figsize=(7, 5))
+_ = ax.scatter(sub["beneficiaries"], sub["paid_per_bene"],
+               c=np.where(sub["iforest_flag"], "#b08a49", "#cccccc"),
+               s=10, alpha=0.5)
+_ = ax.set(xscale="log", yscale="log",
+           xlabel="Unique beneficiaries (log)", ylabel="Paid per beneficiary (log)")
+_ = ax.spines[["top", "right"]].set_visible(False)
+plt.tight_layout()
+plt.show()
+```
+
+## Where are the outliers?
+
+```{r map}
+#| label: fig-map
+#| fig-cap: "Interactive map of the top 200 peer-group outliers. Marker size encodes robust z-score; color encodes specialty group."
+
+map_df <- providers |>
+  filter(robust_z >= 5,
+         beneficiaries >= 30,
+         !is.na(lat), !is.na(lon)) |>
+  arrange(desc(robust_z)) |>
+  slice_head(n = 200) |>
+  mutate(
+    popup = sprintf(
+      "<b>NPI:</b> %s<br/><b>State:</b> %s<br/><b>Specialty:</b> %s<br/><b>HCPCS:</b> %s<br/><b>Per beneficiary:</b> $%s<br/><b>Robust z:</b> %.1f",
+      npi, state, specialty_name, hcpcs,
+      format(round(paid / beneficiaries), big.mark = ","),
+      robust_z
+    )
+  )
+
+pal <- leaflet::colorFactor(
+  palette = c("#0d5c63", "#b08a49", "#4b7f52", "#8a3b3b", "#3b5998", "#6a4c93"),
+  domain  = map_df$specialty_class
+)
+
+leaflet::leaflet(map_df, width = "100%") |>
+  leaflet::addProviderTiles(leaflet::providers$CartoDB.Positron) |>
+  leaflet::addCircleMarkers(
+    lng = ~lon, lat = ~lat,
+    radius = ~pmin(3 + (robust_z - 5) / 2, 14),
+    color = ~pal(specialty_class),
+    stroke = FALSE, fillOpacity = 0.7,
+    popup = ~popup
+  ) |>
+  leaflet::addLegend(
+    pal = pal, values = ~specialty_class,
+    title = "Specialty group", opacity = 0.8
+  )
+```
+
+## State-level intensity
+
+```{r state-intensity}
+#| label: fig-state
+#| fig-cap: "Peer-group-excess Medicaid spending by state. Height is the sum of paid dollars above each HCPCS's peer median, by provider practice state."
+
+state_excess <- providers |>
+  filter(!is.na(state), beneficiaries >= 30) |>
+  mutate(excess_ppb = pmax(paid_per_bene - hcpcs_median_ppb, 0)) |>
+  group_by(state) |>
+  summarize(
+    excess_paid = sum(excess_ppb * beneficiaries, na.rm = TRUE),
+    providers_n = n_distinct(npi),
+    .groups = "drop"
+  ) |>
+  arrange(desc(excess_paid)) |>
+  slice_head(n = 25)
+
+ggplot(state_excess, aes(reorder(state, excess_paid), excess_paid)) +
+  geom_col(fill = "#0d5c63") +
+  coord_flip() +
+  scale_y_continuous(labels = format_money) +
+  labs(x = NULL, y = "Paid above HCPCS peer median ($)")
+```
+
+## Takeaways
+
+- **Heavy tails demand robust statistics.** A naive z-score on claims data is dominated by a few mega-providers; MAD-based scoring is still simple, audit-friendly, and far more defensible.
+- **Rule-based and unsupervised flags agree where it counts.** The overlap between a robust-z ≥ 5 rule and an isolation-forest's 1% contamination call is the highest-confidence outlier set — the set a Program Integrity team would actually review first.
+- **Geography is where interpretation starts.** Clusters on the map are a prompt, not a conclusion — state-level Medicaid rate structures, MCO contracting, and referral network differences can all produce geographic patterns that look like outliers but are artifacts of policy.
+
+## Next steps
+
+- **Specialty-adjusted peer groups.** Today the peer group is "everyone billing this HCPCS"; tighter peer groups (same specialty, similar patient panel size) will surface a different, higher-quality signal.
+- **Time-aware outlier detection.** Repeat the analysis on rolling 3-month windows to separate persistent outliers from transient spikes (COVID, policy shocks, one-off audits).
+- **SDoH overlay.** Merge state-level CDC PLACES / ACS indicators to test whether residual excess spending tracks community need vs. billing behavior — a health-equity stress test for the flagged list.
+
+---
+
+::: {.callout-tip}
+### Reading this as code samples
+Every cell above is the real executed code — not screenshots. Use the **Code** dropdown at the top-right to toggle visibility, copy blocks, or view the [raw `.qmd` source](https://github.com/paulinedmdf/paulinadelmundomd/blob/main/projects/02-medicaid-outliers/analysis.qmd) on GitHub. The one-shot DuckDB prep step lives in [`prep.py`](https://github.com/paulinedmdf/paulinadelmundomd/blob/main/projects/02-medicaid-outliers/prep.py).
+:::

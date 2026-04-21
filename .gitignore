@@ -224,7 +224,9 @@ renv/local/
 renv/cellar/
 renv/staging/
 
-# ---------- NHANES & derived data ----------
-# Analyses re-download from the CDC on render — never commit raw downloads
+# ---------- Raw + derived data ----------
+# Raw downloads stay local; processed Parquets (small, curated) are committed.
 projects/**/data/
 !projects/**/data/.gitkeep
+!projects/**/data/processed/
+!projects/**/data/processed/**
