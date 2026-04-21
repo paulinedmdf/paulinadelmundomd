@@ -19,6 +19,7 @@ format:
     fig-height: 5
     mainfont: "Inter, system-ui, sans-serif"
     monofont: "JetBrains Mono, Menlo, monospace"
+    embed-resources: true
 execute:
   echo: true
   warning: false
@@ -52,6 +53,10 @@ source(here::here("R", "nhanes_helpers.R"))
 library(gtsummary)
 library(ggplot2)
 library(reticulate)
+reticulate::py_require(c(
+  "pandas", "numpy", "scipy", "scikit-learn",
+  "xgboost", "shap", "matplotlib"
+))
 theme_set(theme_minimal(base_size = 12))
 ```
 
@@ -121,14 +126,14 @@ dat <- nhanes_raw |>
     sbp       = rowMeans(cbind(BPXSY1, BPXSY2, BPXSY3), na.rm = TRUE),
     dbp       = rowMeans(cbind(BPXDI1, BPXDI2, BPXDI3), na.rm = TRUE),
     fpg       = LBXGLU,
-    dm_rx     = DIQ070 == 1,
+    dm_dx     = !is.na(DIQ010) & DIQ010 == "Yes",
     waist_hit = (sex == "Male"   & waist >= 102) |
                 (sex == "Female" & waist >= 88),
     trig_hit  = trig >= 150,
     hdl_hit   = (sex == "Male"   & hdl < 40) |
                 (sex == "Female" & hdl < 50),
     bp_hit    = sbp >= 130 | dbp >= 85,
-    glu_hit   = fpg >= 100 | dm_rx,
+    glu_hit   = fpg >= 100 | dm_dx,
     mets_n    = rowSums(cbind(waist_hit, trig_hit, hdl_hit, bp_hit, glu_hit), na.rm = TRUE),
     metsyn    = mets_n >= 3
   ) |>
@@ -182,15 +187,24 @@ Using `svyglm` so standard errors reflect NHANES's clustered, stratified design.
 ```{r svyglm}
 #| label: svyglm
 
+dat_fit <- dat |>
+  mutate(
+    metsyn   = as.integer(metsyn),
+    sex      = droplevels(factor(sex)),
+    race_eth = droplevels(factor(race_eth))
+  )
+
+des_std <- survey::svydesign(
+  ids     = ~SDMVPSU,
+  strata  = ~SDMVSTRA,
+  weights = ~WTMEC2YR,
+  data    = dat_fit,
+  nest    = TRUE
+)
+
 fit <- survey::svyglm(
   metsyn ~ age_years + sex + race_eth,
-  design = as_survey_design(dat,
-                            ids = SDMVPSU, strata = SDMVSTRA,
-                            weights = WTMEC2YR, nest = TRUE) |>
-            as.data.frame() |> (\(x) survey::svydesign(
-              ids = ~SDMVPSU, strata = ~SDMVSTRA,
-              weights = ~WTMEC2YR, data = x, nest = TRUE
-            ))(),
+  design = des_std,
   family = quasibinomial()
 )
 

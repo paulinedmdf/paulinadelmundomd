@@ -32,19 +32,16 @@ nhanes_design <- function(data, weight = "WTMEC2YR") {
     )
 }
 
-#' Recode NHANES demographic columns into analysis-ready factors.
+#' Rename NHANES demographic columns to analysis-friendly names.
+#'
+#' The `nhanesA` package already returns `RIAGENDR` and `RIDRETH3` as
+#' labeled factors ("Male"/"Female", "Non-Hispanic White", ...), so we
+#' just alias them and coerce to numeric for age.
 recode_demographics <- function(df) {
   df |>
     mutate(
-      sex       = factor(RIAGENDR, levels = c(1, 2), labels = c("Male", "Female")),
-      age_years = RIDAGEYR,
-      race_eth  = factor(
-        RIDRETH3,
-        levels = c(1, 2, 3, 4, 6, 7),
-        labels = c(
-          "Mexican American", "Other Hispanic", "NH White", "NH Black",
-          "NH Asian", "Other / Multi"
-        )
-      )
+      sex       = RIAGENDR,
+      age_years = as.numeric(RIDAGEYR),
+      race_eth  = RIDRETH3
     )
 }
