@@ -237,15 +237,15 @@ plt.tight_layout()
 plt.show()
 ```
 
-## Where does the dollar go? A disease-group cost atlas
+## Where does the dollar go? A Medicaid category cost atlas
 
-A provider-outlier list is a fraud-review input. Most policy audiences, though, want the opposite question: **which disease categories cost the most, and where do those costs concentrate geographically?** Switching from "who" to "what and where" requires three pieces we've now built upstream in [`prep.py`](prep.py):
+A provider-outlier list is a fraud-review input. Most policy audiences, though, want the opposite question: **which categories of care cost the most, and where do those costs concentrate geographically?** Switching from "who" to "what and where" requires three pieces we've now built upstream in [`prep.py`](prep.py):
 
-1. A rule-based **HCPCS → category** classifier that buckets every procedure, drug, DME, and Medicaid-specific T-code into one of 12 clinical or service groups.
+1. A rule-based **HCPCS → category** classifier that buckets every procedure, drug, DME, and Medicaid-specific T-code into one of 12 spending categories.
 2. A **Census 2020 ZCTA → county** crosswalk so every provider's practice ZIP resolves to a county FIPS.
-3. A county × group aggregate with **within-group quintile rankings** so a single color scale reads consistently across panels: darker = this county is in the top 20% of cost-per-beneficiary for *that* group.
+3. A county × category aggregate with **within-category quintile rankings** so a single color scale reads consistently across panels: darker = this county is in the top 20% of cost-per-beneficiary for *that* category.
 
-Four of the 12 buckets are **service categories** rather than disease areas — Transportation (Medicaid NEMT), Long-Term Services & Supports, Evaluation & Management, and the Other Medical Services catch-all. They carry real dollars, so the atlas dropdown keeps them but groups them separately from the eight **disease-focused** buckets. Read the disease panels as clinical cost geography; read the service panels as "where does Medicaid spend on non-clinical support." The bar chart below puts both kinds side by side so the split is explicit.
+These buckets are a mix of clinical areas (Behavioral Health, Dental, Dialysis & ESRD, Prescription Drugs) and service-type groupings that the HCPCS code system itself organizes by (Surgery & Procedures, Radiology, Laboratory, DME, Transportation, LTSS, E&M) — not a true disease taxonomy. Reading the atlas as "categories of Medicaid spend" is more honest than reading it as "diseases": HCPCS doesn't carry diagnosis, so the closest we can get without ICD is spending-category geography.
 
 ::: {.callout-note}
 ## Why county, not HSA or ZIP3?
@@ -257,50 +257,37 @@ For a Medicaid cost atlas, counties are the defensible middle path — clean TIG
 county_atlas <- arrow::read_parquet(file.path(data_dir, "county_group_atlas.parquet"))
 group_totals <- arrow::read_parquet(file.path(data_dir, "group_totals.parquet"))
 
-service_buckets <- c(
-  "Transportation",
-  "Long-Term Services & Supports",
-  "Evaluation & Management",
-  "Other Medical Services"
-)
-
-top_groups <- group_totals |>
-  filter(!disease_group %in% service_buckets) |>
-  arrange(desc(total_paid)) |>
-  slice_head(n = 6) |>
-  pull(disease_group)
-
-top_service_groups <- group_totals |>
-  filter(disease_group %in% service_buckets) |>
+top_categories <- group_totals |>
   arrange(desc(total_paid)) |>
   pull(disease_group)
 
-atlas_groups <- c(top_groups, top_service_groups)
+# Recompute a within-category decile rank on paid-per-beneficiary. The parquet
+# carries quintiles from prep.py; we override with 10 bins here so shading
+# shows more granular within-category variation without re-running the
+# DuckDB prep. For categories with < 100 billing counties some deciles will
+# be tied — the lambda collapses those cleanly.
+county_atlas <- county_atlas |>
+  group_by(disease_group) |>
+  mutate(decile_ppb = dplyr::ntile(paid_per_bene, 10)) |>
+  ungroup()
 ```
 
 ```{r group-bar}
-#| fig-cap: "Total national Medicaid paid by group, 2024. Teal bars are the disease-focused groups that populate the atlas dropdown; gold bars are service categories kept for provenance but excluded from the choropleth because paid-per-beneficiary for transport, LTSS, E&M, and the classifier's catch-all isn't a defensible 'disease cost' metric."
+#| fig-cap: "Total national Medicaid paid by HCPCS-derived category, 2024. Ranked descending by total paid. 'Other Medical Services' captures 99000-series codes the classifier doesn't yet disambiguate."
 #| fig-width: 9
 #| fig-height: 4.5
 
 group_totals |>
-  mutate(
-    kind = if_else(disease_group %in% service_buckets,
-                   "Service category", "Disease-focused"),
-    disease_group = fct_reorder(disease_group, total_paid)
-  ) |>
-  ggplot(aes(disease_group, total_paid, fill = kind)) +
-  geom_col() +
-  scale_fill_manual(values = c("Service category" = "#b08a49",
-                               "Disease-focused"  = "#0d5c63")) +
+  mutate(category = fct_reorder(disease_group, total_paid)) |>
+  ggplot(aes(category, total_paid)) +
+  geom_col(fill = "#756bb1") +
   coord_flip() +
   scale_y_continuous(labels = format_money) +
-  labs(x = NULL, y = "Total paid (USD)", fill = NULL) +
-  theme(legend.position = "top")
+  labs(x = NULL, y = "Total paid (USD)")
 ```
 
 ```{r county-choropleth}
-#| fig-cap: "Interactive county-level cost atlas: Medicaid paid per beneficiary ranked into within-group quintiles (darker purple = higher cost relative to other counties for that same group). Each panel is its own choropleth so coloring is comparable within group, not across groups. The top-right dropdown groups options as *Disease areas* (top 6 by spend) and *Service categories* (NEMT, LTSS, E&M, and the classifier catch-all). Alaska, Hawaii, and territories omitted for contiguous-US framing; grey counties have no Medicaid providers billing that category."
+#| fig-cap: "Interactive county-level cost atlas: Medicaid paid per beneficiary ranked into within-category deciles (darker purple = higher cost relative to other counties for that same category). Each panel is its own choropleth so coloring is comparable within category, not across categories. Use the top-right dropdown to switch across all 12 HCPCS spending categories. Alaska, Hawaii, and territories omitted for contiguous-US framing; grey counties have no Medicaid providers billing that category."
 
 options(tigris_use_cache = TRUE)
 counties_sf <- tigris::counties(year = 2020, cb = TRUE, resolution = "5m", progress_bar = FALSE) |>
@@ -308,11 +295,11 @@ counties_sf <- tigris::counties(year = 2020, cb = TRUE, resolution = "5m", progr
   dplyr::filter(!stringr::str_detect(GEOID, "^(02|15|60|66|69|72|78)")) |>
   sf::st_transform(4326)
 
-purples <- c("#f2f0f7", "#cbc9e2", "#9e9ac8", "#756bb1", "#54278f")
-pal <- leaflet::colorFactor(purples, domain = factor(1:5))
+purples <- grDevices::colorRampPalette(c("#fcfbfd", "#3f007d"))(10)
+pal <- leaflet::colorFactor(purples, domain = factor(1:10))
 
 atlas_sub <- county_atlas |>
-  filter(disease_group %in% atlas_groups)
+  filter(disease_group %in% top_categories)
 
 lmap <- leaflet::leaflet(width = "100%", height = "620px") |>
   leaflet::addProviderTiles(
@@ -330,7 +317,7 @@ lmap <- leaflet::leaflet(width = "100%", height = "620px") |>
     options     = leaflet::pathOptions(interactive = FALSE)
   )
 
-for (g in atlas_groups) {
+for (g in top_categories) {
   dat <- counties_sf |>
     dplyr::inner_join(
       atlas_sub |> dplyr::filter(disease_group == g),
@@ -340,7 +327,7 @@ for (g in atlas_groups) {
     leaflet::addPolygons(
       data         = dat,
       group        = g,
-      fillColor    = ~pal(factor(quintile_ppb)),
+      fillColor    = ~pal(factor(decile_ppb)),
       fillOpacity  = 0.88,
       color        = "white",
       weight       = 0.3,
@@ -359,28 +346,20 @@ for (g in atlas_groups) {
         "Total paid: $",
         format(round(total_paid / 1e3), big.mark = ","), "K<br/>",
         "Providers: ", providers_n, "<br/>",
-        "Within-group quintile: ", quintile_ppb, " of 5"
+        "Within-category decile: ", decile_ppb, " of 10"
       )
     )
 }
 
-dropdown_payload <- jsonlite::toJSON(
-  list(
-    list(label = "Disease areas",      items = as.list(top_groups)),
-    list(label = "Service categories", items = as.list(top_service_groups))
-  ),
-  auto_unbox = TRUE
-)
+categories_json <- jsonlite::toJSON(top_categories)
 dropdown_js <- sprintf("
 function(el, x) {
   var map = this;
-  var optgroups = %s;
-  var allItems = [];
-  optgroups.forEach(function(g) { allItems = allItems.concat(g.items); });
-  var initial = allItems[0];
+  var categories = %s;
+  var initial = categories[0];
 
   function showOnly(picked) {
-    allItems.forEach(function(g) {
+    categories.forEach(function(g) {
       var fg = map.layerManager.getLayerGroup(g, false);
       if (!fg) return;
       if (g === picked) {
@@ -406,17 +385,12 @@ function(el, x) {
 
     var sel = document.createElement('select');
     sel.style.cssText = 'padding:4px 6px;font-size:12px;border:1px solid #ccc;border-radius:3px;background:white;min-width:240px;';
-    optgroups.forEach(function(og) {
-      var groupEl = document.createElement('optgroup');
-      groupEl.label = og.label;
-      og.items.forEach(function(g) {
-        var opt = document.createElement('option');
-        opt.value = g;
-        opt.textContent = g;
-        if (g === initial) opt.selected = true;
-        groupEl.appendChild(opt);
-      });
-      sel.appendChild(groupEl);
+    categories.forEach(function(g) {
+      var opt = document.createElement('option');
+      opt.value = g;
+      opt.textContent = g;
+      if (g === initial) opt.selected = true;
+      sel.appendChild(opt);
     });
     sel.addEventListener('change', function(e) { showOnly(e.target.value); });
 
@@ -428,26 +402,26 @@ function(el, x) {
   };
   ctrl.addTo(map);
 }
-", dropdown_payload)
+", categories_json)
 
 lmap |>
   htmlwidgets::onRender(dropdown_js) |>
   leaflet::addLegend(
     position = "bottomleft",
     colors   = purples,
-    labels   = c("1 (lowest)", "2", "3", "4", "5 (highest)"),
-    title    = "Quintile of paid<br/>per beneficiary",
+    labels   = c("1 (lowest)", "2", "3", "4", "5", "6", "7", "8", "9", "10 (highest)"),
+    title    = "Decile of paid<br/>per beneficiary",
     opacity  = 0.85
   )
 ```
 
-## Disease-area explorer
+## Category explorer
 
-The choropleth shows *where* a disease area is expensive. The three views below answer three follow-up questions policy audiences almost always ask next: **what drives the spend inside each disease area, how spatially concentrated is that spend, and which states sit at the top of the ladder?**
+The choropleth shows *where* a category is expensive. The three views below answer three follow-up questions policy audiences almost always ask next: **what HCPCS codes drive the spend inside each category, how spatially concentrated is that spend across counties, and which states sit at the top of the ladder?** Every chunk iterates over all 12 categories — no cherry-picking — so the honest shape of Medicaid dollar flow is visible in one sweep.
 
 ```{r hcpcs-classifier}
 #| code-fold: show
-#| code-summary: "HCPCS → group classifier (mirrors the DuckDB CASE in prep.py)"
+#| code-summary: "HCPCS → category classifier (mirrors the DuckDB CASE in prep.py)"
 
 classify_hcpcs <- function(code) {
   num    <- suppressWarnings(as.integer(code))
@@ -473,35 +447,35 @@ classify_hcpcs <- function(code) {
   )
 }
 
-hcpcs_by_group <- hcpcs_sum |>
-  mutate(disease_group = classify_hcpcs(hcpcs)) |>
-  filter(disease_group %in% top_groups)
+hcpcs_by_category <- hcpcs_sum |>
+  mutate(category = classify_hcpcs(hcpcs)) |>
+  filter(category %in% top_categories)
 ```
 
-### What codes drive each disease area?
+### What codes drive each category?
 
-```{r disease-area-hcpcs-mix}
-#| fig-cap: "Top 5 HCPCS codes by total Medicaid paid within each disease-focused group. The codes carrying the weight are very different per group — J-codes (specialty infusibles and injectables) dominate the drug bucket; a handful of E&M-adjacent therapy codes dominate Behavioral Health; a single periodic-exam code (D0120) and a pair of restoration codes drive most of Dental."
-#| fig-width: 10
-#| fig-height: 7
+```{r category-hcpcs-mix}
+#| fig-cap: "Top 5 HCPCS codes by total Medicaid paid within each category. The codes carrying the weight are very different per category — J-codes (specialty infusibles and injectables) dominate the drug bucket; Transportation collapses onto A0/T20-series non-emergency transport; LTSS is driven by T-series personal-care and case-management codes; E&M is dominated by the 99213/99214 office-visit pair; a single periodic-exam code (D0120) and a pair of restoration codes drive most of Dental."
+#| fig-width: 11
+#| fig-height: 11
 
-top_hcpcs_per_group <- hcpcs_by_group |>
-  dplyr::group_by(disease_group) |>
+top_hcpcs_per_category <- hcpcs_by_category |>
+  dplyr::group_by(category) |>
   dplyr::arrange(dplyr::desc(total_paid), .by_group = TRUE) |>
   dplyr::slice_head(n = 5) |>
   dplyr::ungroup() |>
   dplyr::mutate(
-    disease_group = factor(disease_group, levels = top_groups),
-    row_id        = dplyr::row_number()
+    category = factor(category, levels = top_categories),
+    row_id   = dplyr::row_number()
   )
 
-ggplot(top_hcpcs_per_group,
+ggplot(top_hcpcs_per_category,
        aes(x = stats::reorder(paste(hcpcs, row_id), total_paid),
            y = total_paid)) +
   geom_col(fill = "#54278f") +
   geom_text(aes(label = format_money(total_paid)),
             hjust = -0.08, size = 3, color = "#333") +
-  facet_wrap(~ disease_group, scales = "free", ncol = 2) +
+  facet_wrap(~ category, scales = "free", ncol = 3) +
   scale_x_discrete(labels = \(x) sub(" \\d+$", "", x)) +
   scale_y_continuous(labels = format_money,
                      expand = expansion(mult = c(0, 0.22))) +
@@ -509,12 +483,12 @@ ggplot(top_hcpcs_per_group,
   labs(x = NULL, y = "Total paid (all billing providers)")
 ```
 
-### How spatially concentrated is each disease area?
+### How spatially concentrated is each category?
 
-```{r disease-area-concentration}
-#| fig-cap: "Gini coefficient of county Medicaid paid within each disease-focused group, and the share of that group's total spend captured by just the top 10 counties. A Gini near 1 means spend collapses onto a handful of counties — expected for sparse, high-acuity categories; Gini near 0 is evenly diffused public outlay."
+```{r category-concentration}
+#| fig-cap: "Gini coefficient of county Medicaid paid within each category, and the share of that category's total spend captured by just the top 10 counties. A Gini near 1 means spend collapses onto a handful of counties — expected for sparse, high-acuity categories like Dialysis & ESRD; Gini near 0 is evenly diffused public outlay, like LTSS and E&M."
 #| fig-width: 9
-#| fig-height: 4.5
+#| fig-height: 5.5
 
 gini <- function(x) {
   x <- sort(x[!is.na(x) & x >= 0])
@@ -524,8 +498,8 @@ gini <- function(x) {
 }
 
 spatial_conc <- county_atlas |>
-  filter(disease_group %in% top_groups) |>
-  group_by(disease_group) |>
+  filter(disease_group %in% top_categories) |>
+  group_by(category = disease_group) |>
   summarise(
     counties_n    = dplyr::n(),
     gini_paid     = gini(total_paid),
@@ -536,8 +510,8 @@ spatial_conc <- county_atlas |>
   arrange(desc(gini_paid))
 
 spatial_conc |>
-  mutate(disease_group = fct_reorder(disease_group, gini_paid)) |>
-  ggplot(aes(disease_group, gini_paid)) +
+  mutate(category = fct_reorder(category, gini_paid)) |>
+  ggplot(aes(category, gini_paid)) +
   geom_col(fill = "#756bb1") +
   geom_text(aes(label = sprintf("Gini %.2f · top-10 share %s",
                                 gini_paid,
@@ -547,16 +521,16 @@ spatial_conc |>
   scale_y_continuous(limits = c(0, 1.05),
                      labels = scales::number_format(accuracy = 0.01),
                      expand = expansion(mult = c(0, 0))) +
-  labs(x = NULL, y = "Gini of county Medicaid paid (within disease group)") +
+  labs(x = NULL, y = "Gini of county Medicaid paid (within category)") +
   theme(plot.margin = margin(5, 110, 5, 5))
 ```
 
-### Which states lead each disease area?
+### Which states lead each category?
 
-```{r disease-area-state-hotspots}
+```{r category-state-hotspots}
 state_hotspots <- county_atlas |>
-  filter(disease_group %in% top_groups, !is.na(state)) |>
-  group_by(state, disease_group) |>
+  filter(disease_group %in% top_categories, !is.na(state)) |>
+  group_by(state, category = disease_group) |>
   summarise(
     state_paid = sum(total_paid,  na.rm = TRUE),
     state_bene = sum(total_bene,  na.rm = TRUE),
@@ -565,127 +539,24 @@ state_hotspots <- county_atlas |>
   ) |>
   filter(state_bene >= 1000) |>
   mutate(state_ppb = state_paid / state_bene) |>
-  group_by(disease_group) |>
+  group_by(category) |>
   arrange(desc(state_ppb), .by_group = TRUE) |>
   slice_head(n = 5) |>
   ungroup() |>
-  mutate(disease_group = factor(disease_group, levels = top_groups)) |>
-  arrange(disease_group, desc(state_ppb))
+  mutate(category = factor(category, levels = top_categories)) |>
+  arrange(category, desc(state_ppb))
 
 knitr::kable(
   state_hotspots |>
     transmute(
-      `Disease group`      = disease_group,
+      Category             = category,
       State                = state,
       Counties             = counties,
       `Total paid`         = format_money(state_paid),
       Beneficiaries        = format(state_bene, big.mark = ","),
       `$ per beneficiary`  = format_money(state_ppb)
     ),
-  caption = "Top 5 states by Medicaid paid-per-beneficiary within each disease-focused group (states with at least 1,000 beneficiaries in that group)."
-)
-```
-
-## Service-area explorer — where non-clinical Medicaid dollars go
-
-Disease categories answer *which diseases cost most*. Service categories answer a complementary question: **what non-clinical support Medicaid underwrites at scale.** Transportation (NEMT), Long-Term Services & Supports, the Evaluation & Management bucket of office visits, and the Other Medical Services catch-all together account for a majority of paid dollars in the dataset. The same three views applied to that subset:
-
-```{r service-area-hcpcs-mix}
-#| fig-cap: "Top 5 HCPCS codes by total Medicaid paid within each service category. Transportation collapses onto a handful of A0/T20-series non-emergency transport codes; LTSS is driven by T-series personal-care and case-management codes; E&M is dominated by the 99213/99214 office-visit pair; Other Medical Services surfaces the un-disambiguated 99000-series the classifier punts on."
-#| fig-width: 10
-#| fig-height: 6.5
-
-hcpcs_by_service <- hcpcs_sum |>
-  mutate(disease_group = classify_hcpcs(hcpcs)) |>
-  filter(disease_group %in% top_service_groups)
-
-top_hcpcs_per_service <- hcpcs_by_service |>
-  dplyr::group_by(disease_group) |>
-  dplyr::arrange(dplyr::desc(total_paid), .by_group = TRUE) |>
-  dplyr::slice_head(n = 5) |>
-  dplyr::ungroup() |>
-  dplyr::mutate(
-    disease_group = factor(disease_group, levels = top_service_groups),
-    row_id        = dplyr::row_number()
-  )
-
-ggplot(top_hcpcs_per_service,
-       aes(x = stats::reorder(paste(hcpcs, row_id), total_paid),
-           y = total_paid)) +
-  geom_col(fill = "#b08a49") +
-  geom_text(aes(label = format_money(total_paid)),
-            hjust = -0.08, size = 3, color = "#333") +
-  facet_wrap(~ disease_group, scales = "free", ncol = 2) +
-  scale_x_discrete(labels = \(x) sub(" \\d+$", "", x)) +
-  scale_y_continuous(labels = format_money,
-                     expand = expansion(mult = c(0, 0.22))) +
-  coord_flip() +
-  labs(x = NULL, y = "Total paid (all billing providers)")
-```
-
-```{r service-area-concentration}
-#| fig-cap: "Spatial concentration of Medicaid paid per service category. LTSS and E&M dollars diffuse across thousands of counties (low Gini); NEMT is more concentrated — not surprising since transport benefits cluster in urban corridors and aging-rural regions with long travel distances to care."
-#| fig-width: 9
-#| fig-height: 3.8
-
-service_conc <- county_atlas |>
-  filter(disease_group %in% top_service_groups) |>
-  group_by(disease_group) |>
-  summarise(
-    counties_n    = dplyr::n(),
-    gini_paid     = gini(total_paid),
-    top10_share   = sum(sort(total_paid, decreasing = TRUE)[seq_len(min(10, dplyr::n()))],
-                        na.rm = TRUE) / sum(total_paid, na.rm = TRUE),
-    .groups = "drop"
-  ) |>
-  arrange(desc(gini_paid))
-
-service_conc |>
-  mutate(disease_group = fct_reorder(disease_group, gini_paid)) |>
-  ggplot(aes(disease_group, gini_paid)) +
-  geom_col(fill = "#b08a49") +
-  geom_text(aes(label = sprintf("Gini %.2f · top-10 share %s",
-                                gini_paid,
-                                scales::percent(top10_share, accuracy = 1))),
-            hjust = -0.05, size = 3.1, color = "#333") +
-  coord_flip(clip = "off") +
-  scale_y_continuous(limits = c(0, 1.05),
-                     labels = scales::number_format(accuracy = 0.01),
-                     expand = expansion(mult = c(0, 0))) +
-  labs(x = NULL, y = "Gini of county Medicaid paid (within service category)") +
-  theme(plot.margin = margin(5, 110, 5, 5))
-```
-
-```{r service-area-state-hotspots}
-service_state_hotspots <- county_atlas |>
-  filter(disease_group %in% top_service_groups, !is.na(state)) |>
-  group_by(state, disease_group) |>
-  summarise(
-    state_paid = sum(total_paid,  na.rm = TRUE),
-    state_bene = sum(total_bene,  na.rm = TRUE),
-    counties   = dplyr::n(),
-    .groups = "drop"
-  ) |>
-  filter(state_bene >= 1000) |>
-  mutate(state_ppb = state_paid / state_bene) |>
-  group_by(disease_group) |>
-  arrange(desc(state_ppb), .by_group = TRUE) |>
-  slice_head(n = 5) |>
-  ungroup() |>
-  mutate(disease_group = factor(disease_group, levels = top_service_groups)) |>
-  arrange(disease_group, desc(state_ppb))
-
-knitr::kable(
-  service_state_hotspots |>
-    transmute(
-      `Service category`   = disease_group,
-      State                = state,
-      Counties             = counties,
-      `Total paid`         = format_money(state_paid),
-      Beneficiaries        = format(state_bene, big.mark = ","),
-      `$ per beneficiary`  = format_money(state_ppb)
-    ),
-  caption = "Top 5 states by Medicaid paid-per-beneficiary within each service category (states with at least 1,000 beneficiaries in that category)."
+  caption = "Top 5 states by Medicaid paid-per-beneficiary within each category (states with at least 1,000 beneficiaries in that category)."
 )
 ```
 
