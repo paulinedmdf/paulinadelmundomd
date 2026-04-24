@@ -61,8 +61,8 @@ library(ggplot2)
 library(purrr)
 library(reticulate)
 
-# MI + pooling packages — installed on first render if absent.
-for (pkg in c("mice", "mitools")) {
+# Method packages — installed on first render if absent.
+for (pkg in c("mice", "mitools", "e1071", "fitdistrplus", "performance", "lme4")) {
   if (!requireNamespace(pkg, quietly = TRUE)) {
     install.packages(pkg, repos = "https://cloud.r-project.org")
   }
@@ -304,6 +304,143 @@ cat(sprintf(
   format(nrow(dat),      big.mark = ","),
   100 * (1 - nrow(dat) / nrow(dat_full))
 ))
+```
+
+## Diagnostics on the analytic cohort
+
+Three publication-grade checks before any modeling: a **formal distributional fit** for each continuous candidate (skew/kurtosis quantified, candidate distributions ranked by AIC), a **selection-bias check** comparing the dropped rows to the kept ones, and an **ICC variance partition** that quantifies how much of the outcome variance lives at each clustering level of the NHANES sample design.
+
+```{r eda-distributional-fit}
+#| label: eda-distributional-fit
+
+cont_vars <- list(
+  bmi   = dat_full$bmi,   waist = dat_full$waist,
+  trig  = dat_full$trig,  hdl   = dat_full$hdl,
+  sbp   = dat_full$sbp,   dbp   = dat_full$dbp,
+  fpg   = dat_full$fpg,   tc    = dat_full$tc
+)
+
+skew_kurt <- vapply(cont_vars, function(x) {
+  x <- x[!is.na(x)]
+  c(skew = e1071::skewness(x), kurtosis = e1071::kurtosis(x))
+}, numeric(2))
+
+knitr::kable(
+  data.frame(
+    Variable = colnames(skew_kurt),
+    n        = vapply(cont_vars, \(x) sum(!is.na(x)), integer(1)),
+    Skew     = round(skew_kurt["skew", ], 2),
+    `Excess kurtosis` = round(skew_kurt["kurtosis", ], 2),
+    Shape    = ifelse(abs(skew_kurt["skew", ]) > 1, "Right-skewed",
+                ifelse(abs(skew_kurt["skew", ]) > 0.5, "Mildly skewed", "Roughly symmetric")),
+    check.names = FALSE
+  ),
+  caption = "Skewness and excess kurtosis on the eight continuous candidate variables. |skew| > 1 indicates a heavy tail that materially affects the choice of regression family or transformation. The right-skewed variables get a formal distribution fit in the next table."
+)
+
+skewed <- names(cont_vars)[abs(skew_kurt["skew", ]) > 1]
+fit_results <- list()
+for (v in skewed) {
+  x <- cont_vars[[v]]
+  x <- x[!is.na(x) & x > 0]
+  fits <- list(
+    normal = try(fitdistrplus::fitdist(x, "norm"),  silent = TRUE),
+    lnorm  = try(fitdistrplus::fitdist(x, "lnorm"), silent = TRUE),
+    gamma  = try(fitdistrplus::fitdist(x, "gamma"), silent = TRUE)
+  )
+  aics <- vapply(fits, function(f) {
+    if (inherits(f, "try-error") || is.null(f)) NA_real_ else f$aic
+  }, numeric(1))
+  fit_results[[v]] <- aics
+}
+
+if (length(fit_results) > 0) {
+  fit_mat <- do.call(rbind, fit_results)
+  best    <- colnames(fit_mat)[apply(fit_mat, 1, function(r) which.min(r))]
+  knitr::kable(
+    data.frame(
+      Variable = rownames(fit_mat),
+      `AIC normal` = round(fit_mat[, "normal"], 0),
+      `AIC log-normal` = round(fit_mat[, "lnorm"], 0),
+      `AIC gamma` = round(fit_mat[, "gamma"], 0),
+      `Best fit`  = best,
+      check.names = FALSE
+    ),
+    caption = "AIC comparison of three candidate distributions on the right-skewed variables (positive values only). Lowest AIC = best fit. The 'best fit' column is the recommended starting family for any regression that takes one of these as outcome — for triglycerides and fasting glucose the answer is almost always log-normal or gamma rather than normal."
+  )
+}
+```
+
+```{r eda-selection-bias}
+#| label: eda-selection-bias
+
+# Tag inclusion status, then formally test whether the included and
+# excluded subsamples differ on the demographics we're going to condition
+# on downstream. Significant differences quantify the selection-bias
+# threat that motivates MICE in a later section.
+dat_full2 <- dat_full |>
+  dplyr::mutate(included = SEQN %in% dat$SEQN)
+
+n_inc <- sum(dat_full2$included)
+n_exc <- sum(!dat_full2$included)
+
+results <- list(
+  age_years = stats::t.test(age_years ~ included, data = dat_full2),
+  bmi       = stats::t.test(bmi       ~ included, data = dat_full2),
+  sex       = stats::chisq.test(table(dat_full2$sex,      dat_full2$included)),
+  race_eth  = stats::chisq.test(table(dat_full2$race_eth, dat_full2$included)),
+  cycle     = stats::chisq.test(table(dat_full2$cycle,    dat_full2$included))
+)
+
+bias_df <- data.frame(
+  Variable    = names(results),
+  Test        = c("Welch t", "Welch t", "Pearson chi-squared",
+                  "Pearson chi-squared", "Pearson chi-squared"),
+  Statistic   = vapply(results, \(r) round(as.numeric(r$statistic), 2), numeric(1)),
+  df          = vapply(results, \(r) {
+    p <- if (!is.null(r$parameter)) as.numeric(r$parameter[1]) else NA_real_
+    if (is.na(p)) "" else as.character(round(p, 1))
+  }, character(1)),
+  `p-value`   = vapply(results, \(r) format.pval(r$p.value, eps = 1e-300, digits = 2),
+                       character(1)),
+  check.names = FALSE
+)
+
+cat(sprintf("Included (complete-case) : %s\nExcluded                : %s\n\n",
+            format(n_inc, big.mark = ","),
+            format(n_exc, big.mark = ",")))
+knitr::kable(
+  bias_df,
+  caption = "Selection-bias diagnostics: do the rows we drop in the complete-case filter differ from the rows we keep, on the demographics that condition the downstream regression? Significant differences (typically on age, since fasting subsamples skew older) quantify the threat that motivates the MICE section below."
+)
+```
+
+```{r eda-icc-partition}
+#| label: eda-icc-partition
+
+# Partition the variance of MetS at NHANES's complex-survey clustering
+# levels — strata, then PSU within stratum. Subject-level variance
+# falls out as the residual.
+icc_model <- lme4::glmer(
+  as.integer(metsyn) ~ 1 + (1 | SDMVSTRA) + (1 | SDMVPSU),
+  data    = dat,
+  family  = binomial(),
+  control = lme4::glmerControl(optimizer = "bobyqa")
+)
+
+vc <- as.data.frame(lme4::VarCorr(icc_model))[, c("grp", "vcov")]
+# For binomial GLMM with logit link, the residual variance is fixed at
+# pi^2 / 3 on the latent scale (Snijders & Bosker convention).
+vc <- rbind(vc, data.frame(grp = "Residual (latent)", vcov = pi^2 / 3))
+total <- sum(vc$vcov)
+vc$ICC_pct <- sprintf("%.2f%%", 100 * vc$vcov / total)
+vc$Variance <- round(vc$vcov, 4)
+
+knitr::kable(
+  vc[, c("grp", "Variance", "ICC_pct")],
+  col.names = c("Clustering level", "Variance", "% of total"),
+  caption = "Variance partition for binary MetS via random-intercept logit. Stratum + PSU together carry the design-induced clustering; the residual is the per-subject variance on the latent (logit) scale (pi^2/3 by convention). When the stratum + PSU share is non-trivial, design-aware estimators are doing real inferential work — not a stylistic choice."
+)
 ```
 
 ## Weighted prevalence by demographics

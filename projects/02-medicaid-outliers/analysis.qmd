@@ -229,7 +229,112 @@ cat(sprintf(paste0(
 
 The geo-coverage line is the join-quality check that any geographic claim downstream depends on: a county-level atlas built from a 60% NPPES-state coverage would mean the map is showing 60% of the data, not 100% — and the difference matters for any conclusion about state-level Medicaid policy.
 
-## Pareto: where does the dollar concentrate?
+### Overdispersion and zero-inflation diagnostics
+
+Two formal checks before any future modeling on the count-like features. The variance-to-mean ratio (VMR) tests whether Poisson is even on the table — a VMR much greater than 1 means the variance grows faster than the mean and you need negative binomial (or quasi-Poisson). Pairing VMR with the % zero count is what motivates a **zero-inflated NB** rather than a plain NB.
+
+```{r eda-overdispersion}
+#| label: eda-overdispersion
+
+vmr <- function(x) {
+  x <- x[!is.na(x) & x >= 0]
+  if (length(x) == 0 || mean(x) == 0) return(c(mean = NA, var = NA, vmr = NA))
+  c(mean = mean(x), var = stats::var(x), vmr = stats::var(x) / mean(x))
+}
+zero_pct <- function(x) {
+  x <- x[!is.na(x)]
+  if (!length(x)) return(NA_real_)
+  100 * mean(x == 0)
+}
+
+vmr_tbl <- rbind(
+  paid          = vmr(outliers$paid),
+  beneficiaries = vmr(outliers$beneficiaries),
+  claims        = vmr(outliers$claims),
+  months_active = vmr(outliers$months_active)
+)
+
+family_call <- function(v) {
+  if (is.na(v)) return("—")
+  if (v < 1.2)              "Poisson"
+  else if (v < 5)           "Quasi-Poisson / NB"
+  else                      "Negative binomial / ZINB"
+}
+
+knitr::kable(
+  data.frame(
+    Variable     = rownames(vmr_tbl),
+    Mean         = sprintf("%.1f", vmr_tbl[, "mean"]),
+    Variance     = sprintf("%.1f", vmr_tbl[, "var"]),
+    VMR          = sprintf("%.1f", vmr_tbl[, "vmr"]),
+    `% zeros`    = sprintf("%.2f%%",
+                            vapply(list(outliers$paid, outliers$beneficiaries,
+                                        outliers$claims, outliers$months_active),
+                                   zero_pct, numeric(1))),
+    `Family`     = vapply(vmr_tbl[, "vmr"], family_call, character(1)),
+    check.names = FALSE
+  ),
+  caption = "Variance-to-mean ratio (VMR), zero-inflation, and the implied regression family for each count-like feature. Caveat: the outliers parquet is already filtered to robust_z >= 2 OR top-20 spend codes AND beneficiaries >= 11 in prep, so the % zeros reads near 0 by construction. The VMR is still informative because it characterizes the conditional dispersion that any future modeling step will need to absorb."
+)
+```
+
+### Within-flagged-set selection bias
+
+The outliers parquet is itself a non-random sample of the full DuckDB output (kept rows are those with `robust_z >= 2` OR billed under the top-20 spending HCPCS codes). We can't directly compare against the dropped rows without re-running the 11 GB DuckDB pipeline, but we *can* check whether the **high-z subset** (`robust_z >= 5`, the program-integrity threshold) systematically differs from the **moderate-z subset** (`2 <= robust_z < 5`) on the variables we'd otherwise model — a "what makes the flagged-flagged set different from the merely flagged" check.
+
+```{r eda-within-cohort-bias}
+#| label: eda-within-cohort-bias
+
+with_groups <- outliers |>
+  dplyr::filter(!is.na(robust_z), robust_z >= 2) |>
+  dplyr::mutate(
+    z_group = dplyr::if_else(robust_z >= 5, "High z (>= 5)", "Moderate z (2 - 5)")
+  )
+
+n_hi  <- sum(with_groups$z_group == "High z (>= 5)")
+n_mod <- sum(with_groups$z_group == "Moderate z (2 - 5)")
+
+cont_results <- list(
+  beneficiaries  = stats::wilcox.test(beneficiaries  ~ z_group, data = with_groups),
+  claims         = stats::wilcox.test(claims         ~ z_group, data = with_groups),
+  paid           = stats::wilcox.test(paid           ~ z_group, data = with_groups),
+  paid_per_bene  = stats::wilcox.test(paid_per_bene  ~ z_group, data = with_groups),
+  months_active  = stats::wilcox.test(months_active  ~ z_group, data = with_groups)
+)
+
+state_tab <- table(with_groups$state, with_groups$z_group)
+spec_tab  <- table(with_groups$specialty_class, with_groups$z_group)
+
+cat_tests <- list(
+  state           = suppressWarnings(stats::chisq.test(state_tab)),
+  specialty_class = suppressWarnings(stats::chisq.test(spec_tab))
+)
+
+bias_df <- data.frame(
+  Variable    = c(names(cont_results), names(cat_tests)),
+  Test        = c(rep("Mann-Whitney U", length(cont_results)),
+                  rep("Pearson chi-squared", length(cat_tests))),
+  Statistic   = c(
+    vapply(cont_results, \(r) round(as.numeric(r$statistic), 0), numeric(1)),
+    vapply(cat_tests,    \(r) round(as.numeric(r$statistic), 1), numeric(1))
+  ),
+  `p-value`   = c(
+    vapply(cont_results, \(r) format.pval(r$p.value, eps = 1e-300, digits = 2),
+           character(1)),
+    vapply(cat_tests,    \(r) format.pval(r$p.value, eps = 1e-300, digits = 2),
+           character(1))
+  ),
+  check.names = FALSE
+)
+
+cat(sprintf("High-z (>= 5)         : %s rows\nModerate-z (2 - 5)    : %s rows\n\n",
+            format(n_hi,  big.mark = ","),
+            format(n_mod, big.mark = ",")))
+knitr::kable(
+  bias_df,
+  caption = "Within-flagged-set bias check: do high-z (>= 5) rows differ from moderate-z (2 - 5) rows on the inputs that would feed any peer-comparison model? The 'high-z is just larger providers' null can be ruled out by checking the beneficiary and claim distributions; specialty mix differences expose which clinical areas drive the high-z tail."
+)
+```
 
 ```{r pareto}
 #| fig-cap: "Cumulative share of total Medicaid paid dollars, ordered by HCPCS code from highest- to lowest-spending. A steep early curve means a small set of codes drives most public outlay."
