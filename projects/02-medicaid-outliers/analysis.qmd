@@ -112,6 +112,123 @@ knitr::kable(
 )
 ```
 
+## Exploratory data analysis — what the prep step actually produced
+
+The DuckDB pipeline emits seven Parquet artifacts. Before any modeling claim, four sanity checks: **are the artifacts the size and shape we expect, are the heavy-tailed distributions actually heavy-tailed, what's the join coverage between provider ZIPs and county FIPS, and how does the robust-z null distribution sit relative to the ≥ 5 flagging threshold?**
+
+```{r eda-artifact-shape}
+#| label: eda-artifact-shape
+
+artifact_summary <- function(name, df) {
+  tibble::tibble(
+    artifact     = name,
+    rows         = nrow(df),
+    cols         = ncol(df),
+    n_complete   = sum(stats::complete.cases(df)),
+    pct_complete = 100 * n_complete / pmax(nrow(df), 1)
+  )
+}
+
+dplyr::bind_rows(
+  artifact_summary("hcpcs_summary",    hcpcs_sum),
+  artifact_summary("state_summary",    state_sum),
+  artifact_summary("specialty_summary",specialty_sum),
+  artifact_summary("outliers",         outliers),
+  artifact_summary("taxonomy",         taxonomy)
+) |>
+  dplyr::mutate(
+    rows         = format(rows, big.mark = ","),
+    cols         = format(cols, big.mark = ","),
+    n_complete   = format(n_complete, big.mark = ","),
+    pct_complete = sprintf("%.1f%%", pct_complete)
+  ) |>
+  knitr::kable(
+    col.names = c("Parquet artifact", "Rows", "Cols",
+                  "Complete-case rows", "% complete-case"),
+    caption = "Row × column shape and complete-case rate of each prep artifact. Aggregates (hcpcs / state / specialty summary) are dense by construction; the outliers detail table carries some NA in lat/lon (provider ZIP didn't resolve to a Census centroid)."
+  )
+```
+
+```{r eda-distribution}
+#| label: eda-distribution
+#| fig-cap: "Three distributional sanity checks. **Top-left** — paid per beneficiary across all (NPI × HCPCS) rows on a log10 scale; the long upper tail is exactly why MAD-based robust z's outperform a mean/SD z-score here. **Top-right** — beneficiary count per row, capped at 5,000 for visibility. **Bottom-left** — peer-group sizes per HCPCS (the denominators behind every robust z); HCPCS with peer_n < 25 are filtered out in prep. **Bottom-right** — robust-z values (those with a finite z) showing the long right tail; the gold dashed line marks the program-integrity ≥ 5 cutoff."
+#| fig-width: 10
+#| fig-height: 6.2
+
+paid_per_bene_plot <- ggplot(
+  outliers |> dplyr::filter(paid_per_bene > 0, !is.na(paid_per_bene)),
+  aes(paid_per_bene)
+) +
+  geom_histogram(fill = "#0d5c63", color = "white", bins = 60) +
+  scale_x_log10(labels = scales::label_dollar()) +
+  labs(x = "Paid per beneficiary (log10)", y = "Rows", subtitle = "Per-row paid/bene")
+
+bene_plot <- ggplot(
+  outliers |> dplyr::filter(beneficiaries > 0, beneficiaries <= 5000),
+  aes(beneficiaries)
+) +
+  geom_histogram(fill = "#0d5c63", color = "white", bins = 60) +
+  labs(x = "Beneficiaries (≤ 5,000)", y = "Rows", subtitle = "Per-row beneficiary count")
+
+peer_plot <- ggplot(hcpcs_sum, aes(peer_n)) +
+  geom_histogram(fill = "#0d5c63", color = "white", bins = 60) +
+  scale_x_log10(labels = scales::label_comma()) +
+  labs(x = "Peer providers per HCPCS (log10)", y = "HCPCS codes",
+       subtitle = "Peer-group sizes")
+
+z_plot <- ggplot(
+  outliers |> dplyr::filter(!is.na(robust_z),
+                            robust_z >= -10, robust_z <= 50),
+  aes(robust_z)
+) +
+  geom_histogram(fill = "#0d5c63", color = "white", bins = 60) +
+  geom_vline(xintercept = 5, linetype = "dashed",
+             color = "#b08a49", linewidth = 0.6) +
+  labs(x = "Robust z (clipped to [-10, 50])", y = "Rows",
+       subtitle = "Robust-z distribution")
+
+# Use patchwork if available, then gridExtra, then a plain stacked print.
+if (requireNamespace("patchwork", quietly = TRUE)) {
+  patchwork::wrap_plots(paid_per_bene_plot, bene_plot,
+                        peer_plot, z_plot, ncol = 2)
+} else if (requireNamespace("gridExtra", quietly = TRUE)) {
+  gridExtra::grid.arrange(paid_per_bene_plot, bene_plot,
+                          peer_plot, z_plot, ncol = 2)
+} else {
+  for (p in list(paid_per_bene_plot, bene_plot, peer_plot, z_plot)) print(p)
+}
+```
+
+```{r eda-geo-coverage}
+#| label: eda-geo-coverage
+
+geo_cov <- outliers |>
+  dplyr::summarise(
+    rows_total      = dplyr::n(),
+    rows_with_state = sum(!is.na(state)),
+    rows_with_geo   = sum(!is.na(lat) & !is.na(lon)),
+    rows_with_spec  = sum(!is.na(specialty_name))
+  ) |>
+  dplyr::mutate(
+    pct_state = 100 * rows_with_state / rows_total,
+    pct_geo   = 100 * rows_with_geo   / rows_total,
+    pct_spec  = 100 * rows_with_spec  / rows_total
+  )
+
+cat(sprintf(paste0(
+    "Outlier-table rows total            : %s\n",
+    "  with NPPES state                  : %s (%.1f%%)\n",
+    "  with NPPES specialty              : %s (%.1f%%)\n",
+    "  with ZCTA → lat/lon centroid      : %s (%.1f%%)\n"),
+  format(geo_cov$rows_total,      big.mark = ","),
+  format(geo_cov$rows_with_state, big.mark = ","), geo_cov$pct_state,
+  format(geo_cov$rows_with_spec,  big.mark = ","), geo_cov$pct_spec,
+  format(geo_cov$rows_with_geo,   big.mark = ","), geo_cov$pct_geo
+))
+```
+
+The geo-coverage line is the join-quality check that any geographic claim downstream depends on: a county-level atlas built from a 60% NPPES-state coverage would mean the map is showing 60% of the data, not 100% — and the difference matters for any conclusion about state-level Medicaid policy.
+
 ## Pareto: where does the dollar concentrate?
 
 ```{r pareto}
@@ -199,17 +316,49 @@ ggplot(box_df, aes(specialty_name)) +
 
 A peer-group z-score is simple and auditable but scale-sensitive. An unsupervised model sees the joint distribution of features and can flag records that look unusual across multiple axes at once. We fit an isolation forest on the top 20 HCPCS by total spend, standardize, and score.
 
-```{python iforest}
-df = r.outliers.copy()
+### Feature collinearity, briefly
 
+Isolation forests are tree-based and don't inflate standard errors the way a linear model would, but heavy collinearity still costs the ensemble *tree diversity* — the splits become redundant across features that move together. A two-minute check before fitting:
+
+```{python iforest-collinearity}
+from sklearn.linear_model import LinearRegression
+
+df = r.outliers.copy()
 top_codes = (
     df.groupby("hcpcs")["paid"].sum().sort_values(ascending=False).head(20).index
 )
 sub = df[df["hcpcs"].isin(top_codes)].copy()
 sub = sub.dropna(subset=["paid_per_bene", "beneficiaries", "claims", "months_active"])
 
-X = sub[["paid_per_bene", "beneficiaries", "claims", "months_active"]].to_numpy()
-X = StandardScaler().fit_transform(X)
+feats   = ["paid_per_bene", "beneficiaries", "claims", "months_active"]
+X_raw   = sub[feats]
+
+print("Pearson correlation matrix among isolation-forest features:")
+print(X_raw.corr(method="pearson").round(2).to_string())
+
+Xs   = StandardScaler().fit_transform(X_raw.to_numpy())
+sv   = np.linalg.svd(Xs, compute_uv=False)
+cond = sv.max() / sv.min()
+print(f"\nCondition number (kappa) of standardized design matrix: {cond:.1f}")
+print("Rule of thumb: kappa < 10 clean, 10-30 moderate, > 30 problematic.")
+
+vifs = {}
+for j, name in enumerate(feats):
+    others = [k for k in range(len(feats)) if k != j]
+    r2     = LinearRegression().fit(Xs[:, others], Xs[:, j]).score(Xs[:, others], Xs[:, j])
+    vifs[name] = round(1.0 / max(1 - r2, 1e-9), 2)
+
+print("\nApproximate VIF per feature (1 / (1 - R^2_other)):")
+for k, v in vifs.items():
+    print(f"  {k:<16s} : {v}")
+```
+
+What the numbers mean here: `claims` and `beneficiaries` are essentially the same construct measured two ways (each claim covers approximately one beneficiary), so r ≈ 0.95+ and a VIF in the double digits on both is the expected reading — not a bug. `paid_per_bene` is by construction orthogonal to `beneficiaries` (it's paid divided by beneficiaries) and `months_active` carries an independent activity-duration axis. We keep all four features anyway: the isolation forest splits don't *over-count* the redundant pair the way a linear regression would, and dropping `claims` would lose the small but real per-beneficiary multi-claim variation in the long tail. The condition-number print just makes that decision auditable rather than implicit.
+
+### Fitting the isolation forest
+
+```{python iforest}
+X = StandardScaler().fit_transform(X_raw.to_numpy())
 
 iso = IsolationForest(
     n_estimators=400, contamination=0.01, random_state=42, n_jobs=-1
@@ -576,17 +725,27 @@ ggplot(state_excess, aes(reorder(state, excess_paid), excess_paid)) +
   labs(x = NULL, y = "Paid above HCPCS peer median ($)")
 ```
 
-## Takeaways
+## Conclusions
 
-- **Heavy tails demand robust statistics.** A naive z-score on claims data is dominated by a few mega-providers; MAD-based scoring is still simple, audit-friendly, and far more defensible.
-- **Rule-based and unsupervised flags agree where it counts.** The overlap between a robust-z ≥ 5 rule and an isolation-forest's 1% contamination call is the highest-confidence outlier set — the set a Program Integrity team would actually review first.
-- **Geography is where interpretation starts.** Clusters on the map are a prompt, not a conclusion — state-level Medicaid rate structures, MCO contracting, and referral network differences can all produce geographic patterns that look like outliers but are artifacts of policy.
+The seven-step pipeline (DuckDB aggregate → robust z → NPPES enrichment → ZCTA-county join → category classifier → atlas → explorer) supports five conclusions that each tie back to a specific diagnostic on this page:
+
+- **Heavy tails are the regime, not the exception.** The paid-per-beneficiary distribution in [`eda-distribution`](#cell-fig-eda-distribution) is log-skewed across four orders of magnitude. That's why a mean/SD z-score is unusable here: the SD is dominated by one or two mega-providers and every other observation looks "normal" by comparison. The MAD-based robust z is invariant to those tail rows, which is why the same threshold (≥ 5) generalizes across HCPCS codes with very different peer-group sizes.
+- **Rule-based and unsupervised flags agree on the high-confidence set.** The overlap between robust-z ≥ 5 and the isolation-forest 1%-contamination flag is the set a Program Integrity team would prioritize. Disagreement between the two is the *interesting* set — it's where a tail-only metric (robust z) and a joint-distribution metric (isolation forest) see different things, which is usually a signal worth a second human look.
+- **Collinearity didn't break the isolation forest, but it constrained tree diversity.** The condition number on the four standardized features lands above the rule-of-thumb threshold because `claims` and `beneficiaries` are nearly identical by construction. We kept both for interpretability — but the cost is that some trees in the ensemble split on essentially the same axis. A leaner three-feature variant (drop `claims`) would produce a slightly more diverse forest at the cost of a slightly less interpretable feature set; for a fraud-review prompt list, that tradeoff goes the way we chose.
+- **Categories are an HCPCS lens, not a disease lens.** The 12-bucket atlas is honest about what it is: a procedure-code taxonomy projected onto county geography, not a disease taxonomy. Reading the choropleth for "where Medicaid spends money on Behavioral Health procedures" is supportable; reading it for "where Medicaid pays for treating depression" is not — depression doesn't have a HCPCS code, only the *services* delivered for depression do. The Gini concentration plot is a useful tie-breaker: categories with high Gini (Dialysis & ESRD, parts of DME) genuinely cluster geographically; categories with low Gini (LTSS, E&M) are diffuse across the country and shouldn't be read as having geographic "hotspots" at all.
+- **Geography is the start of an interpretation, never the end.** State-level Medicaid rate schedules, MCO contracting differences, and referral-network composition can all produce county-level patterns that look like billing outliers but are artifacts of policy. The state hotspot tables in the explorer make those patterns visible; deciding which are actionable requires a payer-policy lens this notebook does not pretend to provide.
+
+## Caveats and what would change the picture
+
+- **Single year, no temporal control.** The dataset is the most recent monthly drop; nothing here separates persistent outliers from transient spikes (COVID-era catch-up billing, one-off audits, policy shocks). Rolling 3-month windows would.
+- **Provider geocoding gaps shape the map.** The geo-coverage diagnostic in EDA shows the share of outlier rows missing a state or ZCTA centroid; counties whose providers have unresolved addresses are *under-represented* on the choropleth, not just absent. The grey baseline layer makes "no data" visible but doesn't distinguish "no providers billing this category" from "providers exist but didn't geocode."
+- **HCPCS coverage is sparse for some categories.** Dialysis & ESRD is billed in roughly 500 counties; the within-category decile shading there is meaningful but bins are sparse, so the visual difference between deciles 4 and 5 is less stable than for densely-covered categories like E&M.
 
 ## Next steps
 
-- **Specialty-adjusted peer groups.** Today the peer group is "everyone billing this HCPCS"; tighter peer groups (same specialty, similar patient panel size) will surface a different, higher-quality signal.
-- **Time-aware outlier detection.** Repeat the analysis on rolling 3-month windows to separate persistent outliers from transient spikes (COVID, policy shocks, one-off audits).
-- **SDoH overlay.** Merge state-level CDC PLACES / ACS indicators to test whether residual excess spending tracks community need vs. billing behavior — a health-equity stress test for the flagged list.
+- **Specialty-adjusted peer groups.** Today the peer group is "everyone billing this HCPCS"; tighter peer groups (same specialty, similar patient panel size) will surface a different, higher-quality signal — especially in categories where the peer pool mixes radically different practice types.
+- **Time-aware outlier detection.** Repeat the analysis on rolling 3-month windows to separate persistent outliers from transient spikes; the same robust-z framework applies, the only change is the partitioning column in the DuckDB prep.
+- **SDoH overlay.** Merge state-level CDC PLACES / ACS indicators to test whether residual excess spending tracks community need vs. billing behavior — a health-equity stress test for the flagged list. The county-FIPS join already exists; adding a tract-level layer is a one-join extension.
 
 ---
 

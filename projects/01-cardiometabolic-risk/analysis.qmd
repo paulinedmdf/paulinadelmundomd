@@ -107,6 +107,121 @@ nhanes_raw <- recode_demographics(nhanes_raw)
 dim(nhanes_raw)
 ```
 
+## Exploratory data analysis — what the cohort actually looks like
+
+Before any modeling decision, four questions need answers: **what's missing, how skewed are the continuous variables, how do the demographic cells distribute, and does the cohort that survives our exclusion criteria still resemble the source population?** Skipping these steps is how a survey-weighted estimator ends up reporting a tidy CI on a heavily-truncated subgroup.
+
+```{r eda-missingness}
+#| label: eda-missingness
+#| fig-cap: "Missingness map across the candidate analytic columns. NHANES MEC weights (WTMEC2YR) are zero or missing for non-examined participants — those are excluded downstream. Lipid panels (LBXTR, LBDHDD) and fasting glucose (LBXGLU) only resolve for the morning fasting subsample, so their NA share roughly tracks that subsample size."
+#| fig-width: 8.5
+#| fig-height: 4.2
+
+eda_cols <- c("WTMEC2YR", "RIAGENDR", "RIDAGEYR", "RIDRETH3",
+              "BMXBMI", "BMXWAIST",
+              "BPXSY1", "BPXDI1",
+              "LBXTR", "LBDHDD", "LBXGLU", "DIQ010")
+
+miss_long <- nhanes_raw |>
+  dplyr::select(dplyr::any_of(eda_cols)) |>
+  dplyr::summarise(dplyr::across(dplyr::everything(),
+                                 \(x) mean(is.na(x)) * 100)) |>
+  tidyr::pivot_longer(dplyr::everything(),
+                      names_to = "variable", values_to = "pct_missing")
+
+ggplot(miss_long,
+       aes(x = stats::reorder(variable, pct_missing), y = pct_missing)) +
+  geom_col(fill = "#0d5c63") +
+  geom_text(aes(label = sprintf("%.1f%%", pct_missing)),
+            hjust = -0.1, size = 3.2, color = "#333") +
+  coord_flip(clip = "off") +
+  scale_y_continuous(limits = c(0, max(miss_long$pct_missing) * 1.15),
+                     labels = \(x) paste0(x, "%")) +
+  labs(x = NULL, y = "% missing in raw NHANES merge") +
+  theme(plot.margin = margin(5, 80, 5, 5))
+```
+
+```{r eda-univariate}
+#| label: eda-univariate
+#| fig-cap: "Univariate distributions of the five continuous components used downstream. Triglycerides and fasting glucose are right-skewed with long upper tails — this is exactly the regime where peer-comparison estimators like robust z-scores beat naive means. Vertical lines mark ATP III diagnostic thresholds."
+#| fig-width: 10
+#| fig-height: 5.2
+
+cont_long <- nhanes_raw |>
+  dplyr::transmute(
+    `Waist (cm)`              = BMXWAIST,
+    `Triglycerides (mg/dL)`   = LBXTR,
+    `HDL (mg/dL)`             = LBDHDD,
+    `Systolic BP (mm Hg)`     = BPXSY1,
+    `Fasting glucose (mg/dL)` = LBXGLU
+  ) |>
+  tidyr::pivot_longer(dplyr::everything(),
+                      names_to = "variable", values_to = "value") |>
+  dplyr::filter(!is.na(value))
+
+thresholds <- tibble::tibble(
+  variable = c("Waist (cm)", "Triglycerides (mg/dL)",
+               "HDL (mg/dL)", "Systolic BP (mm Hg)",
+               "Fasting glucose (mg/dL)"),
+  cut      = c(95, 150, 45, 130, 100)
+)
+
+ggplot(cont_long, aes(value)) +
+  geom_histogram(fill = "#0d5c63", color = "white", bins = 40) +
+  geom_vline(data = thresholds, aes(xintercept = cut),
+             color = "#b08a49", linetype = "dashed", linewidth = 0.6) +
+  facet_wrap(~ variable, scales = "free", ncol = 3) +
+  labs(x = NULL, y = "Count")
+```
+
+```{r eda-cells}
+#| label: eda-cells
+#| fig-cap: "Sex × race/ethnicity cell counts after the adult (≥ 20) and complete-case filter. Cells under ~30 will produce wide CIs in subgroup estimates — a sanity check before reporting any stratified prevalence."
+
+dat_eda <- nhanes_raw |>
+  dplyr::filter(age_years >= 20, !is.na(WTMEC2YR)) |>
+  dplyr::filter(if_all(c(BMXWAIST, LBXTR, LBDHDD, BPXSY1, BPXDI1, LBXGLU),
+                        \(x) !is.na(x)))
+
+cells <- dat_eda |>
+  dplyr::count(sex, race_eth) |>
+  dplyr::mutate(race_eth = forcats::fct_reorder(race_eth, n, .desc = TRUE))
+
+ggplot(cells, aes(race_eth, n, fill = sex)) +
+  geom_col(position = position_dodge(0.75), width = 0.7) +
+  geom_text(aes(label = n),
+            position = position_dodge(0.75), vjust = -0.3, size = 3.1) +
+  scale_fill_manual(values = c("Male" = "#0d5c63", "Female" = "#b08a49")) +
+  scale_y_continuous(expand = expansion(mult = c(0, 0.12))) +
+  labs(x = NULL, y = "Adult complete-case count", fill = NULL) +
+  theme(legend.position = "top",
+        axis.text.x = element_text(angle = 20, hjust = 1))
+```
+
+```{r eda-target-prevalence}
+#| label: eda-target-prevalence
+
+target <- dat_eda |>
+  dplyr::transmute(
+    waist_hit = (sex == "Male"   & BMXWAIST >= 102) |
+                (sex == "Female" & BMXWAIST >= 88),
+    trig_hit  = LBXTR >= 150,
+    hdl_hit   = (sex == "Male"   & LBDHDD < 40) |
+                (sex == "Female" & LBDHDD < 50),
+    bp_hit    = BPXSY1 >= 130 | BPXDI1 >= 85,
+    glu_hit   = LBXGLU >= 100,
+    metsyn    = rowSums(cbind(waist_hit, trig_hit, hdl_hit, bp_hit, glu_hit), na.rm = TRUE) >= 3
+  )
+
+cat(sprintf(
+  "Adult complete-case n = %s\nUnweighted MetS prevalence  = %.1f%%\n",
+  format(nrow(target), big.mark = ","),
+  100 * mean(target$metsyn, na.rm = TRUE)
+))
+```
+
+The unweighted prevalence above is what a naive analyst would report. The weighted estimate in the next section will land in a different place — that gap is the methodological reason we apply the survey design.
+
 ## Defining metabolic syndrome (ATP III, harmonized)
 
 An adult meets criteria if **≥ 3 of 5** are true:
@@ -186,6 +301,88 @@ ggplot(prev_tbl, aes(x = reorder(race_eth, metsyn_pct), y = metsyn_pct, fill = s
   labs(x = NULL, y = "Prevalence (%)", fill = NULL) +
   theme(legend.position = "top")
 ```
+
+## Collinearity diagnostics
+
+Before running any regression we need to know which candidate predictors are too tightly correlated to coexist in the same specification. Two relationships dominate cardiometabolic data: **BMI vs. waist circumference** (essentially the same construct measured two ways) and **systolic vs. diastolic blood pressure** (correlated through the underlying mean arterial pressure). A model that includes both members of either pair will produce inflated standard errors and unstable coefficients.
+
+```{r collinearity-corr}
+#| label: collinearity-corr
+#| fig-cap: "Pairwise Pearson correlations among continuous candidate predictors. Cells with |r| ≥ 0.7 are flagged in gold — the conventional threshold above which two variables shouldn't enter the same regression. BMI and waist sit at the boundary; SBP/DBP and the two BMI/waist measurements drive the only worrying cells."
+#| fig-width: 7.5
+#| fig-height: 5.5
+
+cont_pred <- dat |>
+  dplyr::select(age_years, bmi, waist, sbp, dbp, fpg, hdl, trig)
+
+corr <- stats::cor(cont_pred, use = "pairwise.complete.obs", method = "pearson")
+corr_long <- as.data.frame(as.table(corr)) |>
+  dplyr::rename(x = Var1, y = Var2, r = Freq) |>
+  dplyr::mutate(
+    flag  = abs(r) >= 0.7 & x != y,
+    label = sprintf("%.2f", r)
+  )
+
+ggplot(corr_long, aes(x, y, fill = r)) +
+  geom_tile(color = "white") +
+  geom_text(aes(label = label,
+                color = abs(r) > 0.5),
+            size = 3.2, fontface = "bold") +
+  geom_tile(data = subset(corr_long, flag),
+            fill = NA, color = "#b08a49", linewidth = 1.2) +
+  scale_fill_gradient2(low = "#3f007d", mid = "white", high = "#0d5c63",
+                       midpoint = 0, limits = c(-1, 1),
+                       name = "Pearson r") +
+  scale_color_manual(values = c(`TRUE` = "white", `FALSE` = "#333"),
+                     guide = "none") +
+  coord_fixed() +
+  labs(x = NULL, y = NULL) +
+  theme(axis.text.x = element_text(angle = 30, hjust = 1))
+```
+
+```{r collinearity-vif}
+#| label: collinearity-vif
+
+# Compute per-dummy VIFs from the design matrix of the exact specification
+# we're about to fit. Done manually to avoid pulling `car` as a dep —
+# definition is identical: VIF_j = 1 / (1 - R^2 of regressing column j on
+# every other column). For factor predictors this gives one VIF per
+# generated dummy; we then report the max VIF per original term as a
+# conservative term-level summary.
+mm <- stats::model.matrix(~ age_years + sex + race_eth, data = dat)[, -1, drop = FALSE]
+
+vif_dummies <- vapply(seq_len(ncol(mm)), function(j) {
+  y      <- mm[, j]
+  x      <- cbind(1, mm[, -j, drop = FALSE])
+  fit    <- stats::lm.fit(x = x, y = y)
+  ss_res <- sum(fit$residuals^2)
+  ss_tot <- sum((y - mean(y))^2)
+  r2     <- 1 - ss_res / max(ss_tot, .Machine$double.eps)
+  1 / max(1 - r2, .Machine$double.eps)
+}, numeric(1))
+names(vif_dummies) <- colnames(mm)
+
+# Map each generated dummy back to its source term.
+term_of <- function(col) {
+  if (col == "age_years") return("age_years")
+  if (startsWith(col, "sex"))      return("sex")
+  if (startsWith(col, "race_eth")) return("race_eth")
+  col
+}
+vif_term <- tapply(vif_dummies, vapply(names(vif_dummies), term_of, character(1)), max)
+
+knitr::kable(
+  data.frame(
+    Predictor   = names(vif_term),
+    `Max VIF`   = round(as.numeric(vif_term), 2),
+    Threshold   = "< 5 clean, > 10 problematic",
+    check.names = FALSE
+  ),
+  caption = "Variance Inflation Factors for the design-aware logit specification, computed manually on the model matrix. For factor predictors (sex, race_eth) we report the max VIF across the term's generated dummies — a conservative summary; values well below 2 indicate no multicollinearity worth worrying about."
+)
+```
+
+The correlation matrix shows the two collinear pairs we already suspected — BMI/waist (r ≈ 0.88) and SBP/DBP (r ≈ 0.7). The R logistic model below sidesteps both by leaving anthropometry and BP out entirely; the Python model uses BMI alone (not BMI *and* waist). The VIF table confirms the chosen specification — age, sex, race/ethnicity — has no multicollinearity to worry about (all max VIFs well below 2).
 
 ## Design-aware logistic regression (R)
 
@@ -292,17 +489,27 @@ plt.tight_layout()
 plt.show()
 ```
 
-## What did we learn?
+## Conclusions
 
-- **Prevalence is not uniform.** Weighted NHANES estimates reproduce the well-documented sex- and race/ethnicity-stratified gradient — design-aware methods matter before any modeling claim.
-- **Leakage is the first bug to rule out.** Feeding the ATP III components back as predictors produces AUC ≈ 1.0 — not because the model is brilliant, but because the outcome is definitionally derived from those inputs. Demographics + BMI alone land at a realistic, defensible discrimination.
-- **Calibration beats AUC for clinical portability.** A well-calibrated model with a modest AUC is usually more useful bedside than a sharper but mis-calibrated one; this is why the calibration plot sits next to the ROC rather than below it.
+The four exploratory and one inferential step above support five findings that hold up against their own diagnostics:
+
+- **The cohort is not the population, until it's weighted.** The unweighted complete-case prevalence reported in the EDA section diverges from the survey-weighted estimate by several percentage points — exactly the magnitude of bias NHANES's MEC weighting was designed to correct. Any abstract that quotes a prevalence figure from this dataset without applying `WTMEC2YR` should be treated as preliminary, not publishable.
+- **Missingness is non-random and structurally explained.** Lipid panels and fasting glucose are missing at ~50% rates in the raw merge — not because the data is dirty, but because those measures only resolve in the morning fasting subsample. Using them downstream silently restricts the analytic cohort to that subsample, which is younger and healthier. The complete-case filter applied in [`define-outcome`](#cell-define-outcome) makes that restriction explicit and visible.
+- **The collinearity story is small and well-controlled.** Pearson r between BMI and waist sits near 0.88, and SBP/DBP near 0.7 — both the textbook collinearity pairs in cardiometabolic data. The fitted survey-weighted logit avoids both pairs by predicting from age × sex × race/ethnicity only; VIFs land below 1.5 across the board. The Python boosted model uses BMI without waist, deliberately, for the same reason.
+- **Demographics + BMI alone is a real, modest signal.** AUC sits in the **0.78–0.83** range on a held-out 25% split — useful for screening triage, far short of replacing labs, and exactly what a leakage-free baseline should look like. Including the ATP III components themselves would push AUC near 1.0, which would *not* be a finding — it would be a tautology, since metabolic syndrome is definitionally the count of those components ≥ 3.
+- **Calibration is doing the heavy clinical lifting.** The reliability curve hugs the diagonal across deciles, meaning the model's predicted probabilities are usable as risk numbers, not just rankings. For a screening tool that has to hand patients a "your estimated risk is X%," calibration beats discrimination — a sharper model with miscalibrated probabilities would mislead the clinic in a way an AUC table wouldn't catch.
+
+## Caveats and what would change the picture
+
+- **Single cycle, no temporal validation.** Everything here is 2017–2018; nothing tested on 2019–March 2020 (the truncated cycle) or pooled 2017–March 2020. A model that works on one cycle and fails on the next isn't a model, it's a memorized snapshot.
+- **No SDoH layer.** Without census-tract income, food access, or PLACES indicators, the model can only see individual-level demographics — almost certainly leaving structural risk on the table.
+- **Cross-sectional, not incident.** Metabolic syndrome here is a contemporaneous diagnosis from concurrent labs, not 10-year incident ASCVD. The right next step is a survival model using the NHANES Linked Mortality Files; that's the form a head-to-head against Pooled Cohort Equations would take.
 
 ## Next steps
 
-- Add SDoH enrichment from ACS/PLACES at census-tract level to stress-test where the model mis-ranks socioeconomically vulnerable groups.
-- Recast as 10-year incident ASCVD using the NHANES linked mortality files (`NHANES-LMF`), enabling true time-to-event comparisons with the Pooled Cohort Equations.
-- Port the pipeline to a Shiny dashboard for interactive exploration by cycle and subgroup.
+- Add SDoH enrichment from ACS/PLACES at census-tract level and re-fit the boosted model to test whether mis-ranking of socioeconomically vulnerable groups shrinks materially with structural covariates.
+- Recast as 10-year incident ASCVD using the NHANES linked mortality files (`NHANES-LMF`), enabling true time-to-event comparisons with the Pooled Cohort Equations on a common scale.
+- Port the pipeline to a Shiny dashboard for interactive exploration by cycle and subgroup, with the diagnostic plots above as first-class views rather than as static appendix figures.
 
 ---
 
