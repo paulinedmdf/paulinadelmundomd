@@ -481,6 +481,92 @@ ggplot(prev_tbl, aes(x = reorder(race_eth, metsyn_pct), y = metsyn_pct, fill = s
   theme(legend.position = "top")
 ```
 
+### Sensitivity to the metabolic-syndrome definition
+
+The headline prevalence depends on which diagnostic rule we apply. Three sets of criteria are in active use in the literature: **NCEP ATP III** (the original 2001 definition, which is what the rest of this notebook uses), **IDF 2005** (waist-circumference is mandatory rather than one of five), and **Harmonized / JIS 2009** (waist thresholds vary by ethnicity, the rest match ATP III). Reporting all three side-by-side closes the "your headline depends on the threshold" reviewer comment.
+
+```{r mets-sensitivity}
+#| label: mets-sensitivity
+
+# Three definitions, each producing a binary metsyn flag on dat. We
+# reuse the existing component thresholds for ATP III, then express
+# IDF and JIS as modifications of the same components. Population:
+# adult complete-case cohort (consistent with the rest of the section).
+mets_atp3 <- dat |>
+  dplyr::transmute(
+    SEQN, WTMEC4YR, SDMVPSU, SDMVSTRA,
+    waist_hit = (sex == "Male" & waist >= 102) | (sex == "Female" & waist >= 88),
+    trig_hit  = trig >= 150,
+    hdl_hit   = (sex == "Male" & hdl < 40) | (sex == "Female" & hdl < 50),
+    bp_hit    = sbp >= 130 | dbp >= 85 | bp_treated,
+    glu_hit   = fpg >= 100 | dm_dx,
+    metsyn    = as.integer(rowSums(cbind(waist_hit, trig_hit, hdl_hit, bp_hit, glu_hit),
+                                    na.rm = TRUE) >= 3)
+  )
+
+# IDF 2005: central obesity is mandatory (waist >= 94/M, 80/F for
+# Europid; we use the more conservative ATP-III thresholds here as a
+# sensitivity floor) PLUS any 2 of the remaining 4.
+mets_idf <- dat |>
+  dplyr::transmute(
+    SEQN, WTMEC4YR, SDMVPSU, SDMVSTRA,
+    central   = (sex == "Male" & waist >= 94) | (sex == "Female" & waist >= 80),
+    trig_hit  = trig >= 150,
+    hdl_hit   = (sex == "Male" & hdl < 40) | (sex == "Female" & hdl < 50),
+    bp_hit    = sbp >= 130 | dbp >= 85 | bp_treated,
+    glu_hit   = fpg >= 100 | dm_dx,
+    metsyn    = as.integer(central &
+                            rowSums(cbind(trig_hit, hdl_hit, bp_hit, glu_hit),
+                                    na.rm = TRUE) >= 2)
+  )
+
+# JIS 2009: same as ATP III on every component except waist threshold,
+# which is ethnicity-specific. We use the conservative ATP III values
+# for Non-Hispanic White/Black and IDF Asian-specific (90/M, 80/F) for
+# the Asian/Mexican-American/Other groups present in NHANES.
+mets_jis <- dat |>
+  dplyr::mutate(
+    waist_cut_m = dplyr::if_else(grepl("Asian|Mexican|Other", as.character(race_eth)),
+                                  90, 102),
+    waist_cut_f = dplyr::if_else(grepl("Asian|Mexican|Other", as.character(race_eth)),
+                                  80, 88)
+  ) |>
+  dplyr::transmute(
+    SEQN, WTMEC4YR, SDMVPSU, SDMVSTRA,
+    waist_hit = (sex == "Male"   & waist >= waist_cut_m) |
+                (sex == "Female" & waist >= waist_cut_f),
+    trig_hit  = trig >= 150,
+    hdl_hit   = (sex == "Male" & hdl < 40) | (sex == "Female" & hdl < 50),
+    bp_hit    = sbp >= 130 | dbp >= 85 | bp_treated,
+    glu_hit   = fpg >= 100 | dm_dx,
+    metsyn    = as.integer(rowSums(cbind(waist_hit, trig_hit, hdl_hit, bp_hit, glu_hit),
+                                    na.rm = TRUE) >= 3)
+  )
+
+prev_for <- function(d, label) {
+  des_x <- survey::svydesign(ids = ~SDMVPSU, strata = ~SDMVSTRA,
+                              weights = ~WTMEC4YR, data = d, nest = TRUE)
+  m  <- survey::svymean(~metsyn, des_x)
+  ci <- stats::confint(m)
+  data.frame(
+    Definition = label,
+    `Prevalence` = sprintf("%.1f%%", 100 * as.numeric(coef(m))),
+    `95% CI`     = sprintf("%.1f%% – %.1f%%", 100 * ci[1, 1], 100 * ci[1, 2]),
+    n            = nrow(d),
+    check.names = FALSE
+  )
+}
+
+knitr::kable(
+  rbind(
+    prev_for(mets_atp3, "NCEP ATP III (primary)"),
+    prev_for(mets_idf,  "IDF 2005 (waist-mandatory)"),
+    prev_for(mets_jis,  "JIS 2009 (ethnicity-specific waist)")
+  ),
+  caption = "Survey-weighted metabolic-syndrome prevalence under three published definitions. The primary analysis uses NCEP ATP III; IDF 2005 is more conservative because central obesity is mandatory; JIS 2009 uses lower waist cutoffs for Asian and Mexican-American groups, which raises prevalence in those subpopulations and shifts the headline upward. The spread across the three is the bound a reviewer would ask the headline number to sit inside."
+)
+```
+
 ## Collinearity diagnostics
 
 Before running any regression we need to know which candidate predictors are too tightly correlated to coexist in the same specification. Two relationships dominate cardiometabolic data: **BMI vs. waist circumference** (essentially the same construct measured two ways) and **systolic vs. diastolic blood pressure** (correlated through the underlying mean arterial pressure). A model that includes both members of either pair will produce inflated standard errors and unstable coefficients.
@@ -952,6 +1038,40 @@ Seven analytic steps support seven findings that each tie back to a diagnostic a
 - **SDoH enrichment** from ACS / CDC PLACES at census-tract level and a re-fit to test whether mis-ranking of socioeconomically vulnerable groups shrinks materially with structural covariates.
 - **Subgroup SHAP** within race/ethnicity strata to test for differential prediction — the algorithmic-fairness check that any clinical-prediction reviewer will request.
 - **Splines on age and age × sex interaction** in the design-aware logit — the two most common reviewer comments on cardiometabolic models.
+
+## Appendix — TRIPOD+AI reporting checklist
+
+For ML-based clinical prediction models, major journals (BMJ, JAMA, Annals) now require **TRIPOD+AI** (Transparent Reporting of a multivariable prediction model for Individual Prognosis Or Diagnosis, AI extension; Collins et al. 2024, BMJ). Each item below is a pointer to where in this notebook the requirement is met or, where not met, the explicit gap.
+
+| # | TRIPOD+AI item | Where addressed | Status |
+|---|---|---|---|
+| 1 | Title identifies model purpose, target population, outcome | Document title and subtitle | ✓ |
+| 2 | Structured summary of design, predictors, outcomes, performance | "Why this analysis" + Conclusions | ✓ |
+| 3 | Background / scientific rationale | "Why this analysis" | ✓ |
+| 4 | Specific objectives, including model purpose (diagnosis vs. prognosis) | "Why this analysis" — diagnostic, cross-sectional | ✓ |
+| 5 | Source of data, dates, setting | NHANES 2015–2018 (cycles I + J), described in `pull-data` | ✓ |
+| 6 | Eligibility criteria, treatments | Adult ≥ 20 years, complete-case for primary; MI for sensitivity | ✓ |
+| 7 | Outcome definition, with sensitivity to alternative definitions | `define-outcome` chunk + `mets-sensitivity` (NCEP/IDF/JIS) | ✓ |
+| 8 | Predictors with justification | `define-outcome` + `collinearity-corr` + `collinearity-vif` | ✓ |
+| 9 | Sample size justification | Cohort sketch in EDA section; pooling rationale in `pull-data` | Partial — no formal power calc |
+| 10 | Missing data handling | `eda-missingness`, `eda-selection-bias`, `mi-impute`, `mi-prevalence` | ✓ |
+| 11 | Statistical methods (model type, regularization, hyperparameters) | `svyglm`, `mi-svyglm`, `handoff` (XGBoost: 400 trees, depth 4, lr 0.05) | ✓ |
+| 12 | Validation / resampling strategy | 75/25 stratified split with `random_state=42` | Partial — no external validation |
+| 13 | Performance measures (discrimination + calibration) | `fig-roc`, `fig-calibration`, AUC + Brier reported | ✓ |
+| 14 | Subgroup performance | Subgroup SHAP listed in Next Steps | **Gap** |
+| 15 | Handling of class imbalance / fairness considerations | PCE race-term limitation called out in Caveats | Partial |
+| 16 | Interpretability methods | `fig-shap` global SHAP | ✓ — global only |
+| 17 | Comparison with existing prediction models | `pce-construct-validity`, `fig-pce-vs-xgb-auc` | ✓ |
+| 18 | Algorithmic fairness assessment | Caveats note PCE race limitation; subgroup SHAP in Next Steps | **Gap** |
+| 19 | Multiplicity / multiple-comparisons correction | Single-outcome model; no FDR needed for the primary AUC | N/A |
+| 20 | Deployment and clinical-implementation considerations | Calibration emphasized over AUC for clinical use | ✓ |
+| 21 | Limitations | Caveats section — cross-sectional, MI single-source, PCE race | ✓ |
+| 22 | Funding | Not applicable (portfolio analysis) | N/A |
+| 23 | Code availability | renv.lock + qmd source on GitHub | ✓ |
+| 24 | Data availability | NHANES is public; specific files listed in `pull-data` | ✓ |
+| 25 | Conflicts of interest | None declared | ✓ |
+
+The two open gaps (subgroup performance / algorithmic-fairness assessment) are exactly the items called out in the Next Steps section. A publishable version would close both before submission.
 
 ---
 

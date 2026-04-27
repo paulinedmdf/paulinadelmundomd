@@ -357,19 +357,56 @@ ggplot(hcpcs_totals, aes(rank_pct, cum_share)) +
 
 ## Peer-group outlier detection (R)
 
-The DuckDB prep computed a robust z-score per HCPCS using the median-of-absolute-deviations (MAD) scaled by 1.4826. Values ≥ 5 correspond roughly to "5σ from the peer median for this code," which is the threshold CMS Program Integrity uses as a first-pass screen.
+The DuckDB prep computed a robust z-score per HCPCS using the median-of-absolute-deviations (MAD) scaled by 1.4826. Values ≥ 5 correspond roughly to "5σ from the peer median for this code," which is the threshold CMS Program Integrity uses as a first-pass screen — but at this scale of testing (hundreds of thousands of NPI × HCPCS rows), a fixed z-cutoff with no multiplicity control will produce many false positives by chance. We compute Benjamini–Hochberg false discovery rate adjusted q-values alongside the raw z, and use FDR ≤ 0.01 as the publishable flagging threshold.
+
+```{r bh-fdr-flagging}
+#| label: bh-fdr-flagging
+
+flagged <- outliers |>
+  dplyr::filter(!is.na(robust_z), beneficiaries >= 30) |>
+  dplyr::mutate(
+    # Two-sided p from a normal approximation on the robust z. This is
+    # an approximation — the MAD-z null distribution isn't exactly
+    # normal, but a normal reference is the standard CMS PI starting
+    # point and gives a conservative FDR.
+    p_value  = 2 * stats::pnorm(-abs(robust_z)),
+    q_value  = stats::p.adjust(p_value, method = "BH"),
+    flag_z5  = robust_z >= 5,
+    flag_fdr = q_value <= 0.01 & robust_z > 0
+  )
+
+flagging_summary <- data.frame(
+  Rule                 = c("Raw z >= 5",
+                            "BH-FDR <= 0.01 (one-sided)",
+                            "Both rules agree (intersection)"),
+  Flagged              = c(sum(flagged$flag_z5),
+                            sum(flagged$flag_fdr),
+                            sum(flagged$flag_z5 & flagged$flag_fdr))
+)
+flagging_summary$`% of tested` <- sprintf("%.2f%%",
+  100 * flagging_summary$Flagged / nrow(flagged))
+
+knitr::kable(
+  flagging_summary,
+  caption = sprintf(
+    "Flagging counts for %s NPI x HCPCS rows tested. The raw z >= 5 cutoff is what CMS uses as a first-pass screen but applies no multiplicity control. The BH-FDR rule guarantees no more than 1%% of flagged rows are false positives in expectation. The intersection is the highest-confidence subset for downstream review.",
+    format(nrow(flagged), big.mark = ",")
+  )
+)
+```
 
 ```{r top-outliers}
-top_outliers <- outliers |>
-  filter(robust_z >= 5, beneficiaries >= 30) |>
-  arrange(desc(robust_z)) |>
+top_outliers <- flagged |>
+  filter(flag_fdr) |>
+  arrange(q_value, desc(robust_z)) |>
   slice_head(n = 25) |>
   transmute(
     npi, state, specialty_name, hcpcs,
     beneficiaries, paid,
     paid_per_bene       = paid / beneficiaries,
     hcpcs_median_ppb,
-    robust_z            = round(robust_z, 1)
+    robust_z            = round(robust_z, 1),
+    q_value             = format.pval(q_value, eps = 1e-300, digits = 2)
   )
 
 knitr::kable(
@@ -379,7 +416,7 @@ knitr::kable(
       paid_per_bene     = format_money(paid_per_bene),
       hcpcs_median_ppb  = format_money(hcpcs_median_ppb)
     ),
-  caption = "Top 25 peer-group outliers (robust z ≥ 5, ≥ 30 beneficiaries)"
+  caption = "Top 25 peer-group outliers ranked by BH-FDR q-value (FDR ≤ 0.01, ≥ 30 beneficiaries). The q-value column is the false-discovery-adjusted p — these are the rows the multiplicity-controlled rule keeps."
 )
 ```
 
