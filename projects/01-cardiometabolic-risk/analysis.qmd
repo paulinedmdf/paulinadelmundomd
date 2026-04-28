@@ -11,7 +11,8 @@ format:
     toc-location: right
     code-tools: true
     code-copy: true
-    code-fold: false
+    code-fold: true
+    code-summary: "Show code"
     code-overflow: wrap
     number-sections: true
     fig-responsive: true
@@ -32,6 +33,16 @@ execute:
   message: false
   freeze: auto
 ---
+
+::: {.callout-tip icon=false}
+## Key findings — TL;DR
+
+- **Survey-weighted prevalence of metabolic syndrome in US adults ≥ 20 years (NHANES 2015–2018, MI-pooled): ~33%.** The unweighted complete-case figure is ~5 points lower, the gap MI is built to recover.
+- **Definition matters by ~5 percentage points.** Spread across NCEP ATP III, IDF 2005, and JIS 2009 brackets the headline; JIS shifts upward in Asian and Mexican-American subpopulations because it uses lower waist cutoffs.
+- **PCE inputs beat demographics + BMI on the same outcome — and that's the *expected* result.** PCE inputs include 3 of the 5 MetS components, so the comparison is "what fraction of MetS signal sits in cardiovascular labs vs pure adiposity," not a clean apples-to-apples test.
+- **Calibration carries the clinical interpretability.** AUC sits in 0.78–0.83 for the boosted model; the reliability curve hugs the diagonal across deciles. Calibration > discrimination for any tool that hands a patient a "your estimated risk is X%."
+- **Methods used (every claim ties back to a specific chunk):** complex-survey design with pooled cycles + WTMEC4YR, MICE imputation pooled by Rubin's rules, design-aware logistic via `svyglm`, gradient-boosted classifier with SHAP, PCE comparator, TRIPOD+AI checklist as Appendix.
+:::
 
 ## Why this analysis
 
@@ -62,10 +73,24 @@ library(purrr)
 library(reticulate)
 
 # Method packages — installed on first render if absent.
-for (pkg in c("mice", "mitools", "e1071", "fitdistrplus", "performance", "lme4")) {
+for (pkg in c("mice", "mitools", "e1071", "fitdistrplus",
+              "performance", "lme4", "kableExtra")) {
   if (!requireNamespace(pkg, quietly = TRUE)) {
     install.packages(pkg, repos = "https://cloud.r-project.org")
   }
+}
+
+# Lightweight wrapper for hero tables — bootstrap styling, no monospaced
+# greyscale dump. Plain knitr::kable() still works elsewhere for inline /
+# diagnostic tables where the styled version is overkill.
+pretty_kable <- function(x, caption = NULL, ...) {
+  knitr::kable(x, caption = caption, ...) |>
+    kableExtra::kable_styling(
+      bootstrap_options = c("striped", "hover", "condensed", "responsive"),
+      full_width        = FALSE,
+      position          = "left",
+      font_size         = 13
+    )
 }
 
 reticulate::py_require(c(
@@ -445,6 +470,8 @@ knitr::kable(
 
 ## Weighted prevalence by demographics
 
+> **In one sentence.** Apply the NHANES design weights so prevalence estimates generalize to the US civilian non-institutionalized population — and report the weighted estimate as the headline rather than the unweighted one.
+
 Critically, NHANES oversamples certain subpopulations. A naive proportion is biased; we have to apply the MEC sampling weights with `survey`/`srvyr`.
 
 ```{r weighted-table}
@@ -457,11 +484,11 @@ prev_tbl <- des |>
     metsyn_pct = survey_mean(metsyn, proportion = TRUE, vartype = "ci") * 100
   )
 
-knitr::kable(
+pretty_kable(
   prev_tbl,
   digits = 1,
   col.names = c("Sex", "Race/Ethnicity", "Prevalence (%)", "Lower 95% CI", "Upper 95% CI"),
-  caption = "Weighted metabolic syndrome prevalence, US adults ≥ 20 years (NHANES 2017–2018)"
+  caption = "Weighted metabolic syndrome prevalence, US adults ≥ 20 years (NHANES 2015–2018, pooled)."
 )
 ```
 
@@ -557,7 +584,7 @@ prev_for <- function(d, label) {
   )
 }
 
-knitr::kable(
+pretty_kable(
   rbind(
     prev_for(mets_atp3, "NCEP ATP III (primary)"),
     prev_for(mets_idf,  "IDF 2005 (waist-mandatory)"),
@@ -684,6 +711,8 @@ fit |>
 
 ## Multiple imputation — beyond complete case
 
+> **In one sentence.** Re-estimate the prevalence and the design-aware logit on the broader cohort with imputation uncertainty propagated through Rubin's rules — the figure to put in a paper, with complete-case as the sensitivity contrast.
+
 The complete-case cohort silently drops everyone outside the morning fasting subsample (lipids and glucose are the binding constraint). Multiple Imputation by Chained Equations (MICE) re-fits the prevalence and regression on the broader cohort with imputation uncertainty propagated through Rubin's rules. We impute the eight clinical measurements (BMI, waist, lipids, BP readings, fasting glucose) with predictive mean matching, holding the design columns (cycle, weight, strata, PSU) and demographics fixed.
 
 ```{r mi-impute}
@@ -763,7 +792,7 @@ cc_prev <- survey::svymean(~as.integer(metsyn), des_std)
 cc_est  <- as.numeric(coef(cc_prev))
 cc_se   <- sqrt(as.numeric(stats::vcov(cc_prev)))
 
-knitr::kable(
+pretty_kable(
   data.frame(
     Estimator      = c("Complete-case", "MI-pooled (m=5)"),
     Prevalence     = sprintf("%.1f%%", 100 * c(cc_est, qbar)),
@@ -830,7 +859,7 @@ mi_table <- data.frame(
   check.names = FALSE
 )
 
-knitr::kable(
+pretty_kable(
   mi_table,
   caption = "Design-aware odds ratios for metabolic syndrome, pooled across 5 multiple imputations using Rubin's rules. The 'Frac. missing info' column estimates the share of variance in each coefficient attributable to imputation noise — values above 30% are the threshold for raising m above 5 in a published analysis."
 )
@@ -909,6 +938,8 @@ plt.show()
 ```
 
 ## Pooled Cohort Equations — head-to-head comparator
+
+> **In one sentence.** Compare against an established clinical risk score on two axes — distribution (does PCE risk track MetS status?) and same-outcome AUC (does a logit on PCE inputs beat demographics + BMI?) — so the model has a benchmark, not just a number.
 
 The 2013 ACC/AHA Pooled Cohort Equations (PCE; Goff et al. 2014) is the established 10-year ASCVD risk score in US guidelines. Its outcome (incident ASCVD over 10 years) doesn't match ours (cross-sectional metabolic syndrome), so a direct AUC comparison would be apples-to-oranges. We do two complementary checks instead:
 

@@ -11,7 +11,8 @@ format:
     toc-location: right
     code-tools: true
     code-copy: true
-    code-fold: false
+    code-fold: true
+    code-summary: "Show code"
     code-overflow: wrap
     number-sections: true
     fig-responsive: true
@@ -30,6 +31,16 @@ execute:
   message: false
   freeze: auto
 ---
+
+::: {.callout-tip icon=false}
+## Key findings — TL;DR
+
+- **Heavy tails are the regime, not the exception.** Paid-per-beneficiary spans four orders of magnitude on a log scale. MAD-based robust z's are usable here; mean/SD z's aren't.
+- **BH-FDR ≤ 0.01 keeps a much smaller, much higher-confidence flag list than raw z ≥ 5.** The intersection of the two rules is the set a Program Integrity team would prioritize first.
+- **The 12-bucket cost atlas is an HCPCS lens, not a disease lens.** Reading it as "Behavioral Health spending geography" is supportable; reading it as "depression cost geography" is not (HCPCS doesn't carry diagnosis).
+- **Spatial concentration varies by category.** Dialysis & ESRD and parts of DME concentrate geographically (high Gini); LTSS and E&M diffuse across the country (low Gini) and shouldn't be read as having "hotspots."
+- **Methods used (every claim ties back to a specific chunk):** DuckDB streaming aggregate of the 11 GB CSV, robust z + BH-FDR, isolation forest with collinearity diagnostics, ZCTA → county join, within-category decile shading on a leaflet choropleth, three-view category explorer (top HCPCS / Gini / state hotspots).
+:::
 
 ## Why this analysis
 
@@ -72,6 +83,26 @@ suppressPackageStartupMessages({
 reticulate::py_require(c("pandas", "numpy", "scikit-learn", "matplotlib"))
 
 theme_set(theme_minimal(base_size = 12))
+
+# Method packages — installed on first render if absent.
+for (pkg in c("kableExtra")) {
+  if (!requireNamespace(pkg, quietly = TRUE)) {
+    install.packages(pkg, repos = "https://cloud.r-project.org")
+  }
+}
+
+# Lightweight wrapper for hero tables — bootstrap styling, no monospaced
+# greyscale dump. Plain knitr::kable() still works elsewhere for inline /
+# diagnostic tables where the styled version is overkill.
+pretty_kable <- function(x, caption = NULL, ...) {
+  knitr::kable(x, caption = caption, ...) |>
+    kableExtra::kable_styling(
+      bootstrap_options = c("striped", "hover", "condensed", "responsive"),
+      full_width        = FALSE,
+      position          = "left",
+      font_size         = 13
+    )
+}
 
 data_dir     <- here::here("projects", "02-medicaid-outliers", "data", "processed")
 outliers     <- arrow::read_parquet(file.path(data_dir, "outliers.parquet"))
@@ -261,7 +292,7 @@ family_call <- function(v) {
   else                      "Negative binomial / ZINB"
 }
 
-knitr::kable(
+pretty_kable(
   data.frame(
     Variable     = rownames(vmr_tbl),
     Mean         = sprintf("%.1f", vmr_tbl[, "mean"]),
@@ -357,6 +388,8 @@ ggplot(hcpcs_totals, aes(rank_pct, cum_share)) +
 
 ## Peer-group outlier detection (R)
 
+> **In one sentence.** Compute a MAD-based robust z per (NPI × HCPCS) row, then apply Benjamini–Hochberg FDR ≤ 0.01 instead of a hard z-cutoff so the flag list comes with a multiplicity guarantee, not just an arbitrary threshold.
+
 The DuckDB prep computed a robust z-score per HCPCS using the median-of-absolute-deviations (MAD) scaled by 1.4826. Values ≥ 5 correspond roughly to "5σ from the peer median for this code," which is the threshold CMS Program Integrity uses as a first-pass screen — but at this scale of testing (hundreds of thousands of NPI × HCPCS rows), a fixed z-cutoff with no multiplicity control will produce many false positives by chance. We compute Benjamini–Hochberg false discovery rate adjusted q-values alongside the raw z, and use FDR ≤ 0.01 as the publishable flagging threshold.
 
 ```{r bh-fdr-flagging}
@@ -386,7 +419,7 @@ flagging_summary <- data.frame(
 flagging_summary$`% of tested` <- sprintf("%.2f%%",
   100 * flagging_summary$Flagged / nrow(flagged))
 
-knitr::kable(
+pretty_kable(
   flagging_summary,
   caption = sprintf(
     "Flagging counts for %s NPI x HCPCS rows tested. The raw z >= 5 cutoff is what CMS uses as a first-pass screen but applies no multiplicity control. The BH-FDR rule guarantees no more than 1%% of flagged rows are false positives in expectation. The intersection is the highest-confidence subset for downstream review.",
@@ -409,7 +442,7 @@ top_outliers <- flagged |>
     q_value             = format.pval(q_value, eps = 1e-300, digits = 2)
   )
 
-knitr::kable(
+pretty_kable(
   top_outliers |>
     mutate(
       paid              = format_money(paid),
@@ -529,6 +562,8 @@ plt.show()
 ```
 
 ## Where does the dollar go? A Medicaid category cost atlas
+
+> **In one sentence.** A county-level interactive choropleth across all 12 HCPCS spending categories, shaded by within-category decile of paid-per-beneficiary — coloring is comparable inside a category, not across them.
 
 A provider-outlier list is a fraud-review input. Most policy audiences, though, want the opposite question: **which categories of care cost the most, and where do those costs concentrate geographically?** Switching from "who" to "what and where" requires three pieces we've now built upstream in [`prep.py`](prep.py):
 
@@ -708,6 +743,8 @@ lmap |>
 
 ## Category explorer
 
+> **In one sentence.** Three companion views of the atlas — top 5 HCPCS per category, spatial Gini concentration, and state hotspot table — that answer the three follow-up questions a policy reviewer always asks next.
+
 The choropleth shows *where* a category is expensive. The three views below answer three follow-up questions policy audiences almost always ask next: **what HCPCS codes drive the spend inside each category, how spatially concentrated is that spend across counties, and which states sit at the top of the ladder?** Every chunk iterates over all 12 categories — no cherry-picking — so the honest shape of Medicaid dollar flow is visible in one sweep.
 
 ```{r hcpcs-classifier}
@@ -837,7 +874,7 @@ state_hotspots <- county_atlas |>
   mutate(category = factor(category, levels = top_categories)) |>
   arrange(category, desc(state_ppb))
 
-knitr::kable(
+pretty_kable(
   state_hotspots |>
     transmute(
       Category             = category,
