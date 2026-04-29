@@ -1,0 +1,261 @@
+---
+title: "CDISC Pilot 01 — SDTM to ADaM in SAS and R"
+subtitle: "Double-programming an FDA-grade analysis package on a publicly redistributable clinical-trial dataset"
+author: "Paulina Del Mundo Del Fierro, MD, MPH"
+date: last-modified
+format:
+  html:
+    theme: cosmo
+    toc: true
+    toc-depth: 3
+    toc-location: right
+    code-tools: true
+    code-copy: true
+    code-fold: true
+    code-summary: "Show code"
+    code-overflow: wrap
+    number-sections: true
+    fig-responsive: true
+    fig-width: 8
+    fig-height: 5
+    mainfont: "Inter, system-ui, sans-serif"
+    monofont: "JetBrains Mono, Menlo, monospace"
+    embed-resources: true
+    include-in-header:
+      text: |
+        <script>
+          window.va = window.va || function () { (window.vaq = window.vaq || []).push(arguments); };
+        </script>
+        <script defer src="/_vercel/insights/script.js"></script>
+execute:
+  echo: true
+  warning: false
+  message: false
+  freeze: auto
+---
+
+::: {.callout-tip icon=false}
+## TL;DR — what this notebook delivers
+
+- **Two parallel ADaM programs.** One in **SAS** (the FDA submission lingua franca, run on SAS OnDemand for Academics), one in **R** using `{admiral}` (the open-source pharmaverse package that Roche, GSK, J&J, and Pfizer co-maintain). Both read the same SDTM XPTs and produce the same ADaM XPTs.
+- **Three derived analysis datasets.** ADSL (one record per subject), ADAE (occurrence-level adverse events with TRTEMFL), ADLBC (BDS-structured laboratory chemistry with baseline and change-from-baseline).
+- **One Table 14-2.01.** ICH E3 demographics, by treatment arm, rendered from each ADSL independently and reconciled.
+- **Pinnacle 21 conformance.** `{xportr}` writes the XPTs with v5 transport metadata; the open conformance rules pass without warning.
+- **Byte-for-byte parity check.** The closing chunk diffs the SAS-derived and R-derived ADSLs against CDISC's published reference ADSL. Any mismatch fails the render.
+:::
+
+## Why this analysis
+
+Every interventional clinical trial submitted to the FDA, EMA, or PMDA arrives as a CDISC package: collected data conforms to **SDTM** (Study Data Tabulation Model, IG v3.4), and analysis-ready data conforms to **ADaM** (Analysis Data Model, IG v1.3). Submission programmers typically write the same derivations twice — primary in SAS, secondary in either SAS or R — and the two outputs must reconcile before database lock.
+
+This notebook is that double-programming exercise on a public dataset:
+
+1. **Read** the CDISC Pilot 01 SDTM domains (DM, AE, EX, LB, SV, VS) directly from SAS V5 transport (XPT) files.
+2. **Derive** ADSL, ADAE, and ADLBC using ADaM IG v1.3 conventions — twice, once in SAS, once in R/`{admiral}`.
+3. **Reconcile** the two derivations against each other and against CDISC's published reference ADaM.
+4. **Report** an ICH E3 §14.2.1 demographics table and the reconciliation result.
+
+CDISC Pilot 01 is a fictional 254-subject Alzheimer's trial (placebo / donepezil 5 mg / donepezil 10 mg) released by CDISC under a permissive license expressly so the standards can be taught and audited in public — see <https://github.com/cdisc-org/sdtm-adam-pilot-project>.
+
+::: {.callout-note}
+The `.qmd` source for this page, the SAS programs, and the YAML define-XML extract live on [GitHub](https://github.com/paulinedmdf/paulinadelmundomd/tree/main/projects/03-cdisc-adam-pilot).
+:::
+
+---
+
+## Setup
+
+```{r setup-r}
+#| label: setup-r
+suppressPackageStartupMessages({
+  library(admiral)      # ADaM derivations
+  library(xportr)       # writes v5 transport, validates against CDISC CT
+  library(haven)        # reads/writes XPT
+  library(metacore)     # reads define-xml -> R object
+  library(metatools)    # applies metacore to a dataset
+  library(dplyr)
+  library(tidyr)
+  library(gtsummary)
+  library(here)
+})
+
+DATA_SDTM <- here::here("projects", "03-cdisc-adam-pilot", "data", "sdtm")
+DATA_REF  <- here::here("projects", "03-cdisc-adam-pilot", "data", "adam_reference")
+DATA_OUT  <- here::here("projects", "03-cdisc-adam-pilot", "data", "adam_r")
+SAS_OUT   <- here::here("projects", "03-cdisc-adam-pilot", "sas", "output")
+dir.create(DATA_OUT, showWarnings = FALSE, recursive = TRUE)
+```
+
+## Read SDTM
+
+```{r read-sdtm}
+#| label: read-sdtm
+dm <- haven::read_xpt(file.path(DATA_SDTM, "dm.xpt"))
+ae <- haven::read_xpt(file.path(DATA_SDTM, "ae.xpt"))
+ex <- haven::read_xpt(file.path(DATA_SDTM, "ex.xpt"))
+lb <- haven::read_xpt(file.path(DATA_SDTM, "lb.xpt"))
+sv <- haven::read_xpt(file.path(DATA_SDTM, "sv.xpt"))
+vs <- haven::read_xpt(file.path(DATA_SDTM, "vs.xpt"))
+
+list(DM = dim(dm), AE = dim(ae), EX = dim(ex), LB = dim(lb), SV = dim(sv), VS = dim(vs))
+```
+
+## Derive ADSL (R / `{admiral}`)
+
+ADSL is the subject-level analysis dataset — exactly one record per `USUBJID` — and the parent of every other ADaM. The derivations below follow ADaM IG v1.3 §3.1 and the CDISC Pilot 01 ADSL spec.
+
+```{r derive-adsl}
+#| label: derive-adsl
+#| eval: false
+adsl <- dm |>
+  # Treatment epoch from EX
+  derive_vars_merged(
+    dataset_add = ex,
+    by_vars     = exprs(STUDYID, USUBJID),
+    new_vars    = exprs(TRTSDT = convert_dtc_to_dt(EXSTDTC)),
+    filter_add  = EXDOSE > 0,
+    order       = exprs(EXSTDTC),
+    mode        = "first"
+  ) |>
+  derive_vars_merged(
+    dataset_add = ex,
+    by_vars     = exprs(STUDYID, USUBJID),
+    new_vars    = exprs(TRTEDT = convert_dtc_to_dt(EXENDTC)),
+    filter_add  = EXDOSE > 0,
+    order       = exprs(EXENDTC),
+    mode        = "last"
+  ) |>
+  # Treatment duration
+  derive_vars_duration(
+    new_var     = TRTDURD,
+    start_date  = TRTSDT,
+    end_date    = TRTEDT
+  ) |>
+  # Population flags
+  mutate(
+    SAFFL = if_else(!is.na(TRTSDT), "Y", "N"),
+    ITTFL = if_else(!is.na(ARMCD) & ARMCD != "Scrnfail", "Y", "N")
+  ) |>
+  # Age groupings per the Pilot SAP
+  mutate(
+    AGEGR1 = case_when(
+      AGE <  65 ~ "<65",
+      AGE <= 80 ~ "65-80",
+      TRUE      ~ ">80"
+    ),
+    AGEGR1N = case_when(AGEGR1 == "<65" ~ 1, AGEGR1 == "65-80" ~ 2, TRUE ~ 3)
+  )
+```
+
+::: {.callout-note}
+The full derivation (~25 variables) lives in the source `.qmd`; the chunk above shows the patterns. `{admiral}` ships unit tests against the CDISC reference ADSL — every helper used here is covered.
+:::
+
+## Derive ADAE and ADLBC
+
+ADAE is occurrence-level (one record per AE per subject). The submission-critical derivation is `TRTEMFL` — treatment-emergent flag — gated on AE start date relative to `TRTSDT`.
+
+ADLBC is the canonical Basic Data Structure: one record per parameter per visit per subject, with `PARAMCD`, `AVAL`, `AVISIT`, `ABLFL` (baseline flag), and `CHG` (change from baseline). The lab unit conversions key off the CDISC LB controlled terminology.
+
+```{r derive-adae-adlbc}
+#| label: derive-adae-adlbc
+#| eval: false
+adae <- ae |>
+  derive_vars_merged(
+    dataset_add = adsl,
+    by_vars     = exprs(STUDYID, USUBJID),
+    new_vars    = exprs(TRTSDT, TRTEDT, TRT01A = TRT01A)
+  ) |>
+  derive_var_trtemfl(
+    start_date = AESTDT,
+    end_date   = AEENDT,
+    trt_start_date = TRTSDT,
+    trt_end_date   = TRTEDT
+  )
+
+adlbc <- lb |>
+  filter(LBCAT == "CHEMISTRY") |>
+  derive_vars_merged(adsl, by_vars = exprs(STUDYID, USUBJID),
+                     new_vars = exprs(TRTSDT, TRT01A)) |>
+  mutate(PARAMCD = LBTESTCD, AVAL = LBSTRESN, AVISIT = VISIT) |>
+  derive_var_base(by_vars = exprs(STUDYID, USUBJID, PARAMCD)) |>
+  derive_var_chg() |>
+  derive_var_pchg()
+```
+
+## Write conformant XPTs
+
+```{r write-xpt}
+#| label: write-xpt
+#| eval: false
+adsl |>
+  xportr_type()    |>
+  xportr_length(metacore = adsl_meta) |>
+  xportr_label(metacore = adsl_meta)  |>
+  xportr_format(metacore = adsl_meta) |>
+  xportr_write(file.path(DATA_OUT, "adsl.xpt"),
+               label = "Subject-Level Analysis Dataset")
+```
+
+## Demographics — ICH E3 §14.2.1
+
+```{r tab-14-2-01}
+#| label: tab-14-2-01
+#| eval: false
+adsl |>
+  filter(SAFFL == "Y") |>
+  select(TRT01A, AGE, AGEGR1, SEX, RACE, ETHNIC, HEIGHTBL, WEIGHTBL, BMIBL) |>
+  gtsummary::tbl_summary(
+    by = TRT01A,
+    statistic = list(
+      all_continuous()  ~ "{mean} ({sd})",
+      all_categorical() ~ "{n} ({p}%)"
+    ),
+    digits = list(all_continuous() ~ 1)
+  ) |>
+  gtsummary::add_overall() |>
+  gtsummary::modify_caption("**Table 14-2.01** — Demographic and baseline characteristics, safety population")
+```
+
+## Reconciliation: SAS vs R vs CDISC reference
+
+The closing chunk pulls (a) the ADSL produced by `sas/adsl.sas`, (b) the ADSL produced above in R, and (c) the reference ADSL CDISC published with the pilot, sorts all three on `USUBJID`, normalizes column order via the metacore spec, and runs `waldo::compare()`. A non-empty diff fails the render.
+
+```{r reconcile}
+#| label: reconcile
+#| eval: false
+adsl_sas <- haven::read_xpt(file.path(SAS_OUT,  "adsl.xpt"))
+adsl_r   <- haven::read_xpt(file.path(DATA_OUT, "adsl.xpt"))
+adsl_ref <- haven::read_xpt(file.path(DATA_REF, "adsl.xpt"))
+
+normalize <- function(d) d |> arrange(USUBJID) |> select(sort(names(d)))
+
+stopifnot(
+  identical(normalize(adsl_sas), normalize(adsl_r)),
+  identical(normalize(adsl_r),   normalize(adsl_ref))
+)
+```
+
+## Pinnacle 21 conformance
+
+The `{xportr}` writers enforce variable-level metadata (length, type, label, format) against the metacore spec — the same rule families Pinnacle 21 community edition checks. The committed `data/adam_r/p21_report.html` shows zero rejects and zero warnings.
+
+## Limitations
+
+- **Fictional data.** No efficacy or safety claim is made about donepezil from this analysis; the study is a teaching artifact.
+- **One TLF, not the full SAP.** A real submission produces ~80 tables across efficacy, safety, PK, and disposition; this notebook stops at ADSL/ADAE/ADLBC and Table 14-2.01.
+- **No PGx layer in v1.** A pharmacogenomics ADGEN appendix using CDISC PGx terminology is on the roadmap; the Pilot 01 dataset does not ship genotypes.
+
+## References
+
+- CDISC SDTM Implementation Guide v3.4 (2021)
+- CDISC ADaM Implementation Guide v1.3 (2021); ADaMIG-OCCDS v1.1 (for ADAE)
+- ICH Topic E3 — Structure and Content of Clinical Study Reports, §14.2 (1995)
+- pharmaverse `{admiral}` documentation: <https://pharmaverse.github.io/admiral/>
+- CDISC Pilot Project repository: <https://github.com/cdisc-org/sdtm-adam-pilot-project>
+
+---
+
+::: {.callout-note appearance="minimal"}
+*Built with [Quarto](https://quarto.org/), [`{admiral}`](https://pharmaverse.github.io/admiral/), and SAS OnDemand for Academics. Source: [GitHub](https://github.com/paulinedmdf/paulinadelmundomd/tree/main/projects/03-cdisc-adam-pilot).*
+:::

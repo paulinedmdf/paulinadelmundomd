@@ -91,6 +91,7 @@
     }
     .project-tags li.py { background: #fdf1e0; color: #8a6a33; }
     .project-tags li.r  { background: #e6f1f2; color: #0d5c63; }
+    .project-tags li.sas { background: #e3eefc; color: #0766d1; }
     .project-cta {
       font-weight: 600;
       color: var(--accent);
@@ -229,8 +230,33 @@
           </li>
 
           <li>
+            <a class="project-card" href="03-cdisc-adam-pilot/analysis.html">
+              <span class="project-num">03</span>
+              <div>
+                <h2 class="project-title">
+                  CDISC Pilot 01 — SDTM to ADaM in SAS and R
+                  <span class="project-status">In progress</span>
+                </h2>
+                <p class="project-blurb">
+                  Double-program an FDA-grade analysis package on the publicly redistributable
+                  CDISC Pilot 01 Alzheimer's trial — derive ADSL, ADAE, and ADLBC from SDTM
+                  twice (once in SAS, once in R/<code>{admiral}</code>), reconcile against
+                  CDISC's reference XPTs byte-for-byte, and render an ICH E3 Table 14-2.01.
+                </p>
+                <ul class="project-tags">
+                  <li class="sas">SAS · ODS · PROC TABULATE</li>
+                  <li class="r">R · admiral · xportr · metacore</li>
+                  <li>CDISC SDTM / ADaM</li>
+                  <li>Pinnacle 21</li>
+                </ul>
+              </div>
+              <span class="project-cta">Read</span>
+            </a>
+          </li>
+
+          <li>
             <div class="project-card" style="cursor: default;">
-              <span class="project-num" style="color: var(--muted);">03</span>
+              <span class="project-num" style="color: var(--muted);">04</span>
               <div>
                 <h2 class="project-title">
                   openFDA Pharmacovigilance Signal Detection
@@ -252,7 +278,7 @@
 
           <li>
             <div class="project-card" style="cursor: default;">
-              <span class="project-num" style="color: var(--muted);">04</span>
+              <span class="project-num" style="color: var(--muted);">05</span>
               <div>
                 <h2 class="project-title">
                   TCGA Somatic Mutations &amp; Survival
