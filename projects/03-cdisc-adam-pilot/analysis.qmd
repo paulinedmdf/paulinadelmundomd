@@ -29,6 +29,7 @@ format:
         <script defer src="/_vercel/insights/script.js"></script>
 execute:
   echo: true
+  eval: false
   warning: false
   message: false
   freeze: auto
@@ -42,6 +43,12 @@ execute:
 - **One Table 14-2.01.** ICH E3 demographics, by treatment arm, rendered from each ADSL independently and reconciled.
 - **Pinnacle 21 conformance.** `{xportr}` writes the XPTs with v5 transport metadata; the open conformance rules pass without warning.
 - **Byte-for-byte parity check.** The closing chunk diffs the SAS-derived and R-derived ADSLs against CDISC's published reference ADSL. Any mismatch fails the render.
+:::
+
+::: {.callout-warning icon=false}
+## Status — scaffold only (in progress)
+
+This page is the published scaffold. Code chunks are shown for review but **do not execute on render** until the SDTM XPTs are downloaded (`make data`) and the `{admiral}` / `{xportr}` / `{metacore}` packages are added to `renv.lock`. The SAS programs in `sas/` are complete and runnable on SAS OnDemand for Academics; rendered logs and listings will be linked in once the run completes.
 :::
 
 ## Why this analysis
