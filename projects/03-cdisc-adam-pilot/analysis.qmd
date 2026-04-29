@@ -158,6 +158,14 @@ adsl <- dm |>
 The full derivation (~25 variables) lives in the source `.qmd`; the chunk above shows the patterns. `{admiral}` ships unit tests against the CDISC reference ADSL — every helper used here is covered.
 :::
 
+### Same derivation in SAS
+
+The primary submission program — same logic, expressed in SAS.
+
+```{.sas filename="sas/adsl.sas"}
+{{< include sas/adsl.sas >}}
+```
+
 ## Derive ADAE and ADLBC
 
 ADAE is occurrence-level (one record per AE per subject). The submission-critical derivation is `TRTEMFL` — treatment-emergent flag — gated on AE start date relative to `TRTSDT`.
@@ -188,6 +196,16 @@ adlbc <- lb |>
   derive_var_base(by_vars = exprs(STUDYID, USUBJID, PARAMCD)) |>
   derive_var_chg() |>
   derive_var_pchg()
+```
+
+### Same derivations in SAS
+
+```{.sas filename="sas/adae.sas"}
+{{< include sas/adae.sas >}}
+```
+
+```{.sas filename="sas/adlbc.sas"}
+{{< include sas/adlbc.sas >}}
 ```
 
 ## Write conformant XPTs
@@ -260,6 +278,30 @@ The `{xportr}` writers enforce variable-level metadata (length, type, label, for
 - ICH Topic E3 — Structure and Content of Clinical Study Reports, §14.2 (1995)
 - pharmaverse `{admiral}` documentation: <https://pharmaverse.github.io/admiral/>
 - CDISC Pilot Project repository: <https://github.com/cdisc-org/sdtm-adam-pilot-project>
+
+---
+
+## Appendix — SAS source
+
+All six SAS programs embedded verbatim, in the run order documented in [`sas/README.md`](https://github.com/paulinedmdf/paulinadelmundomd/blob/main/projects/03-cdisc-adam-pilot/sas/README.md). Click any filename heading to open the file on GitHub.
+
+### [`sas/setup.sas`](https://github.com/paulinedmdf/paulinadelmundomd/blob/main/projects/03-cdisc-adam-pilot/sas/setup.sas)
+
+```{.sas filename="sas/setup.sas"}
+{{< include sas/setup.sas >}}
+```
+
+### [`sas/t_14_2_01_demog.sas`](https://github.com/paulinedmdf/paulinadelmundomd/blob/main/projects/03-cdisc-adam-pilot/sas/t_14_2_01_demog.sas)
+
+```{.sas filename="sas/t_14_2_01_demog.sas"}
+{{< include sas/t_14_2_01_demog.sas >}}
+```
+
+### [`sas/xpt_export.sas`](https://github.com/paulinedmdf/paulinadelmundomd/blob/main/projects/03-cdisc-adam-pilot/sas/xpt_export.sas)
+
+```{.sas filename="sas/xpt_export.sas"}
+{{< include sas/xpt_export.sas >}}
+```
 
 ---
 

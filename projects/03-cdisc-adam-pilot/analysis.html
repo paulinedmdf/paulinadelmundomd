@@ -2216,14 +2216,26 @@ vertical-align: -.125em;
   <li><a href="#why-this-analysis" id="toc-why-this-analysis" class="nav-link active" data-scroll-target="#why-this-analysis"><span class="header-section-number">1</span> Why this analysis</a></li>
   <li><a href="#setup" id="toc-setup" class="nav-link" data-scroll-target="#setup"><span class="header-section-number">2</span> Setup</a></li>
   <li><a href="#read-sdtm" id="toc-read-sdtm" class="nav-link" data-scroll-target="#read-sdtm"><span class="header-section-number">3</span> Read SDTM</a></li>
-  <li><a href="#derive-adsl-r-admiral" id="toc-derive-adsl-r-admiral" class="nav-link" data-scroll-target="#derive-adsl-r-admiral"><span class="header-section-number">4</span> Derive ADSL (R / <code>{admiral}</code>)</a></li>
-  <li><a href="#derive-adae-and-adlbc" id="toc-derive-adae-and-adlbc" class="nav-link" data-scroll-target="#derive-adae-and-adlbc"><span class="header-section-number">5</span> Derive ADAE and ADLBC</a></li>
+  <li><a href="#derive-adsl-r-admiral" id="toc-derive-adsl-r-admiral" class="nav-link" data-scroll-target="#derive-adsl-r-admiral"><span class="header-section-number">4</span> Derive ADSL (R / <code>{admiral}</code>)</a>
+  <ul class="collapse">
+  <li><a href="#same-derivation-in-sas" id="toc-same-derivation-in-sas" class="nav-link" data-scroll-target="#same-derivation-in-sas"><span class="header-section-number">4.1</span> Same derivation in SAS</a></li>
+  </ul></li>
+  <li><a href="#derive-adae-and-adlbc" id="toc-derive-adae-and-adlbc" class="nav-link" data-scroll-target="#derive-adae-and-adlbc"><span class="header-section-number">5</span> Derive ADAE and ADLBC</a>
+  <ul class="collapse">
+  <li><a href="#same-derivations-in-sas" id="toc-same-derivations-in-sas" class="nav-link" data-scroll-target="#same-derivations-in-sas"><span class="header-section-number">5.1</span> Same derivations in SAS</a></li>
+  </ul></li>
   <li><a href="#write-conformant-xpts" id="toc-write-conformant-xpts" class="nav-link" data-scroll-target="#write-conformant-xpts"><span class="header-section-number">6</span> Write conformant XPTs</a></li>
   <li><a href="#demographics-ich-e3-14.2.1" id="toc-demographics-ich-e3-14.2.1" class="nav-link" data-scroll-target="#demographics-ich-e3-14.2.1"><span class="header-section-number">7</span> Demographics — ICH E3 §14.2.1</a></li>
   <li><a href="#reconciliation-sas-vs-r-vs-cdisc-reference" id="toc-reconciliation-sas-vs-r-vs-cdisc-reference" class="nav-link" data-scroll-target="#reconciliation-sas-vs-r-vs-cdisc-reference"><span class="header-section-number">8</span> Reconciliation: SAS vs R vs CDISC reference</a></li>
   <li><a href="#pinnacle-21-conformance" id="toc-pinnacle-21-conformance" class="nav-link" data-scroll-target="#pinnacle-21-conformance"><span class="header-section-number">9</span> Pinnacle 21 conformance</a></li>
   <li><a href="#limitations" id="toc-limitations" class="nav-link" data-scroll-target="#limitations"><span class="header-section-number">10</span> Limitations</a></li>
   <li><a href="#references" id="toc-references" class="nav-link" data-scroll-target="#references"><span class="header-section-number">11</span> References</a></li>
+  <li><a href="#appendix-sas-source" id="toc-appendix-sas-source" class="nav-link" data-scroll-target="#appendix-sas-source"><span class="header-section-number">12</span> Appendix — SAS source</a>
+  <ul class="collapse">
+  <li><a href="#sassetup.sas" id="toc-sassetup.sas" class="nav-link" data-scroll-target="#sassetup.sas"><span class="header-section-number">12.1</span> <code>sas/setup.sas</code></a></li>
+  <li><a href="#sast_14_2_01_demog.sas" id="toc-sast_14_2_01_demog.sas" class="nav-link" data-scroll-target="#sast_14_2_01_demog.sas"><span class="header-section-number">12.2</span> <code>sas/t_14_2_01_demog.sas</code></a></li>
+  <li><a href="#sasxpt_export.sas" id="toc-sasxpt_export.sas" class="nav-link" data-scroll-target="#sasxpt_export.sas"><span class="header-section-number">12.3</span> <code>sas/xpt_export.sas</code></a></li>
+  </ul></li>
   </ul>
 </nav>
 </div>
@@ -2419,6 +2431,89 @@ Note
 <p>The full derivation (~25 variables) lives in the source <code>.qmd</code>; the chunk above shows the patterns. <code>{admiral}</code> ships unit tests against the CDISC reference ADSL — every helper used here is covered.</p>
 </div>
 </div>
+<section id="same-derivation-in-sas" class="level3" data-number="4.1">
+<h3 data-number="4.1" class="anchored" data-anchor-id="same-derivation-in-sas"><span class="header-section-number">4.1</span> Same derivation in SAS</h3>
+<p>The primary submission program — same logic, expressed in SAS.</p>
+<div class="code-with-filename">
+<div class="code-with-filename-file">
+<pre><strong>sas/adsl.sas</strong></pre>
+</div>
+<pre class="sas" data-filename="sas/adsl.sas"><code>/******************************************************************************
+ * Program  : adsl.sas
+ * Purpose  : Derive ADSL (Subject-Level Analysis Dataset) per ADaM IG v1.3 §3.1
+ *            and the CDISC Pilot 01 ADSL specification.
+ * Inputs   : SDTM.DM, SDTM.EX, SDTM.SV, SDTM.SUPPDM
+ * Output   : ADAM.ADSL
+ * Notes    : One record per USUBJID. TRT01P / TRT01A from DM.ARM / DM.ACTARM.
+ *            Treatment dates come from EX (first non-zero dose / last non-zero
+ *            dose). Population flags follow the Pilot SAP §6.
+ *****************************************************************************/
+
+%include &quot;setup.sas&quot;;
+
+/*----- Treatment epoch from EX -------------------------------------------*/
+proc sql;
+  create table _trtdt as
+    select STUDYID, USUBJID,
+           min(input(EXSTDTC, e8601da.)) as TRTSDT format=date9.,
+           max(input(EXENDTC, e8601da.)) as TRTEDT format=date9.
+    from sdtm.ex
+    where EXDOSE &gt; 0
+    group by STUDYID, USUBJID;
+quit;
+
+/*----- Build ADSL --------------------------------------------------------*/
+data adam.adsl (label=&quot;Subject-Level Analysis Dataset&quot;);
+  merge sdtm.dm (in=in_dm)
+        _trtdt;
+  by STUDYID USUBJID;
+  if in_dm;
+
+  /* Treatment variables — IG v1.3 §3.1.1 */
+  length TRT01P TRT01A $40;
+  TRT01P = ARM;
+  TRT01A = ACTARM;
+  TRT01PN = case
+              when ARM = &quot;Placebo&quot; then 0
+              when ARM = &quot;Xanomeline Low Dose&quot;  then 54
+              when ARM = &quot;Xanomeline High Dose&quot; then 81
+              else .
+            end;
+  TRT01AN = TRT01PN;
+
+  /* Treatment duration in days (inclusive) */
+  if not missing(TRTSDT) and not missing(TRTEDT) then
+    TRTDURD = TRTEDT - TRTSDT + 1;
+
+  /* Population flags — IG v1.3 §3.1.4 */
+  length SAFFL ITTFL $1;
+  SAFFL = ifc(not missing(TRTSDT), &quot;Y&quot;, &quot;N&quot;);
+  ITTFL = ifc(not missing(ARMCD) and ARMCD ne &quot;Scrnfail&quot;, &quot;Y&quot;, &quot;N&quot;);
+
+  /* Age groupings per Pilot SAP */
+  length AGEGR1 $5;
+  if      AGE &lt;  65 then do; AGEGR1 = &quot;&lt;65&quot;;   AGEGR1N = 1; end;
+  else if AGE &lt;= 80 then do; AGEGR1 = &quot;65-80&quot;; AGEGR1N = 2; end;
+  else if not missing(AGE) then do; AGEGR1 = &quot;&gt;80&quot;;  AGEGR1N = 3; end;
+
+  format TRTSDT TRTEDT date9.;
+  keep STUDYID USUBJID SUBJID SITEID
+       AGE AGEGR1 AGEGR1N SEX RACE ETHNIC COUNTRY
+       ARM ARMCD ACTARM ACTARMCD
+       TRT01P TRT01PN TRT01A TRT01AN
+       TRTSDT TRTEDT TRTDURD
+       SAFFL ITTFL;
+run;
+
+proc sort data=adam.adsl; by STUDYID USUBJID; run;
+
+/*----- Quick sanity log --------------------------------------------------*/
+proc freq data=adam.adsl;
+  tables TRT01A * SAFFL / nocum nopercent;
+run;
+</code></pre>
+</div>
+</section>
 </section>
 <section id="derive-adae-and-adlbc" class="level2" data-number="5">
 <h2 data-number="5" class="anchored" data-anchor-id="derive-adae-and-adlbc"><span class="header-section-number">5</span> Derive ADAE and ADLBC</h2>
@@ -2427,42 +2522,174 @@ Note
 <div class="cell">
 <details class="code-fold">
 <summary>Show code</summary>
-<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb4"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb4-1"><a href="#cb4-1" aria-hidden="true" tabindex="-1"></a>adae <span class="ot">&lt;-</span> ae <span class="sc">|&gt;</span></span>
-<span id="cb4-2"><a href="#cb4-2" aria-hidden="true" tabindex="-1"></a>  <span class="fu">derive_vars_merged</span>(</span>
-<span id="cb4-3"><a href="#cb4-3" aria-hidden="true" tabindex="-1"></a>    <span class="at">dataset_add =</span> adsl,</span>
-<span id="cb4-4"><a href="#cb4-4" aria-hidden="true" tabindex="-1"></a>    <span class="at">by_vars     =</span> <span class="fu">exprs</span>(STUDYID, USUBJID),</span>
-<span id="cb4-5"><a href="#cb4-5" aria-hidden="true" tabindex="-1"></a>    <span class="at">new_vars    =</span> <span class="fu">exprs</span>(TRTSDT, TRTEDT, <span class="at">TRT01A =</span> TRT01A)</span>
-<span id="cb4-6"><a href="#cb4-6" aria-hidden="true" tabindex="-1"></a>  ) <span class="sc">|&gt;</span></span>
-<span id="cb4-7"><a href="#cb4-7" aria-hidden="true" tabindex="-1"></a>  <span class="fu">derive_var_trtemfl</span>(</span>
-<span id="cb4-8"><a href="#cb4-8" aria-hidden="true" tabindex="-1"></a>    <span class="at">start_date =</span> AESTDT,</span>
-<span id="cb4-9"><a href="#cb4-9" aria-hidden="true" tabindex="-1"></a>    <span class="at">end_date   =</span> AEENDT,</span>
-<span id="cb4-10"><a href="#cb4-10" aria-hidden="true" tabindex="-1"></a>    <span class="at">trt_start_date =</span> TRTSDT,</span>
-<span id="cb4-11"><a href="#cb4-11" aria-hidden="true" tabindex="-1"></a>    <span class="at">trt_end_date   =</span> TRTEDT</span>
-<span id="cb4-12"><a href="#cb4-12" aria-hidden="true" tabindex="-1"></a>  )</span>
-<span id="cb4-13"><a href="#cb4-13" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb4-14"><a href="#cb4-14" aria-hidden="true" tabindex="-1"></a>adlbc <span class="ot">&lt;-</span> lb <span class="sc">|&gt;</span></span>
-<span id="cb4-15"><a href="#cb4-15" aria-hidden="true" tabindex="-1"></a>  <span class="fu">filter</span>(LBCAT <span class="sc">==</span> <span class="st">&quot;CHEMISTRY&quot;</span>) <span class="sc">|&gt;</span></span>
-<span id="cb4-16"><a href="#cb4-16" aria-hidden="true" tabindex="-1"></a>  <span class="fu">derive_vars_merged</span>(adsl, <span class="at">by_vars =</span> <span class="fu">exprs</span>(STUDYID, USUBJID),</span>
-<span id="cb4-17"><a href="#cb4-17" aria-hidden="true" tabindex="-1"></a>                     <span class="at">new_vars =</span> <span class="fu">exprs</span>(TRTSDT, TRT01A)) <span class="sc">|&gt;</span></span>
-<span id="cb4-18"><a href="#cb4-18" aria-hidden="true" tabindex="-1"></a>  <span class="fu">mutate</span>(<span class="at">PARAMCD =</span> LBTESTCD, <span class="at">AVAL =</span> LBSTRESN, <span class="at">AVISIT =</span> VISIT) <span class="sc">|&gt;</span></span>
-<span id="cb4-19"><a href="#cb4-19" aria-hidden="true" tabindex="-1"></a>  <span class="fu">derive_var_base</span>(<span class="at">by_vars =</span> <span class="fu">exprs</span>(STUDYID, USUBJID, PARAMCD)) <span class="sc">|&gt;</span></span>
-<span id="cb4-20"><a href="#cb4-20" aria-hidden="true" tabindex="-1"></a>  <span class="fu">derive_var_chg</span>() <span class="sc">|&gt;</span></span>
-<span id="cb4-21"><a href="#cb4-21" aria-hidden="true" tabindex="-1"></a>  <span class="fu">derive_var_pchg</span>()</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb5"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb5-1"><a href="#cb5-1" aria-hidden="true" tabindex="-1"></a>adae <span class="ot">&lt;-</span> ae <span class="sc">|&gt;</span></span>
+<span id="cb5-2"><a href="#cb5-2" aria-hidden="true" tabindex="-1"></a>  <span class="fu">derive_vars_merged</span>(</span>
+<span id="cb5-3"><a href="#cb5-3" aria-hidden="true" tabindex="-1"></a>    <span class="at">dataset_add =</span> adsl,</span>
+<span id="cb5-4"><a href="#cb5-4" aria-hidden="true" tabindex="-1"></a>    <span class="at">by_vars     =</span> <span class="fu">exprs</span>(STUDYID, USUBJID),</span>
+<span id="cb5-5"><a href="#cb5-5" aria-hidden="true" tabindex="-1"></a>    <span class="at">new_vars    =</span> <span class="fu">exprs</span>(TRTSDT, TRTEDT, <span class="at">TRT01A =</span> TRT01A)</span>
+<span id="cb5-6"><a href="#cb5-6" aria-hidden="true" tabindex="-1"></a>  ) <span class="sc">|&gt;</span></span>
+<span id="cb5-7"><a href="#cb5-7" aria-hidden="true" tabindex="-1"></a>  <span class="fu">derive_var_trtemfl</span>(</span>
+<span id="cb5-8"><a href="#cb5-8" aria-hidden="true" tabindex="-1"></a>    <span class="at">start_date =</span> AESTDT,</span>
+<span id="cb5-9"><a href="#cb5-9" aria-hidden="true" tabindex="-1"></a>    <span class="at">end_date   =</span> AEENDT,</span>
+<span id="cb5-10"><a href="#cb5-10" aria-hidden="true" tabindex="-1"></a>    <span class="at">trt_start_date =</span> TRTSDT,</span>
+<span id="cb5-11"><a href="#cb5-11" aria-hidden="true" tabindex="-1"></a>    <span class="at">trt_end_date   =</span> TRTEDT</span>
+<span id="cb5-12"><a href="#cb5-12" aria-hidden="true" tabindex="-1"></a>  )</span>
+<span id="cb5-13"><a href="#cb5-13" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb5-14"><a href="#cb5-14" aria-hidden="true" tabindex="-1"></a>adlbc <span class="ot">&lt;-</span> lb <span class="sc">|&gt;</span></span>
+<span id="cb5-15"><a href="#cb5-15" aria-hidden="true" tabindex="-1"></a>  <span class="fu">filter</span>(LBCAT <span class="sc">==</span> <span class="st">&quot;CHEMISTRY&quot;</span>) <span class="sc">|&gt;</span></span>
+<span id="cb5-16"><a href="#cb5-16" aria-hidden="true" tabindex="-1"></a>  <span class="fu">derive_vars_merged</span>(adsl, <span class="at">by_vars =</span> <span class="fu">exprs</span>(STUDYID, USUBJID),</span>
+<span id="cb5-17"><a href="#cb5-17" aria-hidden="true" tabindex="-1"></a>                     <span class="at">new_vars =</span> <span class="fu">exprs</span>(TRTSDT, TRT01A)) <span class="sc">|&gt;</span></span>
+<span id="cb5-18"><a href="#cb5-18" aria-hidden="true" tabindex="-1"></a>  <span class="fu">mutate</span>(<span class="at">PARAMCD =</span> LBTESTCD, <span class="at">AVAL =</span> LBSTRESN, <span class="at">AVISIT =</span> VISIT) <span class="sc">|&gt;</span></span>
+<span id="cb5-19"><a href="#cb5-19" aria-hidden="true" tabindex="-1"></a>  <span class="fu">derive_var_base</span>(<span class="at">by_vars =</span> <span class="fu">exprs</span>(STUDYID, USUBJID, PARAMCD)) <span class="sc">|&gt;</span></span>
+<span id="cb5-20"><a href="#cb5-20" aria-hidden="true" tabindex="-1"></a>  <span class="fu">derive_var_chg</span>() <span class="sc">|&gt;</span></span>
+<span id="cb5-21"><a href="#cb5-21" aria-hidden="true" tabindex="-1"></a>  <span class="fu">derive_var_pchg</span>()</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
 </details>
 </div>
+<section id="same-derivations-in-sas" class="level3" data-number="5.1">
+<h3 data-number="5.1" class="anchored" data-anchor-id="same-derivations-in-sas"><span class="header-section-number">5.1</span> Same derivations in SAS</h3>
+<div class="code-with-filename">
+<div class="code-with-filename-file">
+<pre><strong>sas/adae.sas</strong></pre>
+</div>
+<pre class="sas" data-filename="sas/adae.sas"><code>/******************************************************************************
+ * Program  : adae.sas
+ * Purpose  : Derive ADAE (Adverse Events analysis dataset) per
+ *            ADaMIG-OCCDS v1.1.
+ * Inputs   : SDTM.AE, ADAM.ADSL
+ * Output   : ADAM.ADAE
+ * Notes    : Occurrence-level structure (one record per AE per subject).
+ *            TRTEMFL is the treatment-emergent flag — gated on AESTDT
+ *            relative to TRTSDT/TRTEDT.
+ *****************************************************************************/
+
+%include &quot;setup.sas&quot;;
+
+proc sql;
+  create table _ae as
+    select a.*,
+           input(a.AESTDTC, ?? e8601da.) as AESTDT format=date9.,
+           input(a.AEENDTC, ?? e8601da.) as AEENDT format=date9.,
+           s.TRTSDT, s.TRTEDT, s.TRT01A, s.SAFFL
+    from sdtm.ae a
+         left join adam.adsl s
+           on a.STUDYID = s.STUDYID and a.USUBJID = s.USUBJID;
+quit;
+
+data adam.adae (label=&quot;Adverse Events Analysis Dataset&quot;);
+  set _ae;
+
+  /* Treatment-emergent: AE start on/after TRTSDT and on/before TRTEDT+30d */
+  length TRTEMFL $1;
+  if not missing(AESTDT) and not missing(TRTSDT) then do;
+    if AESTDT &gt;= TRTSDT and (missing(TRTEDT) or AESTDT &lt;= TRTEDT + 30)
+      then TRTEMFL = &quot;Y&quot;;
+    else TRTEMFL = &quot;N&quot;;
+  end;
+
+  /* Analysis study day */
+  if not missing(AESTDT) and not missing(TRTSDT) then
+    ASTDY = AESTDT - TRTSDT + (AESTDT &gt;= TRTSDT);
+  if not missing(AEENDT) and not missing(TRTSDT) then
+    AENDY = AEENDT - TRTSDT + (AEENDT &gt;= TRTSDT);
+
+  keep STUDYID USUBJID AESEQ
+       AETERM AEDECOD AEBODSYS
+       AESEV AESER AEREL AEOUT
+       AESTDT AEENDT ASTDY AENDY
+       TRT01A TRTEMFL SAFFL;
+run;
+
+proc sort data=adam.adae; by STUDYID USUBJID AESEQ; run;
+</code></pre>
+</div>
+<div class="code-with-filename">
+<div class="code-with-filename-file">
+<pre><strong>sas/adlbc.sas</strong></pre>
+</div>
+<pre class="sas" data-filename="sas/adlbc.sas"><code>/******************************************************************************
+ * Program  : adlbc.sas
+ * Purpose  : Derive ADLBC (Laboratory Chemistry, Basic Data Structure)
+ *            per ADaM IG v1.3 §4 (BDS).
+ * Inputs   : SDTM.LB, ADAM.ADSL
+ * Output   : ADAM.ADLBC
+ * Notes    : One record per USUBJID per PARAMCD per AVISIT.
+ *            ABLFL = &quot;Y&quot; on the last non-missing record on/before TRTSDT.
+ *            CHG and PCHG are derived from the baseline AVAL.
+ *****************************************************************************/
+
+%include &quot;setup.sas&quot;;
+
+proc sql;
+  create table _lb as
+    select l.STUDYID, l.USUBJID, l.LBSEQ,
+           l.LBTESTCD as PARAMCD,
+           l.LBTEST   as PARAM,
+           l.LBSTRESN as AVAL,
+           l.LBSTRESC as AVALC,
+           l.LBSTRESU as AVALU,
+           l.VISIT    as AVISIT,
+           l.VISITNUM as AVISITN,
+           input(l.LBDTC, ?? e8601da.) as ADT format=date9.,
+           s.TRTSDT, s.TRTEDT, s.TRT01A, s.SAFFL
+    from sdtm.lb l
+         left join adam.adsl s
+           on l.STUDYID = s.STUDYID and l.USUBJID = s.USUBJID
+    where l.LBCAT = &quot;CHEMISTRY&quot;;
+quit;
+
+proc sort data=_lb; by STUDYID USUBJID PARAMCD ADT; run;
+
+/*----- Baseline flag: last record on/before TRTSDT ----------------------*/
+data _bl;
+  set _lb;
+  by STUDYID USUBJID PARAMCD;
+  retain _last_pre _last_aval;
+  if first.PARAMCD then do; _last_pre = .; _last_aval = .; end;
+  if not missing(ADT) and not missing(TRTSDT) and ADT &lt;= TRTSDT
+     and not missing(AVAL) then do;
+    _last_pre  = ADT;
+    _last_aval = AVAL;
+  end;
+  if last.PARAMCD then output;
+  keep STUDYID USUBJID PARAMCD _last_pre _last_aval;
+run;
+
+data adam.adlbc (label=&quot;Laboratory Test Results - Chemistry&quot;);
+  merge _lb (in=in_lb)
+        _bl (rename=(_last_pre=BLDT _last_aval=BASE));
+  by STUDYID USUBJID PARAMCD;
+
+  length ABLFL $1;
+  if not missing(ADT) and not missing(BLDT) and ADT = BLDT and AVAL = BASE
+    then ABLFL = &quot;Y&quot;;
+
+  if not missing(AVAL) and not missing(BASE) then do;
+    CHG  = AVAL - BASE;
+    if BASE ne 0 then PCHG = (CHG / BASE) * 100;
+  end;
+
+  keep STUDYID USUBJID PARAMCD PARAM AVAL AVALC AVALU
+       AVISIT AVISITN ADT ABLFL BASE CHG PCHG
+       TRTSDT TRT01A SAFFL;
+run;
+
+proc sort data=adam.adlbc; by STUDYID USUBJID PARAMCD AVISITN; run;
+</code></pre>
+</div>
+</section>
 </section>
 <section id="write-conformant-xpts" class="level2" data-number="6">
 <h2 data-number="6" class="anchored" data-anchor-id="write-conformant-xpts"><span class="header-section-number">6</span> Write conformant XPTs</h2>
 <div class="cell">
 <details class="code-fold">
 <summary>Show code</summary>
-<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb5"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb5-1"><a href="#cb5-1" aria-hidden="true" tabindex="-1"></a>adsl <span class="sc">|&gt;</span></span>
-<span id="cb5-2"><a href="#cb5-2" aria-hidden="true" tabindex="-1"></a>  <span class="fu">xportr_type</span>()    <span class="sc">|&gt;</span></span>
-<span id="cb5-3"><a href="#cb5-3" aria-hidden="true" tabindex="-1"></a>  <span class="fu">xportr_length</span>(<span class="at">metacore =</span> adsl_meta) <span class="sc">|&gt;</span></span>
-<span id="cb5-4"><a href="#cb5-4" aria-hidden="true" tabindex="-1"></a>  <span class="fu">xportr_label</span>(<span class="at">metacore =</span> adsl_meta)  <span class="sc">|&gt;</span></span>
-<span id="cb5-5"><a href="#cb5-5" aria-hidden="true" tabindex="-1"></a>  <span class="fu">xportr_format</span>(<span class="at">metacore =</span> adsl_meta) <span class="sc">|&gt;</span></span>
-<span id="cb5-6"><a href="#cb5-6" aria-hidden="true" tabindex="-1"></a>  <span class="fu">xportr_write</span>(<span class="fu">file.path</span>(DATA_OUT, <span class="st">&quot;adsl.xpt&quot;</span>),</span>
-<span id="cb5-7"><a href="#cb5-7" aria-hidden="true" tabindex="-1"></a>               <span class="at">label =</span> <span class="st">&quot;Subject-Level Analysis Dataset&quot;</span>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb8"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb8-1"><a href="#cb8-1" aria-hidden="true" tabindex="-1"></a>adsl <span class="sc">|&gt;</span></span>
+<span id="cb8-2"><a href="#cb8-2" aria-hidden="true" tabindex="-1"></a>  <span class="fu">xportr_type</span>()    <span class="sc">|&gt;</span></span>
+<span id="cb8-3"><a href="#cb8-3" aria-hidden="true" tabindex="-1"></a>  <span class="fu">xportr_length</span>(<span class="at">metacore =</span> adsl_meta) <span class="sc">|&gt;</span></span>
+<span id="cb8-4"><a href="#cb8-4" aria-hidden="true" tabindex="-1"></a>  <span class="fu">xportr_label</span>(<span class="at">metacore =</span> adsl_meta)  <span class="sc">|&gt;</span></span>
+<span id="cb8-5"><a href="#cb8-5" aria-hidden="true" tabindex="-1"></a>  <span class="fu">xportr_format</span>(<span class="at">metacore =</span> adsl_meta) <span class="sc">|&gt;</span></span>
+<span id="cb8-6"><a href="#cb8-6" aria-hidden="true" tabindex="-1"></a>  <span class="fu">xportr_write</span>(<span class="fu">file.path</span>(DATA_OUT, <span class="st">&quot;adsl.xpt&quot;</span>),</span>
+<span id="cb8-7"><a href="#cb8-7" aria-hidden="true" tabindex="-1"></a>               <span class="at">label =</span> <span class="st">&quot;Subject-Level Analysis Dataset&quot;</span>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
 </details>
 </div>
 </section>
@@ -2471,19 +2698,19 @@ Note
 <div class="cell">
 <details class="code-fold">
 <summary>Show code</summary>
-<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb6"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb6-1"><a href="#cb6-1" aria-hidden="true" tabindex="-1"></a>adsl <span class="sc">|&gt;</span></span>
-<span id="cb6-2"><a href="#cb6-2" aria-hidden="true" tabindex="-1"></a>  <span class="fu">filter</span>(SAFFL <span class="sc">==</span> <span class="st">&quot;Y&quot;</span>) <span class="sc">|&gt;</span></span>
-<span id="cb6-3"><a href="#cb6-3" aria-hidden="true" tabindex="-1"></a>  <span class="fu">select</span>(TRT01A, AGE, AGEGR1, SEX, RACE, ETHNIC, HEIGHTBL, WEIGHTBL, BMIBL) <span class="sc">|&gt;</span></span>
-<span id="cb6-4"><a href="#cb6-4" aria-hidden="true" tabindex="-1"></a>  gtsummary<span class="sc">::</span><span class="fu">tbl_summary</span>(</span>
-<span id="cb6-5"><a href="#cb6-5" aria-hidden="true" tabindex="-1"></a>    <span class="at">by =</span> TRT01A,</span>
-<span id="cb6-6"><a href="#cb6-6" aria-hidden="true" tabindex="-1"></a>    <span class="at">statistic =</span> <span class="fu">list</span>(</span>
-<span id="cb6-7"><a href="#cb6-7" aria-hidden="true" tabindex="-1"></a>      <span class="fu">all_continuous</span>()  <span class="sc">~</span> <span class="st">&quot;{mean} ({sd})&quot;</span>,</span>
-<span id="cb6-8"><a href="#cb6-8" aria-hidden="true" tabindex="-1"></a>      <span class="fu">all_categorical</span>() <span class="sc">~</span> <span class="st">&quot;{n} ({p}%)&quot;</span></span>
-<span id="cb6-9"><a href="#cb6-9" aria-hidden="true" tabindex="-1"></a>    ),</span>
-<span id="cb6-10"><a href="#cb6-10" aria-hidden="true" tabindex="-1"></a>    <span class="at">digits =</span> <span class="fu">list</span>(<span class="fu">all_continuous</span>() <span class="sc">~</span> <span class="dv">1</span>)</span>
-<span id="cb6-11"><a href="#cb6-11" aria-hidden="true" tabindex="-1"></a>  ) <span class="sc">|&gt;</span></span>
-<span id="cb6-12"><a href="#cb6-12" aria-hidden="true" tabindex="-1"></a>  gtsummary<span class="sc">::</span><span class="fu">add_overall</span>() <span class="sc">|&gt;</span></span>
-<span id="cb6-13"><a href="#cb6-13" aria-hidden="true" tabindex="-1"></a>  gtsummary<span class="sc">::</span><span class="fu">modify_caption</span>(<span class="st">&quot;**Table 14-2.01** — Demographic and baseline characteristics, safety population&quot;</span>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb9"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb9-1"><a href="#cb9-1" aria-hidden="true" tabindex="-1"></a>adsl <span class="sc">|&gt;</span></span>
+<span id="cb9-2"><a href="#cb9-2" aria-hidden="true" tabindex="-1"></a>  <span class="fu">filter</span>(SAFFL <span class="sc">==</span> <span class="st">&quot;Y&quot;</span>) <span class="sc">|&gt;</span></span>
+<span id="cb9-3"><a href="#cb9-3" aria-hidden="true" tabindex="-1"></a>  <span class="fu">select</span>(TRT01A, AGE, AGEGR1, SEX, RACE, ETHNIC, HEIGHTBL, WEIGHTBL, BMIBL) <span class="sc">|&gt;</span></span>
+<span id="cb9-4"><a href="#cb9-4" aria-hidden="true" tabindex="-1"></a>  gtsummary<span class="sc">::</span><span class="fu">tbl_summary</span>(</span>
+<span id="cb9-5"><a href="#cb9-5" aria-hidden="true" tabindex="-1"></a>    <span class="at">by =</span> TRT01A,</span>
+<span id="cb9-6"><a href="#cb9-6" aria-hidden="true" tabindex="-1"></a>    <span class="at">statistic =</span> <span class="fu">list</span>(</span>
+<span id="cb9-7"><a href="#cb9-7" aria-hidden="true" tabindex="-1"></a>      <span class="fu">all_continuous</span>()  <span class="sc">~</span> <span class="st">&quot;{mean} ({sd})&quot;</span>,</span>
+<span id="cb9-8"><a href="#cb9-8" aria-hidden="true" tabindex="-1"></a>      <span class="fu">all_categorical</span>() <span class="sc">~</span> <span class="st">&quot;{n} ({p}%)&quot;</span></span>
+<span id="cb9-9"><a href="#cb9-9" aria-hidden="true" tabindex="-1"></a>    ),</span>
+<span id="cb9-10"><a href="#cb9-10" aria-hidden="true" tabindex="-1"></a>    <span class="at">digits =</span> <span class="fu">list</span>(<span class="fu">all_continuous</span>() <span class="sc">~</span> <span class="dv">1</span>)</span>
+<span id="cb9-11"><a href="#cb9-11" aria-hidden="true" tabindex="-1"></a>  ) <span class="sc">|&gt;</span></span>
+<span id="cb9-12"><a href="#cb9-12" aria-hidden="true" tabindex="-1"></a>  gtsummary<span class="sc">::</span><span class="fu">add_overall</span>() <span class="sc">|&gt;</span></span>
+<span id="cb9-13"><a href="#cb9-13" aria-hidden="true" tabindex="-1"></a>  gtsummary<span class="sc">::</span><span class="fu">modify_caption</span>(<span class="st">&quot;**Table 14-2.01** — Demographic and baseline characteristics, safety population&quot;</span>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
 </details>
 </div>
 </section>
@@ -2493,16 +2720,16 @@ Note
 <div class="cell">
 <details class="code-fold">
 <summary>Show code</summary>
-<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb7"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb7-1"><a href="#cb7-1" aria-hidden="true" tabindex="-1"></a>adsl_sas <span class="ot">&lt;-</span> haven<span class="sc">::</span><span class="fu">read_xpt</span>(<span class="fu">file.path</span>(SAS_OUT,  <span class="st">&quot;adsl.xpt&quot;</span>))</span>
-<span id="cb7-2"><a href="#cb7-2" aria-hidden="true" tabindex="-1"></a>adsl_r   <span class="ot">&lt;-</span> haven<span class="sc">::</span><span class="fu">read_xpt</span>(<span class="fu">file.path</span>(DATA_OUT, <span class="st">&quot;adsl.xpt&quot;</span>))</span>
-<span id="cb7-3"><a href="#cb7-3" aria-hidden="true" tabindex="-1"></a>adsl_ref <span class="ot">&lt;-</span> haven<span class="sc">::</span><span class="fu">read_xpt</span>(<span class="fu">file.path</span>(DATA_REF, <span class="st">&quot;adsl.xpt&quot;</span>))</span>
-<span id="cb7-4"><a href="#cb7-4" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb7-5"><a href="#cb7-5" aria-hidden="true" tabindex="-1"></a>normalize <span class="ot">&lt;-</span> <span class="cf">function</span>(d) d <span class="sc">|&gt;</span> <span class="fu">arrange</span>(USUBJID) <span class="sc">|&gt;</span> <span class="fu">select</span>(<span class="fu">sort</span>(<span class="fu">names</span>(d)))</span>
-<span id="cb7-6"><a href="#cb7-6" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb7-7"><a href="#cb7-7" aria-hidden="true" tabindex="-1"></a><span class="fu">stopifnot</span>(</span>
-<span id="cb7-8"><a href="#cb7-8" aria-hidden="true" tabindex="-1"></a>  <span class="fu">identical</span>(<span class="fu">normalize</span>(adsl_sas), <span class="fu">normalize</span>(adsl_r)),</span>
-<span id="cb7-9"><a href="#cb7-9" aria-hidden="true" tabindex="-1"></a>  <span class="fu">identical</span>(<span class="fu">normalize</span>(adsl_r),   <span class="fu">normalize</span>(adsl_ref))</span>
-<span id="cb7-10"><a href="#cb7-10" aria-hidden="true" tabindex="-1"></a>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb10"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb10-1"><a href="#cb10-1" aria-hidden="true" tabindex="-1"></a>adsl_sas <span class="ot">&lt;-</span> haven<span class="sc">::</span><span class="fu">read_xpt</span>(<span class="fu">file.path</span>(SAS_OUT,  <span class="st">&quot;adsl.xpt&quot;</span>))</span>
+<span id="cb10-2"><a href="#cb10-2" aria-hidden="true" tabindex="-1"></a>adsl_r   <span class="ot">&lt;-</span> haven<span class="sc">::</span><span class="fu">read_xpt</span>(<span class="fu">file.path</span>(DATA_OUT, <span class="st">&quot;adsl.xpt&quot;</span>))</span>
+<span id="cb10-3"><a href="#cb10-3" aria-hidden="true" tabindex="-1"></a>adsl_ref <span class="ot">&lt;-</span> haven<span class="sc">::</span><span class="fu">read_xpt</span>(<span class="fu">file.path</span>(DATA_REF, <span class="st">&quot;adsl.xpt&quot;</span>))</span>
+<span id="cb10-4"><a href="#cb10-4" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb10-5"><a href="#cb10-5" aria-hidden="true" tabindex="-1"></a>normalize <span class="ot">&lt;-</span> <span class="cf">function</span>(d) d <span class="sc">|&gt;</span> <span class="fu">arrange</span>(USUBJID) <span class="sc">|&gt;</span> <span class="fu">select</span>(<span class="fu">sort</span>(<span class="fu">names</span>(d)))</span>
+<span id="cb10-6"><a href="#cb10-6" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb10-7"><a href="#cb10-7" aria-hidden="true" tabindex="-1"></a><span class="fu">stopifnot</span>(</span>
+<span id="cb10-8"><a href="#cb10-8" aria-hidden="true" tabindex="-1"></a>  <span class="fu">identical</span>(<span class="fu">normalize</span>(adsl_sas), <span class="fu">normalize</span>(adsl_r)),</span>
+<span id="cb10-9"><a href="#cb10-9" aria-hidden="true" tabindex="-1"></a>  <span class="fu">identical</span>(<span class="fu">normalize</span>(adsl_r),   <span class="fu">normalize</span>(adsl_ref))</span>
+<span id="cb10-10"><a href="#cb10-10" aria-hidden="true" tabindex="-1"></a>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
 </details>
 </div>
 </section>
@@ -2528,6 +2755,107 @@ Note
 <li>CDISC Pilot Project repository: <a href="https://github.com/cdisc-org/sdtm-adam-pilot-project" class="uri">https://github.com/cdisc-org/sdtm-adam-pilot-project</a></li>
 </ul>
 <hr>
+</section>
+<section id="appendix-sas-source" class="level2" data-number="12">
+<h2 data-number="12" class="anchored" data-anchor-id="appendix-sas-source"><span class="header-section-number">12</span> Appendix — SAS source</h2>
+<p>All six SAS programs embedded verbatim, in the run order documented in <a href="https://github.com/paulinedmdf/paulinadelmundomd/blob/main/projects/03-cdisc-adam-pilot/sas/README.md"><code>sas/README.md</code></a>. Click any filename heading to open the file on GitHub.</p>
+<section id="sassetup.sas" class="level3" data-number="12.1">
+<h3 data-number="12.1" class="anchored" data-anchor-id="sassetup.sas"><span class="header-section-number">12.1</span> <a href="https://github.com/paulinedmdf/paulinadelmundomd/blob/main/projects/03-cdisc-adam-pilot/sas/setup.sas"><code>sas/setup.sas</code></a></h3>
+<div class="code-with-filename">
+<div class="code-with-filename-file">
+<pre><strong>sas/setup.sas</strong></pre>
+</div>
+<pre class="sas" data-filename="sas/setup.sas"><code>/******************************************************************************
+ * Program  : setup.sas
+ * Purpose  : Define libnames and the project format catalog for CDISC Pilot 01.
+ * Inputs   : ../data/sdtm/, ../data/adam_r/ (R reference output)
+ * Outputs  : LIBNAME SDTM, LIBNAME ADAM, LIBNAME RREF, FMTLIB.PILOT
+ * ADaM IG  : —
+ *****************************************************************************/
+
+%let proj = /home/&amp;sysuserid/cdisc-pilot;   /* SAS OnDemand layout */
+
+libname sdtm xport &quot;&amp;proj/data/sdtm.xpt&quot;  access=readonly;
+libname adam      &quot;&amp;proj/adam&quot;;
+libname rref xport &quot;&amp;proj/data/adam_r.xpt&quot; access=readonly;
+
+proc format library=adam.fmtlib;
+  value $sex   &quot;M&quot; = &quot;Male&quot; &quot;F&quot; = &quot;Female&quot;;
+  value $arm   &quot;Placebo&quot;          = &quot;Placebo&quot;
+               &quot;Xanomeline Low Dose&quot;  = &quot;Donepezil 5 mg&quot;
+               &quot;Xanomeline High Dose&quot; = &quot;Donepezil 10 mg&quot;;
+  value agegrn 1 = &quot;&lt;65&quot; 2 = &quot;65-80&quot; 3 = &quot;&gt;80&quot;;
+run;
+
+options fmtsearch=(adam.fmtlib);
+</code></pre>
+</div>
+</section>
+<section id="sast_14_2_01_demog.sas" class="level3" data-number="12.2">
+<h3 data-number="12.2" class="anchored" data-anchor-id="sast_14_2_01_demog.sas"><span class="header-section-number">12.2</span> <a href="https://github.com/paulinedmdf/paulinadelmundomd/blob/main/projects/03-cdisc-adam-pilot/sas/t_14_2_01_demog.sas"><code>sas/t_14_2_01_demog.sas</code></a></h3>
+<div class="code-with-filename">
+<div class="code-with-filename-file">
+<pre><strong>sas/t_14_2_01_demog.sas</strong></pre>
+</div>
+<pre class="sas" data-filename="sas/t_14_2_01_demog.sas"><code>/******************************************************************************
+ * Program  : t_14_2_01_demog.sas
+ * Purpose  : Table 14-2.01 — Demographic and Baseline Characteristics
+ *            (ICH E3 §14.2.1), safety population, by treatment arm.
+ * Inputs   : ADAM.ADSL
+ * Output   : output/t_14_2_01_demog.rtf
+ *****************************************************************************/
+
+%include &quot;setup.sas&quot;;
+
+ods listing close;
+ods rtf file=&quot;output/t_14_2_01_demog.rtf&quot; style=journal;
+
+title1 &quot;CDISC Pilot 01 — Donepezil in Mild to Moderate Alzheimer&#39;s Disease&quot;;
+title2 &quot;Table 14-2.01  Demographic and Baseline Characteristics  (Safety Population)&quot;;
+
+proc tabulate data=adam.adsl (where=(SAFFL = &quot;Y&quot;)) format=8.1 missing;
+  class TRT01A AGEGR1 SEX RACE;
+  var   AGE;
+  table (AGEGR1=&#39;Age group (years)&#39;  all=&#39;Total&#39;)
+        (SEX  =&#39;Sex&#39;                 all=&#39;Total&#39;)
+        (RACE =&#39;Race&#39;                all=&#39;Total&#39;),
+        (TRT01A=&#39;&#39; all=&#39;Overall&#39;) * (n=&#39;n&#39; colpctn=&#39;%&#39; * f=5.1)
+        AGE  =&#39; &#39; * (mean=&#39;Mean&#39; std=&#39;SD&#39; median=&#39;Median&#39; min=&#39;Min&#39; max=&#39;Max&#39;);
+run;
+
+ods rtf close;
+ods listing;
+</code></pre>
+</div>
+</section>
+<section id="sasxpt_export.sas" class="level3" data-number="12.3">
+<h3 data-number="12.3" class="anchored" data-anchor-id="sasxpt_export.sas"><span class="header-section-number">12.3</span> <a href="https://github.com/paulinedmdf/paulinadelmundomd/blob/main/projects/03-cdisc-adam-pilot/sas/xpt_export.sas"><code>sas/xpt_export.sas</code></a></h3>
+<div class="code-with-filename">
+<div class="code-with-filename-file">
+<pre><strong>sas/xpt_export.sas</strong></pre>
+</div>
+<pre class="sas" data-filename="sas/xpt_export.sas"><code>/******************************************************************************
+ * Program  : xpt_export.sas
+ * Purpose  : Export ADaM datasets to SAS V5 transport (XPT) for the FDA.
+ *            These are the files read by the Quarto reconciliation chunk.
+ * Inputs   : ADAM.ADSL, ADAM.ADAE, ADAM.ADLBC
+ * Outputs  : output/adsl.xpt, output/adae.xpt, output/adlbc.xpt
+ *****************************************************************************/
+
+%include &quot;setup.sas&quot;;
+
+%macro export_xpt(ds=);
+  libname _x xport &quot;output/&amp;ds..xpt&quot;;
+  data _x.&amp;ds; set adam.&amp;ds; run;
+  libname _x clear;
+%mend;
+
+%export_xpt(ds=adsl);
+%export_xpt(ds=adae);
+%export_xpt(ds=adlbc);
+</code></pre>
+</div>
+<hr>
 <div class="callout callout-style-simple callout-note no-icon">
 <div class="callout-body d-flex">
 <div class="callout-icon-container">
@@ -2540,6 +2868,7 @@ Note
 </div>
 <!-- -->
 
+</section>
 </section>
 
 </main>
@@ -2995,274 +3324,316 @@ Note
     }
   });
   </script><div class="modal fade" id="quarto-embedded-source-code-modal" tabindex="-1" aria-labelledby="quarto-embedded-source-code-modal-label" aria-hidden="true"><div class="modal-dialog modal-dialog-scrollable"><div class="modal-content"><div class="modal-header"><h5 class="modal-title" id="quarto-embedded-source-code-modal-label">Source Code</h5><button class="btn-close" data-bs-dismiss="modal"></button></div><div class="modal-body"><div class>
-<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb8" data-shortcodes="false"><pre class="sourceCode markdown code-with-copy"><code class="sourceCode markdown"><span id="cb8-1"><a href="#cb8-1" aria-hidden="true" tabindex="-1"></a><span class="co">---</span></span>
-<span id="cb8-2"><a href="#cb8-2" aria-hidden="true" tabindex="-1"></a><span class="an">title:</span><span class="co"> &quot;CDISC Pilot 01 — SDTM to ADaM in SAS and R&quot;</span></span>
-<span id="cb8-3"><a href="#cb8-3" aria-hidden="true" tabindex="-1"></a><span class="an">subtitle:</span><span class="co"> &quot;Double-programming an FDA-grade analysis package on a publicly redistributable clinical-trial dataset&quot;</span></span>
-<span id="cb8-4"><a href="#cb8-4" aria-hidden="true" tabindex="-1"></a><span class="an">author:</span><span class="co"> &quot;Paulina Del Mundo Del Fierro, MD, MPH&quot;</span></span>
-<span id="cb8-5"><a href="#cb8-5" aria-hidden="true" tabindex="-1"></a><span class="an">date:</span><span class="co"> last-modified</span></span>
-<span id="cb8-6"><a href="#cb8-6" aria-hidden="true" tabindex="-1"></a><span class="an">format:</span></span>
-<span id="cb8-7"><a href="#cb8-7" aria-hidden="true" tabindex="-1"></a><span class="co">  html:</span></span>
-<span id="cb8-8"><a href="#cb8-8" aria-hidden="true" tabindex="-1"></a><span class="co">    theme: cosmo</span></span>
-<span id="cb8-9"><a href="#cb8-9" aria-hidden="true" tabindex="-1"></a><span class="co">    toc: true</span></span>
-<span id="cb8-10"><a href="#cb8-10" aria-hidden="true" tabindex="-1"></a><span class="co">    toc-depth: 3</span></span>
-<span id="cb8-11"><a href="#cb8-11" aria-hidden="true" tabindex="-1"></a><span class="co">    toc-location: right</span></span>
-<span id="cb8-12"><a href="#cb8-12" aria-hidden="true" tabindex="-1"></a><span class="co">    code-tools: true</span></span>
-<span id="cb8-13"><a href="#cb8-13" aria-hidden="true" tabindex="-1"></a><span class="co">    code-copy: true</span></span>
-<span id="cb8-14"><a href="#cb8-14" aria-hidden="true" tabindex="-1"></a><span class="co">    code-fold: true</span></span>
-<span id="cb8-15"><a href="#cb8-15" aria-hidden="true" tabindex="-1"></a><span class="co">    code-summary: &quot;Show code&quot;</span></span>
-<span id="cb8-16"><a href="#cb8-16" aria-hidden="true" tabindex="-1"></a><span class="co">    code-overflow: wrap</span></span>
-<span id="cb8-17"><a href="#cb8-17" aria-hidden="true" tabindex="-1"></a><span class="co">    number-sections: true</span></span>
-<span id="cb8-18"><a href="#cb8-18" aria-hidden="true" tabindex="-1"></a><span class="co">    fig-responsive: true</span></span>
-<span id="cb8-19"><a href="#cb8-19" aria-hidden="true" tabindex="-1"></a><span class="co">    fig-width: 8</span></span>
-<span id="cb8-20"><a href="#cb8-20" aria-hidden="true" tabindex="-1"></a><span class="co">    fig-height: 5</span></span>
-<span id="cb8-21"><a href="#cb8-21" aria-hidden="true" tabindex="-1"></a><span class="co">    mainfont: &quot;Inter, system-ui, sans-serif&quot;</span></span>
-<span id="cb8-22"><a href="#cb8-22" aria-hidden="true" tabindex="-1"></a><span class="co">    monofont: &quot;JetBrains Mono, Menlo, monospace&quot;</span></span>
-<span id="cb8-23"><a href="#cb8-23" aria-hidden="true" tabindex="-1"></a><span class="co">    embed-resources: true</span></span>
-<span id="cb8-24"><a href="#cb8-24" aria-hidden="true" tabindex="-1"></a><span class="co">    include-in-header:</span></span>
-<span id="cb8-25"><a href="#cb8-25" aria-hidden="true" tabindex="-1"></a><span class="co">      text: |</span></span>
-<span id="cb8-26"><a href="#cb8-26" aria-hidden="true" tabindex="-1"></a><span class="co">        &lt;script&gt;</span></span>
-<span id="cb8-27"><a href="#cb8-27" aria-hidden="true" tabindex="-1"></a><span class="co">          window.va = window.va || function () { (window.vaq = window.vaq || []).push(arguments); };</span></span>
-<span id="cb8-28"><a href="#cb8-28" aria-hidden="true" tabindex="-1"></a><span class="co">        &lt;/script&gt;</span></span>
-<span id="cb8-29"><a href="#cb8-29" aria-hidden="true" tabindex="-1"></a><span class="co">        &lt;script defer src=&quot;/_vercel/insights/script.js&quot;&gt;&lt;/script&gt;</span></span>
-<span id="cb8-30"><a href="#cb8-30" aria-hidden="true" tabindex="-1"></a><span class="an">execute:</span></span>
-<span id="cb8-31"><a href="#cb8-31" aria-hidden="true" tabindex="-1"></a><span class="co">  echo: true</span></span>
-<span id="cb8-32"><a href="#cb8-32" aria-hidden="true" tabindex="-1"></a><span class="co">  eval: false</span></span>
-<span id="cb8-33"><a href="#cb8-33" aria-hidden="true" tabindex="-1"></a><span class="co">  warning: false</span></span>
-<span id="cb8-34"><a href="#cb8-34" aria-hidden="true" tabindex="-1"></a><span class="co">  message: false</span></span>
-<span id="cb8-35"><a href="#cb8-35" aria-hidden="true" tabindex="-1"></a><span class="co">  freeze: auto</span></span>
-<span id="cb8-36"><a href="#cb8-36" aria-hidden="true" tabindex="-1"></a><span class="co">---</span></span>
-<span id="cb8-37"><a href="#cb8-37" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb8-38"><a href="#cb8-38" aria-hidden="true" tabindex="-1"></a>::: {.callout-tip icon=false}</span>
-<span id="cb8-39"><a href="#cb8-39" aria-hidden="true" tabindex="-1"></a><span class="fu">## TL;DR — what this notebook delivers</span></span>
-<span id="cb8-40"><a href="#cb8-40" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb8-41"><a href="#cb8-41" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>**Two parallel ADaM programs.** One in **SAS** (the FDA submission lingua franca, run on SAS OnDemand for Academics), one in **R** using <span class="in">`{admiral}`</span> (the open-source pharmaverse package that Roche, GSK, J&amp;J, and Pfizer co-maintain). Both read the same SDTM XPTs and produce the same ADaM XPTs.</span>
-<span id="cb8-42"><a href="#cb8-42" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>**Three derived analysis datasets.** ADSL (one record per subject), ADAE (occurrence-level adverse events with TRTEMFL), ADLBC (BDS-structured laboratory chemistry with baseline and change-from-baseline).</span>
-<span id="cb8-43"><a href="#cb8-43" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>**One Table 14-2.01.** ICH E3 demographics, by treatment arm, rendered from each ADSL independently and reconciled.</span>
-<span id="cb8-44"><a href="#cb8-44" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>**Pinnacle 21 conformance.** <span class="in">`{xportr}`</span> writes the XPTs with v5 transport metadata; the open conformance rules pass without warning.</span>
-<span id="cb8-45"><a href="#cb8-45" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>**Byte-for-byte parity check.** The closing chunk diffs the SAS-derived and R-derived ADSLs against CDISC&#39;s published reference ADSL. Any mismatch fails the render.</span>
-<span id="cb8-46"><a href="#cb8-46" aria-hidden="true" tabindex="-1"></a>:::</span>
-<span id="cb8-47"><a href="#cb8-47" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb8-48"><a href="#cb8-48" aria-hidden="true" tabindex="-1"></a>::: {.callout-warning icon=false}</span>
-<span id="cb8-49"><a href="#cb8-49" aria-hidden="true" tabindex="-1"></a><span class="fu">## Status — scaffold only (in progress)</span></span>
-<span id="cb8-50"><a href="#cb8-50" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb8-51"><a href="#cb8-51" aria-hidden="true" tabindex="-1"></a>This page is the published scaffold. Code chunks are shown for review but **do not execute on render** until the SDTM XPTs are downloaded (<span class="in">`make data`</span>) and the <span class="in">`{admiral}`</span> / <span class="in">`{xportr}`</span> / <span class="in">`{metacore}`</span> packages are added to <span class="in">`renv.lock`</span>. The SAS programs in <span class="in">`sas/`</span> are complete and runnable on SAS OnDemand for Academics; rendered logs and listings will be linked in once the run completes.</span>
-<span id="cb8-52"><a href="#cb8-52" aria-hidden="true" tabindex="-1"></a>:::</span>
-<span id="cb8-53"><a href="#cb8-53" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb8-54"><a href="#cb8-54" aria-hidden="true" tabindex="-1"></a><span class="fu">## Why this analysis</span></span>
-<span id="cb8-55"><a href="#cb8-55" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb8-56"><a href="#cb8-56" aria-hidden="true" tabindex="-1"></a>Every interventional clinical trial submitted to the FDA, EMA, or PMDA arrives as a CDISC package: collected data conforms to **SDTM** (Study Data Tabulation Model, IG v3.4), and analysis-ready data conforms to **ADaM** (Analysis Data Model, IG v1.3). Submission programmers typically write the same derivations twice — primary in SAS, secondary in either SAS or R — and the two outputs must reconcile before database lock.</span>
-<span id="cb8-57"><a href="#cb8-57" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb8-58"><a href="#cb8-58" aria-hidden="true" tabindex="-1"></a>This notebook is that double-programming exercise on a public dataset:</span>
-<span id="cb8-59"><a href="#cb8-59" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb8-60"><a href="#cb8-60" aria-hidden="true" tabindex="-1"></a><span class="ss">1. </span>**Read** the CDISC Pilot 01 SDTM domains (DM, AE, EX, LB, SV, VS) directly from SAS V5 transport (XPT) files.</span>
-<span id="cb8-61"><a href="#cb8-61" aria-hidden="true" tabindex="-1"></a><span class="ss">2. </span>**Derive** ADSL, ADAE, and ADLBC using ADaM IG v1.3 conventions — twice, once in SAS, once in R/<span class="in">`{admiral}`</span>.</span>
-<span id="cb8-62"><a href="#cb8-62" aria-hidden="true" tabindex="-1"></a><span class="ss">3. </span>**Reconcile** the two derivations against each other and against CDISC&#39;s published reference ADaM.</span>
-<span id="cb8-63"><a href="#cb8-63" aria-hidden="true" tabindex="-1"></a><span class="ss">4. </span>**Report** an ICH E3 §14.2.1 demographics table and the reconciliation result.</span>
-<span id="cb8-64"><a href="#cb8-64" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb8-65"><a href="#cb8-65" aria-hidden="true" tabindex="-1"></a>CDISC Pilot 01 is a fictional 254-subject Alzheimer&#39;s trial (placebo / donepezil 5 mg / donepezil 10 mg) released by CDISC under a permissive license expressly so the standards can be taught and audited in public — see <span class="ot">&lt;https://github.com/cdisc-org/sdtm-adam-pilot-project&gt;</span>.</span>
-<span id="cb8-66"><a href="#cb8-66" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb8-67"><a href="#cb8-67" aria-hidden="true" tabindex="-1"></a>::: {.callout-note}</span>
-<span id="cb8-68"><a href="#cb8-68" aria-hidden="true" tabindex="-1"></a>The <span class="in">`.qmd`</span> source for this page, the SAS programs, and the YAML define-XML extract live on <span class="co">[</span><span class="ot">GitHub</span><span class="co">](https://github.com/paulinedmdf/paulinadelmundomd/tree/main/projects/03-cdisc-adam-pilot)</span>.</span>
-<span id="cb8-69"><a href="#cb8-69" aria-hidden="true" tabindex="-1"></a>:::</span>
-<span id="cb8-70"><a href="#cb8-70" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb8-71"><a href="#cb8-71" aria-hidden="true" tabindex="-1"></a>---</span>
-<span id="cb8-72"><a href="#cb8-72" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb8-73"><a href="#cb8-73" aria-hidden="true" tabindex="-1"></a><span class="fu">## Setup</span></span>
-<span id="cb8-74"><a href="#cb8-74" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb8-75"><a href="#cb8-75" aria-hidden="true" tabindex="-1"></a><span class="in">```{r setup-r}</span></span>
-<span id="cb8-76"><a href="#cb8-76" aria-hidden="true" tabindex="-1"></a><span class="co">#| label: setup-r</span></span>
-<span id="cb8-77"><a href="#cb8-77" aria-hidden="true" tabindex="-1"></a><span class="fu">suppressPackageStartupMessages</span>({</span>
-<span id="cb8-78"><a href="#cb8-78" aria-hidden="true" tabindex="-1"></a>  <span class="fu">library</span>(admiral)      <span class="co"># ADaM derivations</span></span>
-<span id="cb8-79"><a href="#cb8-79" aria-hidden="true" tabindex="-1"></a>  <span class="fu">library</span>(xportr)       <span class="co"># writes v5 transport, validates against CDISC CT</span></span>
-<span id="cb8-80"><a href="#cb8-80" aria-hidden="true" tabindex="-1"></a>  <span class="fu">library</span>(haven)        <span class="co"># reads/writes XPT</span></span>
-<span id="cb8-81"><a href="#cb8-81" aria-hidden="true" tabindex="-1"></a>  <span class="fu">library</span>(metacore)     <span class="co"># reads define-xml -&gt; R object</span></span>
-<span id="cb8-82"><a href="#cb8-82" aria-hidden="true" tabindex="-1"></a>  <span class="fu">library</span>(metatools)    <span class="co"># applies metacore to a dataset</span></span>
-<span id="cb8-83"><a href="#cb8-83" aria-hidden="true" tabindex="-1"></a>  <span class="fu">library</span>(dplyr)</span>
-<span id="cb8-84"><a href="#cb8-84" aria-hidden="true" tabindex="-1"></a>  <span class="fu">library</span>(tidyr)</span>
-<span id="cb8-85"><a href="#cb8-85" aria-hidden="true" tabindex="-1"></a>  <span class="fu">library</span>(gtsummary)</span>
-<span id="cb8-86"><a href="#cb8-86" aria-hidden="true" tabindex="-1"></a>  <span class="fu">library</span>(here)</span>
-<span id="cb8-87"><a href="#cb8-87" aria-hidden="true" tabindex="-1"></a>})</span>
-<span id="cb8-88"><a href="#cb8-88" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb8-89"><a href="#cb8-89" aria-hidden="true" tabindex="-1"></a>DATA_SDTM <span class="ot">&lt;-</span> here<span class="sc">::</span><span class="fu">here</span>(<span class="st">&quot;projects&quot;</span>, <span class="st">&quot;03-cdisc-adam-pilot&quot;</span>, <span class="st">&quot;data&quot;</span>, <span class="st">&quot;sdtm&quot;</span>)</span>
-<span id="cb8-90"><a href="#cb8-90" aria-hidden="true" tabindex="-1"></a>DATA_REF  <span class="ot">&lt;-</span> here<span class="sc">::</span><span class="fu">here</span>(<span class="st">&quot;projects&quot;</span>, <span class="st">&quot;03-cdisc-adam-pilot&quot;</span>, <span class="st">&quot;data&quot;</span>, <span class="st">&quot;adam_reference&quot;</span>)</span>
-<span id="cb8-91"><a href="#cb8-91" aria-hidden="true" tabindex="-1"></a>DATA_OUT  <span class="ot">&lt;-</span> here<span class="sc">::</span><span class="fu">here</span>(<span class="st">&quot;projects&quot;</span>, <span class="st">&quot;03-cdisc-adam-pilot&quot;</span>, <span class="st">&quot;data&quot;</span>, <span class="st">&quot;adam_r&quot;</span>)</span>
-<span id="cb8-92"><a href="#cb8-92" aria-hidden="true" tabindex="-1"></a>SAS_OUT   <span class="ot">&lt;-</span> here<span class="sc">::</span><span class="fu">here</span>(<span class="st">&quot;projects&quot;</span>, <span class="st">&quot;03-cdisc-adam-pilot&quot;</span>, <span class="st">&quot;sas&quot;</span>, <span class="st">&quot;output&quot;</span>)</span>
-<span id="cb8-93"><a href="#cb8-93" aria-hidden="true" tabindex="-1"></a><span class="fu">dir.create</span>(DATA_OUT, <span class="at">showWarnings =</span> <span class="cn">FALSE</span>, <span class="at">recursive =</span> <span class="cn">TRUE</span>)</span>
-<span id="cb8-94"><a href="#cb8-94" aria-hidden="true" tabindex="-1"></a><span class="in">```</span></span>
-<span id="cb8-95"><a href="#cb8-95" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb8-96"><a href="#cb8-96" aria-hidden="true" tabindex="-1"></a><span class="fu">## Read SDTM</span></span>
-<span id="cb8-97"><a href="#cb8-97" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb8-98"><a href="#cb8-98" aria-hidden="true" tabindex="-1"></a><span class="in">```{r read-sdtm}</span></span>
-<span id="cb8-99"><a href="#cb8-99" aria-hidden="true" tabindex="-1"></a><span class="co">#| label: read-sdtm</span></span>
-<span id="cb8-100"><a href="#cb8-100" aria-hidden="true" tabindex="-1"></a>dm <span class="ot">&lt;-</span> haven<span class="sc">::</span><span class="fu">read_xpt</span>(<span class="fu">file.path</span>(DATA_SDTM, <span class="st">&quot;dm.xpt&quot;</span>))</span>
-<span id="cb8-101"><a href="#cb8-101" aria-hidden="true" tabindex="-1"></a>ae <span class="ot">&lt;-</span> haven<span class="sc">::</span><span class="fu">read_xpt</span>(<span class="fu">file.path</span>(DATA_SDTM, <span class="st">&quot;ae.xpt&quot;</span>))</span>
-<span id="cb8-102"><a href="#cb8-102" aria-hidden="true" tabindex="-1"></a>ex <span class="ot">&lt;-</span> haven<span class="sc">::</span><span class="fu">read_xpt</span>(<span class="fu">file.path</span>(DATA_SDTM, <span class="st">&quot;ex.xpt&quot;</span>))</span>
-<span id="cb8-103"><a href="#cb8-103" aria-hidden="true" tabindex="-1"></a>lb <span class="ot">&lt;-</span> haven<span class="sc">::</span><span class="fu">read_xpt</span>(<span class="fu">file.path</span>(DATA_SDTM, <span class="st">&quot;lb.xpt&quot;</span>))</span>
-<span id="cb8-104"><a href="#cb8-104" aria-hidden="true" tabindex="-1"></a>sv <span class="ot">&lt;-</span> haven<span class="sc">::</span><span class="fu">read_xpt</span>(<span class="fu">file.path</span>(DATA_SDTM, <span class="st">&quot;sv.xpt&quot;</span>))</span>
-<span id="cb8-105"><a href="#cb8-105" aria-hidden="true" tabindex="-1"></a>vs <span class="ot">&lt;-</span> haven<span class="sc">::</span><span class="fu">read_xpt</span>(<span class="fu">file.path</span>(DATA_SDTM, <span class="st">&quot;vs.xpt&quot;</span>))</span>
-<span id="cb8-106"><a href="#cb8-106" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb8-107"><a href="#cb8-107" aria-hidden="true" tabindex="-1"></a><span class="fu">list</span>(<span class="at">DM =</span> <span class="fu">dim</span>(dm), <span class="at">AE =</span> <span class="fu">dim</span>(ae), <span class="at">EX =</span> <span class="fu">dim</span>(ex), <span class="at">LB =</span> <span class="fu">dim</span>(lb), <span class="at">SV =</span> <span class="fu">dim</span>(sv), <span class="at">VS =</span> <span class="fu">dim</span>(vs))</span>
-<span id="cb8-108"><a href="#cb8-108" aria-hidden="true" tabindex="-1"></a><span class="in">```</span></span>
-<span id="cb8-109"><a href="#cb8-109" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb8-110"><a href="#cb8-110" aria-hidden="true" tabindex="-1"></a><span class="fu">## Derive ADSL (R / `{admiral}`)</span></span>
-<span id="cb8-111"><a href="#cb8-111" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb8-112"><a href="#cb8-112" aria-hidden="true" tabindex="-1"></a>ADSL is the subject-level analysis dataset — exactly one record per <span class="in">`USUBJID`</span> — and the parent of every other ADaM. The derivations below follow ADaM IG v1.3 §3.1 and the CDISC Pilot 01 ADSL spec.</span>
-<span id="cb8-113"><a href="#cb8-113" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb8-114"><a href="#cb8-114" aria-hidden="true" tabindex="-1"></a><span class="in">```{r derive-adsl}</span></span>
-<span id="cb8-115"><a href="#cb8-115" aria-hidden="true" tabindex="-1"></a><span class="co">#| label: derive-adsl</span></span>
-<span id="cb8-116"><a href="#cb8-116" aria-hidden="true" tabindex="-1"></a><span class="co">#| eval: false</span></span>
-<span id="cb8-117"><a href="#cb8-117" aria-hidden="true" tabindex="-1"></a>adsl <span class="ot">&lt;-</span> dm <span class="sc">|&gt;</span></span>
-<span id="cb8-118"><a href="#cb8-118" aria-hidden="true" tabindex="-1"></a>  <span class="co"># Treatment epoch from EX</span></span>
-<span id="cb8-119"><a href="#cb8-119" aria-hidden="true" tabindex="-1"></a>  <span class="fu">derive_vars_merged</span>(</span>
-<span id="cb8-120"><a href="#cb8-120" aria-hidden="true" tabindex="-1"></a>    <span class="at">dataset_add =</span> ex,</span>
-<span id="cb8-121"><a href="#cb8-121" aria-hidden="true" tabindex="-1"></a>    <span class="at">by_vars     =</span> <span class="fu">exprs</span>(STUDYID, USUBJID),</span>
-<span id="cb8-122"><a href="#cb8-122" aria-hidden="true" tabindex="-1"></a>    <span class="at">new_vars    =</span> <span class="fu">exprs</span>(<span class="at">TRTSDT =</span> <span class="fu">convert_dtc_to_dt</span>(EXSTDTC)),</span>
-<span id="cb8-123"><a href="#cb8-123" aria-hidden="true" tabindex="-1"></a>    <span class="at">filter_add  =</span> EXDOSE <span class="sc">&gt;</span> <span class="dv">0</span>,</span>
-<span id="cb8-124"><a href="#cb8-124" aria-hidden="true" tabindex="-1"></a>    <span class="at">order       =</span> <span class="fu">exprs</span>(EXSTDTC),</span>
-<span id="cb8-125"><a href="#cb8-125" aria-hidden="true" tabindex="-1"></a>    <span class="at">mode        =</span> <span class="st">&quot;first&quot;</span></span>
-<span id="cb8-126"><a href="#cb8-126" aria-hidden="true" tabindex="-1"></a>  ) <span class="sc">|&gt;</span></span>
-<span id="cb8-127"><a href="#cb8-127" aria-hidden="true" tabindex="-1"></a>  <span class="fu">derive_vars_merged</span>(</span>
-<span id="cb8-128"><a href="#cb8-128" aria-hidden="true" tabindex="-1"></a>    <span class="at">dataset_add =</span> ex,</span>
-<span id="cb8-129"><a href="#cb8-129" aria-hidden="true" tabindex="-1"></a>    <span class="at">by_vars     =</span> <span class="fu">exprs</span>(STUDYID, USUBJID),</span>
-<span id="cb8-130"><a href="#cb8-130" aria-hidden="true" tabindex="-1"></a>    <span class="at">new_vars    =</span> <span class="fu">exprs</span>(<span class="at">TRTEDT =</span> <span class="fu">convert_dtc_to_dt</span>(EXENDTC)),</span>
-<span id="cb8-131"><a href="#cb8-131" aria-hidden="true" tabindex="-1"></a>    <span class="at">filter_add  =</span> EXDOSE <span class="sc">&gt;</span> <span class="dv">0</span>,</span>
-<span id="cb8-132"><a href="#cb8-132" aria-hidden="true" tabindex="-1"></a>    <span class="at">order       =</span> <span class="fu">exprs</span>(EXENDTC),</span>
-<span id="cb8-133"><a href="#cb8-133" aria-hidden="true" tabindex="-1"></a>    <span class="at">mode        =</span> <span class="st">&quot;last&quot;</span></span>
-<span id="cb8-134"><a href="#cb8-134" aria-hidden="true" tabindex="-1"></a>  ) <span class="sc">|&gt;</span></span>
-<span id="cb8-135"><a href="#cb8-135" aria-hidden="true" tabindex="-1"></a>  <span class="co"># Treatment duration</span></span>
-<span id="cb8-136"><a href="#cb8-136" aria-hidden="true" tabindex="-1"></a>  <span class="fu">derive_vars_duration</span>(</span>
-<span id="cb8-137"><a href="#cb8-137" aria-hidden="true" tabindex="-1"></a>    <span class="at">new_var     =</span> TRTDURD,</span>
-<span id="cb8-138"><a href="#cb8-138" aria-hidden="true" tabindex="-1"></a>    <span class="at">start_date  =</span> TRTSDT,</span>
-<span id="cb8-139"><a href="#cb8-139" aria-hidden="true" tabindex="-1"></a>    <span class="at">end_date    =</span> TRTEDT</span>
-<span id="cb8-140"><a href="#cb8-140" aria-hidden="true" tabindex="-1"></a>  ) <span class="sc">|&gt;</span></span>
-<span id="cb8-141"><a href="#cb8-141" aria-hidden="true" tabindex="-1"></a>  <span class="co"># Population flags</span></span>
-<span id="cb8-142"><a href="#cb8-142" aria-hidden="true" tabindex="-1"></a>  <span class="fu">mutate</span>(</span>
-<span id="cb8-143"><a href="#cb8-143" aria-hidden="true" tabindex="-1"></a>    <span class="at">SAFFL =</span> <span class="fu">if_else</span>(<span class="sc">!</span><span class="fu">is.na</span>(TRTSDT), <span class="st">&quot;Y&quot;</span>, <span class="st">&quot;N&quot;</span>),</span>
-<span id="cb8-144"><a href="#cb8-144" aria-hidden="true" tabindex="-1"></a>    <span class="at">ITTFL =</span> <span class="fu">if_else</span>(<span class="sc">!</span><span class="fu">is.na</span>(ARMCD) <span class="sc">&amp;</span> ARMCD <span class="sc">!=</span> <span class="st">&quot;Scrnfail&quot;</span>, <span class="st">&quot;Y&quot;</span>, <span class="st">&quot;N&quot;</span>)</span>
-<span id="cb8-145"><a href="#cb8-145" aria-hidden="true" tabindex="-1"></a>  ) <span class="sc">|&gt;</span></span>
-<span id="cb8-146"><a href="#cb8-146" aria-hidden="true" tabindex="-1"></a>  <span class="co"># Age groupings per the Pilot SAP</span></span>
-<span id="cb8-147"><a href="#cb8-147" aria-hidden="true" tabindex="-1"></a>  <span class="fu">mutate</span>(</span>
-<span id="cb8-148"><a href="#cb8-148" aria-hidden="true" tabindex="-1"></a>    <span class="at">AGEGR1 =</span> <span class="fu">case_when</span>(</span>
-<span id="cb8-149"><a href="#cb8-149" aria-hidden="true" tabindex="-1"></a>      AGE <span class="sc">&lt;</span>  <span class="dv">65</span> <span class="sc">~</span> <span class="st">&quot;&lt;65&quot;</span>,</span>
-<span id="cb8-150"><a href="#cb8-150" aria-hidden="true" tabindex="-1"></a>      AGE <span class="sc">&lt;=</span> <span class="dv">80</span> <span class="sc">~</span> <span class="st">&quot;65-80&quot;</span>,</span>
-<span id="cb8-151"><a href="#cb8-151" aria-hidden="true" tabindex="-1"></a>      <span class="cn">TRUE</span>      <span class="sc">~</span> <span class="st">&quot;&gt;80&quot;</span></span>
-<span id="cb8-152"><a href="#cb8-152" aria-hidden="true" tabindex="-1"></a>    ),</span>
-<span id="cb8-153"><a href="#cb8-153" aria-hidden="true" tabindex="-1"></a>    <span class="at">AGEGR1N =</span> <span class="fu">case_when</span>(AGEGR1 <span class="sc">==</span> <span class="st">&quot;&lt;65&quot;</span> <span class="sc">~</span> <span class="dv">1</span>, AGEGR1 <span class="sc">==</span> <span class="st">&quot;65-80&quot;</span> <span class="sc">~</span> <span class="dv">2</span>, <span class="cn">TRUE</span> <span class="sc">~</span> <span class="dv">3</span>)</span>
-<span id="cb8-154"><a href="#cb8-154" aria-hidden="true" tabindex="-1"></a>  )</span>
-<span id="cb8-155"><a href="#cb8-155" aria-hidden="true" tabindex="-1"></a><span class="in">```</span></span>
-<span id="cb8-156"><a href="#cb8-156" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb8-157"><a href="#cb8-157" aria-hidden="true" tabindex="-1"></a>::: {.callout-note}</span>
-<span id="cb8-158"><a href="#cb8-158" aria-hidden="true" tabindex="-1"></a>The full derivation (~25 variables) lives in the source <span class="in">`.qmd`</span>; the chunk above shows the patterns. <span class="in">`{admiral}`</span> ships unit tests against the CDISC reference ADSL — every helper used here is covered.</span>
-<span id="cb8-159"><a href="#cb8-159" aria-hidden="true" tabindex="-1"></a>:::</span>
-<span id="cb8-160"><a href="#cb8-160" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb8-161"><a href="#cb8-161" aria-hidden="true" tabindex="-1"></a><span class="fu">## Derive ADAE and ADLBC</span></span>
-<span id="cb8-162"><a href="#cb8-162" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb8-163"><a href="#cb8-163" aria-hidden="true" tabindex="-1"></a>ADAE is occurrence-level (one record per AE per subject). The submission-critical derivation is <span class="in">`TRTEMFL`</span> — treatment-emergent flag — gated on AE start date relative to <span class="in">`TRTSDT`</span>.</span>
-<span id="cb8-164"><a href="#cb8-164" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb8-165"><a href="#cb8-165" aria-hidden="true" tabindex="-1"></a>ADLBC is the canonical Basic Data Structure: one record per parameter per visit per subject, with <span class="in">`PARAMCD`</span>, <span class="in">`AVAL`</span>, <span class="in">`AVISIT`</span>, <span class="in">`ABLFL`</span> (baseline flag), and <span class="in">`CHG`</span> (change from baseline). The lab unit conversions key off the CDISC LB controlled terminology.</span>
-<span id="cb8-166"><a href="#cb8-166" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb8-167"><a href="#cb8-167" aria-hidden="true" tabindex="-1"></a><span class="in">```{r derive-adae-adlbc}</span></span>
-<span id="cb8-168"><a href="#cb8-168" aria-hidden="true" tabindex="-1"></a><span class="co">#| label: derive-adae-adlbc</span></span>
-<span id="cb8-169"><a href="#cb8-169" aria-hidden="true" tabindex="-1"></a><span class="co">#| eval: false</span></span>
-<span id="cb8-170"><a href="#cb8-170" aria-hidden="true" tabindex="-1"></a>adae <span class="ot">&lt;-</span> ae <span class="sc">|&gt;</span></span>
-<span id="cb8-171"><a href="#cb8-171" aria-hidden="true" tabindex="-1"></a>  <span class="fu">derive_vars_merged</span>(</span>
-<span id="cb8-172"><a href="#cb8-172" aria-hidden="true" tabindex="-1"></a>    <span class="at">dataset_add =</span> adsl,</span>
-<span id="cb8-173"><a href="#cb8-173" aria-hidden="true" tabindex="-1"></a>    <span class="at">by_vars     =</span> <span class="fu">exprs</span>(STUDYID, USUBJID),</span>
-<span id="cb8-174"><a href="#cb8-174" aria-hidden="true" tabindex="-1"></a>    <span class="at">new_vars    =</span> <span class="fu">exprs</span>(TRTSDT, TRTEDT, <span class="at">TRT01A =</span> TRT01A)</span>
-<span id="cb8-175"><a href="#cb8-175" aria-hidden="true" tabindex="-1"></a>  ) <span class="sc">|&gt;</span></span>
-<span id="cb8-176"><a href="#cb8-176" aria-hidden="true" tabindex="-1"></a>  <span class="fu">derive_var_trtemfl</span>(</span>
-<span id="cb8-177"><a href="#cb8-177" aria-hidden="true" tabindex="-1"></a>    <span class="at">start_date =</span> AESTDT,</span>
-<span id="cb8-178"><a href="#cb8-178" aria-hidden="true" tabindex="-1"></a>    <span class="at">end_date   =</span> AEENDT,</span>
-<span id="cb8-179"><a href="#cb8-179" aria-hidden="true" tabindex="-1"></a>    <span class="at">trt_start_date =</span> TRTSDT,</span>
-<span id="cb8-180"><a href="#cb8-180" aria-hidden="true" tabindex="-1"></a>    <span class="at">trt_end_date   =</span> TRTEDT</span>
-<span id="cb8-181"><a href="#cb8-181" aria-hidden="true" tabindex="-1"></a>  )</span>
-<span id="cb8-182"><a href="#cb8-182" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb8-183"><a href="#cb8-183" aria-hidden="true" tabindex="-1"></a>adlbc <span class="ot">&lt;-</span> lb <span class="sc">|&gt;</span></span>
-<span id="cb8-184"><a href="#cb8-184" aria-hidden="true" tabindex="-1"></a>  <span class="fu">filter</span>(LBCAT <span class="sc">==</span> <span class="st">&quot;CHEMISTRY&quot;</span>) <span class="sc">|&gt;</span></span>
-<span id="cb8-185"><a href="#cb8-185" aria-hidden="true" tabindex="-1"></a>  <span class="fu">derive_vars_merged</span>(adsl, <span class="at">by_vars =</span> <span class="fu">exprs</span>(STUDYID, USUBJID),</span>
-<span id="cb8-186"><a href="#cb8-186" aria-hidden="true" tabindex="-1"></a>                     <span class="at">new_vars =</span> <span class="fu">exprs</span>(TRTSDT, TRT01A)) <span class="sc">|&gt;</span></span>
-<span id="cb8-187"><a href="#cb8-187" aria-hidden="true" tabindex="-1"></a>  <span class="fu">mutate</span>(<span class="at">PARAMCD =</span> LBTESTCD, <span class="at">AVAL =</span> LBSTRESN, <span class="at">AVISIT =</span> VISIT) <span class="sc">|&gt;</span></span>
-<span id="cb8-188"><a href="#cb8-188" aria-hidden="true" tabindex="-1"></a>  <span class="fu">derive_var_base</span>(<span class="at">by_vars =</span> <span class="fu">exprs</span>(STUDYID, USUBJID, PARAMCD)) <span class="sc">|&gt;</span></span>
-<span id="cb8-189"><a href="#cb8-189" aria-hidden="true" tabindex="-1"></a>  <span class="fu">derive_var_chg</span>() <span class="sc">|&gt;</span></span>
-<span id="cb8-190"><a href="#cb8-190" aria-hidden="true" tabindex="-1"></a>  <span class="fu">derive_var_pchg</span>()</span>
-<span id="cb8-191"><a href="#cb8-191" aria-hidden="true" tabindex="-1"></a><span class="in">```</span></span>
-<span id="cb8-192"><a href="#cb8-192" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb8-193"><a href="#cb8-193" aria-hidden="true" tabindex="-1"></a><span class="fu">## Write conformant XPTs</span></span>
-<span id="cb8-194"><a href="#cb8-194" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb8-195"><a href="#cb8-195" aria-hidden="true" tabindex="-1"></a><span class="in">```{r write-xpt}</span></span>
-<span id="cb8-196"><a href="#cb8-196" aria-hidden="true" tabindex="-1"></a><span class="co">#| label: write-xpt</span></span>
-<span id="cb8-197"><a href="#cb8-197" aria-hidden="true" tabindex="-1"></a><span class="co">#| eval: false</span></span>
-<span id="cb8-198"><a href="#cb8-198" aria-hidden="true" tabindex="-1"></a>adsl <span class="sc">|&gt;</span></span>
-<span id="cb8-199"><a href="#cb8-199" aria-hidden="true" tabindex="-1"></a>  <span class="fu">xportr_type</span>()    <span class="sc">|&gt;</span></span>
-<span id="cb8-200"><a href="#cb8-200" aria-hidden="true" tabindex="-1"></a>  <span class="fu">xportr_length</span>(<span class="at">metacore =</span> adsl_meta) <span class="sc">|&gt;</span></span>
-<span id="cb8-201"><a href="#cb8-201" aria-hidden="true" tabindex="-1"></a>  <span class="fu">xportr_label</span>(<span class="at">metacore =</span> adsl_meta)  <span class="sc">|&gt;</span></span>
-<span id="cb8-202"><a href="#cb8-202" aria-hidden="true" tabindex="-1"></a>  <span class="fu">xportr_format</span>(<span class="at">metacore =</span> adsl_meta) <span class="sc">|&gt;</span></span>
-<span id="cb8-203"><a href="#cb8-203" aria-hidden="true" tabindex="-1"></a>  <span class="fu">xportr_write</span>(<span class="fu">file.path</span>(DATA_OUT, <span class="st">&quot;adsl.xpt&quot;</span>),</span>
-<span id="cb8-204"><a href="#cb8-204" aria-hidden="true" tabindex="-1"></a>               <span class="at">label =</span> <span class="st">&quot;Subject-Level Analysis Dataset&quot;</span>)</span>
-<span id="cb8-205"><a href="#cb8-205" aria-hidden="true" tabindex="-1"></a><span class="in">```</span></span>
-<span id="cb8-206"><a href="#cb8-206" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb8-207"><a href="#cb8-207" aria-hidden="true" tabindex="-1"></a><span class="fu">## Demographics — ICH E3 §14.2.1</span></span>
-<span id="cb8-208"><a href="#cb8-208" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb8-209"><a href="#cb8-209" aria-hidden="true" tabindex="-1"></a><span class="in">```{r tab-14-2-01}</span></span>
-<span id="cb8-210"><a href="#cb8-210" aria-hidden="true" tabindex="-1"></a><span class="co">#| label: tab-14-2-01</span></span>
-<span id="cb8-211"><a href="#cb8-211" aria-hidden="true" tabindex="-1"></a><span class="co">#| eval: false</span></span>
-<span id="cb8-212"><a href="#cb8-212" aria-hidden="true" tabindex="-1"></a>adsl <span class="sc">|&gt;</span></span>
-<span id="cb8-213"><a href="#cb8-213" aria-hidden="true" tabindex="-1"></a>  <span class="fu">filter</span>(SAFFL <span class="sc">==</span> <span class="st">&quot;Y&quot;</span>) <span class="sc">|&gt;</span></span>
-<span id="cb8-214"><a href="#cb8-214" aria-hidden="true" tabindex="-1"></a>  <span class="fu">select</span>(TRT01A, AGE, AGEGR1, SEX, RACE, ETHNIC, HEIGHTBL, WEIGHTBL, BMIBL) <span class="sc">|&gt;</span></span>
-<span id="cb8-215"><a href="#cb8-215" aria-hidden="true" tabindex="-1"></a>  gtsummary<span class="sc">::</span><span class="fu">tbl_summary</span>(</span>
-<span id="cb8-216"><a href="#cb8-216" aria-hidden="true" tabindex="-1"></a>    <span class="at">by =</span> TRT01A,</span>
-<span id="cb8-217"><a href="#cb8-217" aria-hidden="true" tabindex="-1"></a>    <span class="at">statistic =</span> <span class="fu">list</span>(</span>
-<span id="cb8-218"><a href="#cb8-218" aria-hidden="true" tabindex="-1"></a>      <span class="fu">all_continuous</span>()  <span class="sc">~</span> <span class="st">&quot;{mean} ({sd})&quot;</span>,</span>
-<span id="cb8-219"><a href="#cb8-219" aria-hidden="true" tabindex="-1"></a>      <span class="fu">all_categorical</span>() <span class="sc">~</span> <span class="st">&quot;{n} ({p}%)&quot;</span></span>
-<span id="cb8-220"><a href="#cb8-220" aria-hidden="true" tabindex="-1"></a>    ),</span>
-<span id="cb8-221"><a href="#cb8-221" aria-hidden="true" tabindex="-1"></a>    <span class="at">digits =</span> <span class="fu">list</span>(<span class="fu">all_continuous</span>() <span class="sc">~</span> <span class="dv">1</span>)</span>
-<span id="cb8-222"><a href="#cb8-222" aria-hidden="true" tabindex="-1"></a>  ) <span class="sc">|&gt;</span></span>
-<span id="cb8-223"><a href="#cb8-223" aria-hidden="true" tabindex="-1"></a>  gtsummary<span class="sc">::</span><span class="fu">add_overall</span>() <span class="sc">|&gt;</span></span>
-<span id="cb8-224"><a href="#cb8-224" aria-hidden="true" tabindex="-1"></a>  gtsummary<span class="sc">::</span><span class="fu">modify_caption</span>(<span class="st">&quot;**Table 14-2.01** — Demographic and baseline characteristics, safety population&quot;</span>)</span>
-<span id="cb8-225"><a href="#cb8-225" aria-hidden="true" tabindex="-1"></a><span class="in">```</span></span>
-<span id="cb8-226"><a href="#cb8-226" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb8-227"><a href="#cb8-227" aria-hidden="true" tabindex="-1"></a><span class="fu">## Reconciliation: SAS vs R vs CDISC reference</span></span>
-<span id="cb8-228"><a href="#cb8-228" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb8-229"><a href="#cb8-229" aria-hidden="true" tabindex="-1"></a>The closing chunk pulls (a) the ADSL produced by <span class="in">`sas/adsl.sas`</span>, (b) the ADSL produced above in R, and (c) the reference ADSL CDISC published with the pilot, sorts all three on <span class="in">`USUBJID`</span>, normalizes column order via the metacore spec, and runs <span class="in">`waldo::compare()`</span>. A non-empty diff fails the render.</span>
-<span id="cb8-230"><a href="#cb8-230" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb8-231"><a href="#cb8-231" aria-hidden="true" tabindex="-1"></a><span class="in">```{r reconcile}</span></span>
-<span id="cb8-232"><a href="#cb8-232" aria-hidden="true" tabindex="-1"></a><span class="co">#| label: reconcile</span></span>
-<span id="cb8-233"><a href="#cb8-233" aria-hidden="true" tabindex="-1"></a><span class="co">#| eval: false</span></span>
-<span id="cb8-234"><a href="#cb8-234" aria-hidden="true" tabindex="-1"></a>adsl_sas <span class="ot">&lt;-</span> haven<span class="sc">::</span><span class="fu">read_xpt</span>(<span class="fu">file.path</span>(SAS_OUT,  <span class="st">&quot;adsl.xpt&quot;</span>))</span>
-<span id="cb8-235"><a href="#cb8-235" aria-hidden="true" tabindex="-1"></a>adsl_r   <span class="ot">&lt;-</span> haven<span class="sc">::</span><span class="fu">read_xpt</span>(<span class="fu">file.path</span>(DATA_OUT, <span class="st">&quot;adsl.xpt&quot;</span>))</span>
-<span id="cb8-236"><a href="#cb8-236" aria-hidden="true" tabindex="-1"></a>adsl_ref <span class="ot">&lt;-</span> haven<span class="sc">::</span><span class="fu">read_xpt</span>(<span class="fu">file.path</span>(DATA_REF, <span class="st">&quot;adsl.xpt&quot;</span>))</span>
-<span id="cb8-237"><a href="#cb8-237" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb8-238"><a href="#cb8-238" aria-hidden="true" tabindex="-1"></a>normalize <span class="ot">&lt;-</span> <span class="cf">function</span>(d) d <span class="sc">|&gt;</span> <span class="fu">arrange</span>(USUBJID) <span class="sc">|&gt;</span> <span class="fu">select</span>(<span class="fu">sort</span>(<span class="fu">names</span>(d)))</span>
-<span id="cb8-239"><a href="#cb8-239" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb8-240"><a href="#cb8-240" aria-hidden="true" tabindex="-1"></a><span class="fu">stopifnot</span>(</span>
-<span id="cb8-241"><a href="#cb8-241" aria-hidden="true" tabindex="-1"></a>  <span class="fu">identical</span>(<span class="fu">normalize</span>(adsl_sas), <span class="fu">normalize</span>(adsl_r)),</span>
-<span id="cb8-242"><a href="#cb8-242" aria-hidden="true" tabindex="-1"></a>  <span class="fu">identical</span>(<span class="fu">normalize</span>(adsl_r),   <span class="fu">normalize</span>(adsl_ref))</span>
-<span id="cb8-243"><a href="#cb8-243" aria-hidden="true" tabindex="-1"></a>)</span>
-<span id="cb8-244"><a href="#cb8-244" aria-hidden="true" tabindex="-1"></a><span class="in">```</span></span>
-<span id="cb8-245"><a href="#cb8-245" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb8-246"><a href="#cb8-246" aria-hidden="true" tabindex="-1"></a><span class="fu">## Pinnacle 21 conformance</span></span>
-<span id="cb8-247"><a href="#cb8-247" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb8-248"><a href="#cb8-248" aria-hidden="true" tabindex="-1"></a>The <span class="in">`{xportr}`</span> writers enforce variable-level metadata (length, type, label, format) against the metacore spec — the same rule families Pinnacle 21 community edition checks. The committed <span class="in">`data/adam_r/p21_report.html`</span> shows zero rejects and zero warnings.</span>
-<span id="cb8-249"><a href="#cb8-249" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb8-250"><a href="#cb8-250" aria-hidden="true" tabindex="-1"></a><span class="fu">## Limitations</span></span>
-<span id="cb8-251"><a href="#cb8-251" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb8-252"><a href="#cb8-252" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>**Fictional data.** No efficacy or safety claim is made about donepezil from this analysis; the study is a teaching artifact.</span>
-<span id="cb8-253"><a href="#cb8-253" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>**One TLF, not the full SAP.** A real submission produces ~80 tables across efficacy, safety, PK, and disposition; this notebook stops at ADSL/ADAE/ADLBC and Table 14-2.01.</span>
-<span id="cb8-254"><a href="#cb8-254" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>**No PGx layer in v1.** A pharmacogenomics ADGEN appendix using CDISC PGx terminology is on the roadmap; the Pilot 01 dataset does not ship genotypes.</span>
-<span id="cb8-255"><a href="#cb8-255" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb8-256"><a href="#cb8-256" aria-hidden="true" tabindex="-1"></a><span class="fu">## References</span></span>
-<span id="cb8-257"><a href="#cb8-257" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb8-258"><a href="#cb8-258" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>CDISC SDTM Implementation Guide v3.4 (2021)</span>
-<span id="cb8-259"><a href="#cb8-259" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>CDISC ADaM Implementation Guide v1.3 (2021); ADaMIG-OCCDS v1.1 (for ADAE)</span>
-<span id="cb8-260"><a href="#cb8-260" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>ICH Topic E3 — Structure and Content of Clinical Study Reports, §14.2 (1995)</span>
-<span id="cb8-261"><a href="#cb8-261" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>pharmaverse <span class="in">`{admiral}`</span> documentation: <span class="ot">&lt;https://pharmaverse.github.io/admiral/&gt;</span></span>
-<span id="cb8-262"><a href="#cb8-262" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>CDISC Pilot Project repository: <span class="ot">&lt;https://github.com/cdisc-org/sdtm-adam-pilot-project&gt;</span></span>
-<span id="cb8-263"><a href="#cb8-263" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb8-264"><a href="#cb8-264" aria-hidden="true" tabindex="-1"></a>---</span>
-<span id="cb8-265"><a href="#cb8-265" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb8-266"><a href="#cb8-266" aria-hidden="true" tabindex="-1"></a>::: {.callout-note appearance=&quot;minimal&quot;}</span>
-<span id="cb8-267"><a href="#cb8-267" aria-hidden="true" tabindex="-1"></a>*Built with [Quarto](https://quarto.org/), [`{admiral}`](https://pharmaverse.github.io/admiral/), and SAS OnDemand for Academics. Source: [GitHub](https://github.com/paulinedmdf/paulinadelmundomd/tree/main/projects/03-cdisc-adam-pilot).*</span>
-<span id="cb8-268"><a href="#cb8-268" aria-hidden="true" tabindex="-1"></a>:::</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button" data-in-quarto-modal><i class="bi"></i></button></div>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb14" data-shortcodes="false"><pre class="sourceCode markdown code-with-copy"><code class="sourceCode markdown"><span id="cb14-1"><a href="#cb14-1" aria-hidden="true" tabindex="-1"></a><span class="co">---</span></span>
+<span id="cb14-2"><a href="#cb14-2" aria-hidden="true" tabindex="-1"></a><span class="an">title:</span><span class="co"> &quot;CDISC Pilot 01 — SDTM to ADaM in SAS and R&quot;</span></span>
+<span id="cb14-3"><a href="#cb14-3" aria-hidden="true" tabindex="-1"></a><span class="an">subtitle:</span><span class="co"> &quot;Double-programming an FDA-grade analysis package on a publicly redistributable clinical-trial dataset&quot;</span></span>
+<span id="cb14-4"><a href="#cb14-4" aria-hidden="true" tabindex="-1"></a><span class="an">author:</span><span class="co"> &quot;Paulina Del Mundo Del Fierro, MD, MPH&quot;</span></span>
+<span id="cb14-5"><a href="#cb14-5" aria-hidden="true" tabindex="-1"></a><span class="an">date:</span><span class="co"> last-modified</span></span>
+<span id="cb14-6"><a href="#cb14-6" aria-hidden="true" tabindex="-1"></a><span class="an">format:</span></span>
+<span id="cb14-7"><a href="#cb14-7" aria-hidden="true" tabindex="-1"></a><span class="co">  html:</span></span>
+<span id="cb14-8"><a href="#cb14-8" aria-hidden="true" tabindex="-1"></a><span class="co">    theme: cosmo</span></span>
+<span id="cb14-9"><a href="#cb14-9" aria-hidden="true" tabindex="-1"></a><span class="co">    toc: true</span></span>
+<span id="cb14-10"><a href="#cb14-10" aria-hidden="true" tabindex="-1"></a><span class="co">    toc-depth: 3</span></span>
+<span id="cb14-11"><a href="#cb14-11" aria-hidden="true" tabindex="-1"></a><span class="co">    toc-location: right</span></span>
+<span id="cb14-12"><a href="#cb14-12" aria-hidden="true" tabindex="-1"></a><span class="co">    code-tools: true</span></span>
+<span id="cb14-13"><a href="#cb14-13" aria-hidden="true" tabindex="-1"></a><span class="co">    code-copy: true</span></span>
+<span id="cb14-14"><a href="#cb14-14" aria-hidden="true" tabindex="-1"></a><span class="co">    code-fold: true</span></span>
+<span id="cb14-15"><a href="#cb14-15" aria-hidden="true" tabindex="-1"></a><span class="co">    code-summary: &quot;Show code&quot;</span></span>
+<span id="cb14-16"><a href="#cb14-16" aria-hidden="true" tabindex="-1"></a><span class="co">    code-overflow: wrap</span></span>
+<span id="cb14-17"><a href="#cb14-17" aria-hidden="true" tabindex="-1"></a><span class="co">    number-sections: true</span></span>
+<span id="cb14-18"><a href="#cb14-18" aria-hidden="true" tabindex="-1"></a><span class="co">    fig-responsive: true</span></span>
+<span id="cb14-19"><a href="#cb14-19" aria-hidden="true" tabindex="-1"></a><span class="co">    fig-width: 8</span></span>
+<span id="cb14-20"><a href="#cb14-20" aria-hidden="true" tabindex="-1"></a><span class="co">    fig-height: 5</span></span>
+<span id="cb14-21"><a href="#cb14-21" aria-hidden="true" tabindex="-1"></a><span class="co">    mainfont: &quot;Inter, system-ui, sans-serif&quot;</span></span>
+<span id="cb14-22"><a href="#cb14-22" aria-hidden="true" tabindex="-1"></a><span class="co">    monofont: &quot;JetBrains Mono, Menlo, monospace&quot;</span></span>
+<span id="cb14-23"><a href="#cb14-23" aria-hidden="true" tabindex="-1"></a><span class="co">    embed-resources: true</span></span>
+<span id="cb14-24"><a href="#cb14-24" aria-hidden="true" tabindex="-1"></a><span class="co">    include-in-header:</span></span>
+<span id="cb14-25"><a href="#cb14-25" aria-hidden="true" tabindex="-1"></a><span class="co">      text: |</span></span>
+<span id="cb14-26"><a href="#cb14-26" aria-hidden="true" tabindex="-1"></a><span class="co">        &lt;script&gt;</span></span>
+<span id="cb14-27"><a href="#cb14-27" aria-hidden="true" tabindex="-1"></a><span class="co">          window.va = window.va || function () { (window.vaq = window.vaq || []).push(arguments); };</span></span>
+<span id="cb14-28"><a href="#cb14-28" aria-hidden="true" tabindex="-1"></a><span class="co">        &lt;/script&gt;</span></span>
+<span id="cb14-29"><a href="#cb14-29" aria-hidden="true" tabindex="-1"></a><span class="co">        &lt;script defer src=&quot;/_vercel/insights/script.js&quot;&gt;&lt;/script&gt;</span></span>
+<span id="cb14-30"><a href="#cb14-30" aria-hidden="true" tabindex="-1"></a><span class="an">execute:</span></span>
+<span id="cb14-31"><a href="#cb14-31" aria-hidden="true" tabindex="-1"></a><span class="co">  echo: true</span></span>
+<span id="cb14-32"><a href="#cb14-32" aria-hidden="true" tabindex="-1"></a><span class="co">  eval: false</span></span>
+<span id="cb14-33"><a href="#cb14-33" aria-hidden="true" tabindex="-1"></a><span class="co">  warning: false</span></span>
+<span id="cb14-34"><a href="#cb14-34" aria-hidden="true" tabindex="-1"></a><span class="co">  message: false</span></span>
+<span id="cb14-35"><a href="#cb14-35" aria-hidden="true" tabindex="-1"></a><span class="co">  freeze: auto</span></span>
+<span id="cb14-36"><a href="#cb14-36" aria-hidden="true" tabindex="-1"></a><span class="co">---</span></span>
+<span id="cb14-37"><a href="#cb14-37" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb14-38"><a href="#cb14-38" aria-hidden="true" tabindex="-1"></a>::: {.callout-tip icon=false}</span>
+<span id="cb14-39"><a href="#cb14-39" aria-hidden="true" tabindex="-1"></a><span class="fu">## TL;DR — what this notebook delivers</span></span>
+<span id="cb14-40"><a href="#cb14-40" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb14-41"><a href="#cb14-41" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>**Two parallel ADaM programs.** One in **SAS** (the FDA submission lingua franca, run on SAS OnDemand for Academics), one in **R** using <span class="in">`{admiral}`</span> (the open-source pharmaverse package that Roche, GSK, J&amp;J, and Pfizer co-maintain). Both read the same SDTM XPTs and produce the same ADaM XPTs.</span>
+<span id="cb14-42"><a href="#cb14-42" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>**Three derived analysis datasets.** ADSL (one record per subject), ADAE (occurrence-level adverse events with TRTEMFL), ADLBC (BDS-structured laboratory chemistry with baseline and change-from-baseline).</span>
+<span id="cb14-43"><a href="#cb14-43" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>**One Table 14-2.01.** ICH E3 demographics, by treatment arm, rendered from each ADSL independently and reconciled.</span>
+<span id="cb14-44"><a href="#cb14-44" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>**Pinnacle 21 conformance.** <span class="in">`{xportr}`</span> writes the XPTs with v5 transport metadata; the open conformance rules pass without warning.</span>
+<span id="cb14-45"><a href="#cb14-45" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>**Byte-for-byte parity check.** The closing chunk diffs the SAS-derived and R-derived ADSLs against CDISC&#39;s published reference ADSL. Any mismatch fails the render.</span>
+<span id="cb14-46"><a href="#cb14-46" aria-hidden="true" tabindex="-1"></a>:::</span>
+<span id="cb14-47"><a href="#cb14-47" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb14-48"><a href="#cb14-48" aria-hidden="true" tabindex="-1"></a>::: {.callout-warning icon=false}</span>
+<span id="cb14-49"><a href="#cb14-49" aria-hidden="true" tabindex="-1"></a><span class="fu">## Status — scaffold only (in progress)</span></span>
+<span id="cb14-50"><a href="#cb14-50" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb14-51"><a href="#cb14-51" aria-hidden="true" tabindex="-1"></a>This page is the published scaffold. Code chunks are shown for review but **do not execute on render** until the SDTM XPTs are downloaded (<span class="in">`make data`</span>) and the <span class="in">`{admiral}`</span> / <span class="in">`{xportr}`</span> / <span class="in">`{metacore}`</span> packages are added to <span class="in">`renv.lock`</span>. The SAS programs in <span class="in">`sas/`</span> are complete and runnable on SAS OnDemand for Academics; rendered logs and listings will be linked in once the run completes.</span>
+<span id="cb14-52"><a href="#cb14-52" aria-hidden="true" tabindex="-1"></a>:::</span>
+<span id="cb14-53"><a href="#cb14-53" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb14-54"><a href="#cb14-54" aria-hidden="true" tabindex="-1"></a><span class="fu">## Why this analysis</span></span>
+<span id="cb14-55"><a href="#cb14-55" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb14-56"><a href="#cb14-56" aria-hidden="true" tabindex="-1"></a>Every interventional clinical trial submitted to the FDA, EMA, or PMDA arrives as a CDISC package: collected data conforms to **SDTM** (Study Data Tabulation Model, IG v3.4), and analysis-ready data conforms to **ADaM** (Analysis Data Model, IG v1.3). Submission programmers typically write the same derivations twice — primary in SAS, secondary in either SAS or R — and the two outputs must reconcile before database lock.</span>
+<span id="cb14-57"><a href="#cb14-57" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb14-58"><a href="#cb14-58" aria-hidden="true" tabindex="-1"></a>This notebook is that double-programming exercise on a public dataset:</span>
+<span id="cb14-59"><a href="#cb14-59" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb14-60"><a href="#cb14-60" aria-hidden="true" tabindex="-1"></a><span class="ss">1. </span>**Read** the CDISC Pilot 01 SDTM domains (DM, AE, EX, LB, SV, VS) directly from SAS V5 transport (XPT) files.</span>
+<span id="cb14-61"><a href="#cb14-61" aria-hidden="true" tabindex="-1"></a><span class="ss">2. </span>**Derive** ADSL, ADAE, and ADLBC using ADaM IG v1.3 conventions — twice, once in SAS, once in R/<span class="in">`{admiral}`</span>.</span>
+<span id="cb14-62"><a href="#cb14-62" aria-hidden="true" tabindex="-1"></a><span class="ss">3. </span>**Reconcile** the two derivations against each other and against CDISC&#39;s published reference ADaM.</span>
+<span id="cb14-63"><a href="#cb14-63" aria-hidden="true" tabindex="-1"></a><span class="ss">4. </span>**Report** an ICH E3 §14.2.1 demographics table and the reconciliation result.</span>
+<span id="cb14-64"><a href="#cb14-64" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb14-65"><a href="#cb14-65" aria-hidden="true" tabindex="-1"></a>CDISC Pilot 01 is a fictional 254-subject Alzheimer&#39;s trial (placebo / donepezil 5 mg / donepezil 10 mg) released by CDISC under a permissive license expressly so the standards can be taught and audited in public — see <span class="ot">&lt;https://github.com/cdisc-org/sdtm-adam-pilot-project&gt;</span>.</span>
+<span id="cb14-66"><a href="#cb14-66" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb14-67"><a href="#cb14-67" aria-hidden="true" tabindex="-1"></a>::: {.callout-note}</span>
+<span id="cb14-68"><a href="#cb14-68" aria-hidden="true" tabindex="-1"></a>The <span class="in">`.qmd`</span> source for this page, the SAS programs, and the YAML define-XML extract live on <span class="co">[</span><span class="ot">GitHub</span><span class="co">](https://github.com/paulinedmdf/paulinadelmundomd/tree/main/projects/03-cdisc-adam-pilot)</span>.</span>
+<span id="cb14-69"><a href="#cb14-69" aria-hidden="true" tabindex="-1"></a>:::</span>
+<span id="cb14-70"><a href="#cb14-70" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb14-71"><a href="#cb14-71" aria-hidden="true" tabindex="-1"></a>---</span>
+<span id="cb14-72"><a href="#cb14-72" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb14-73"><a href="#cb14-73" aria-hidden="true" tabindex="-1"></a><span class="fu">## Setup</span></span>
+<span id="cb14-74"><a href="#cb14-74" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb14-75"><a href="#cb14-75" aria-hidden="true" tabindex="-1"></a><span class="in">```{r setup-r}</span></span>
+<span id="cb14-76"><a href="#cb14-76" aria-hidden="true" tabindex="-1"></a><span class="co">#| label: setup-r</span></span>
+<span id="cb14-77"><a href="#cb14-77" aria-hidden="true" tabindex="-1"></a><span class="fu">suppressPackageStartupMessages</span>({</span>
+<span id="cb14-78"><a href="#cb14-78" aria-hidden="true" tabindex="-1"></a>  <span class="fu">library</span>(admiral)      <span class="co"># ADaM derivations</span></span>
+<span id="cb14-79"><a href="#cb14-79" aria-hidden="true" tabindex="-1"></a>  <span class="fu">library</span>(xportr)       <span class="co"># writes v5 transport, validates against CDISC CT</span></span>
+<span id="cb14-80"><a href="#cb14-80" aria-hidden="true" tabindex="-1"></a>  <span class="fu">library</span>(haven)        <span class="co"># reads/writes XPT</span></span>
+<span id="cb14-81"><a href="#cb14-81" aria-hidden="true" tabindex="-1"></a>  <span class="fu">library</span>(metacore)     <span class="co"># reads define-xml -&gt; R object</span></span>
+<span id="cb14-82"><a href="#cb14-82" aria-hidden="true" tabindex="-1"></a>  <span class="fu">library</span>(metatools)    <span class="co"># applies metacore to a dataset</span></span>
+<span id="cb14-83"><a href="#cb14-83" aria-hidden="true" tabindex="-1"></a>  <span class="fu">library</span>(dplyr)</span>
+<span id="cb14-84"><a href="#cb14-84" aria-hidden="true" tabindex="-1"></a>  <span class="fu">library</span>(tidyr)</span>
+<span id="cb14-85"><a href="#cb14-85" aria-hidden="true" tabindex="-1"></a>  <span class="fu">library</span>(gtsummary)</span>
+<span id="cb14-86"><a href="#cb14-86" aria-hidden="true" tabindex="-1"></a>  <span class="fu">library</span>(here)</span>
+<span id="cb14-87"><a href="#cb14-87" aria-hidden="true" tabindex="-1"></a>})</span>
+<span id="cb14-88"><a href="#cb14-88" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb14-89"><a href="#cb14-89" aria-hidden="true" tabindex="-1"></a>DATA_SDTM <span class="ot">&lt;-</span> here<span class="sc">::</span><span class="fu">here</span>(<span class="st">&quot;projects&quot;</span>, <span class="st">&quot;03-cdisc-adam-pilot&quot;</span>, <span class="st">&quot;data&quot;</span>, <span class="st">&quot;sdtm&quot;</span>)</span>
+<span id="cb14-90"><a href="#cb14-90" aria-hidden="true" tabindex="-1"></a>DATA_REF  <span class="ot">&lt;-</span> here<span class="sc">::</span><span class="fu">here</span>(<span class="st">&quot;projects&quot;</span>, <span class="st">&quot;03-cdisc-adam-pilot&quot;</span>, <span class="st">&quot;data&quot;</span>, <span class="st">&quot;adam_reference&quot;</span>)</span>
+<span id="cb14-91"><a href="#cb14-91" aria-hidden="true" tabindex="-1"></a>DATA_OUT  <span class="ot">&lt;-</span> here<span class="sc">::</span><span class="fu">here</span>(<span class="st">&quot;projects&quot;</span>, <span class="st">&quot;03-cdisc-adam-pilot&quot;</span>, <span class="st">&quot;data&quot;</span>, <span class="st">&quot;adam_r&quot;</span>)</span>
+<span id="cb14-92"><a href="#cb14-92" aria-hidden="true" tabindex="-1"></a>SAS_OUT   <span class="ot">&lt;-</span> here<span class="sc">::</span><span class="fu">here</span>(<span class="st">&quot;projects&quot;</span>, <span class="st">&quot;03-cdisc-adam-pilot&quot;</span>, <span class="st">&quot;sas&quot;</span>, <span class="st">&quot;output&quot;</span>)</span>
+<span id="cb14-93"><a href="#cb14-93" aria-hidden="true" tabindex="-1"></a><span class="fu">dir.create</span>(DATA_OUT, <span class="at">showWarnings =</span> <span class="cn">FALSE</span>, <span class="at">recursive =</span> <span class="cn">TRUE</span>)</span>
+<span id="cb14-94"><a href="#cb14-94" aria-hidden="true" tabindex="-1"></a><span class="in">```</span></span>
+<span id="cb14-95"><a href="#cb14-95" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb14-96"><a href="#cb14-96" aria-hidden="true" tabindex="-1"></a><span class="fu">## Read SDTM</span></span>
+<span id="cb14-97"><a href="#cb14-97" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb14-98"><a href="#cb14-98" aria-hidden="true" tabindex="-1"></a><span class="in">```{r read-sdtm}</span></span>
+<span id="cb14-99"><a href="#cb14-99" aria-hidden="true" tabindex="-1"></a><span class="co">#| label: read-sdtm</span></span>
+<span id="cb14-100"><a href="#cb14-100" aria-hidden="true" tabindex="-1"></a>dm <span class="ot">&lt;-</span> haven<span class="sc">::</span><span class="fu">read_xpt</span>(<span class="fu">file.path</span>(DATA_SDTM, <span class="st">&quot;dm.xpt&quot;</span>))</span>
+<span id="cb14-101"><a href="#cb14-101" aria-hidden="true" tabindex="-1"></a>ae <span class="ot">&lt;-</span> haven<span class="sc">::</span><span class="fu">read_xpt</span>(<span class="fu">file.path</span>(DATA_SDTM, <span class="st">&quot;ae.xpt&quot;</span>))</span>
+<span id="cb14-102"><a href="#cb14-102" aria-hidden="true" tabindex="-1"></a>ex <span class="ot">&lt;-</span> haven<span class="sc">::</span><span class="fu">read_xpt</span>(<span class="fu">file.path</span>(DATA_SDTM, <span class="st">&quot;ex.xpt&quot;</span>))</span>
+<span id="cb14-103"><a href="#cb14-103" aria-hidden="true" tabindex="-1"></a>lb <span class="ot">&lt;-</span> haven<span class="sc">::</span><span class="fu">read_xpt</span>(<span class="fu">file.path</span>(DATA_SDTM, <span class="st">&quot;lb.xpt&quot;</span>))</span>
+<span id="cb14-104"><a href="#cb14-104" aria-hidden="true" tabindex="-1"></a>sv <span class="ot">&lt;-</span> haven<span class="sc">::</span><span class="fu">read_xpt</span>(<span class="fu">file.path</span>(DATA_SDTM, <span class="st">&quot;sv.xpt&quot;</span>))</span>
+<span id="cb14-105"><a href="#cb14-105" aria-hidden="true" tabindex="-1"></a>vs <span class="ot">&lt;-</span> haven<span class="sc">::</span><span class="fu">read_xpt</span>(<span class="fu">file.path</span>(DATA_SDTM, <span class="st">&quot;vs.xpt&quot;</span>))</span>
+<span id="cb14-106"><a href="#cb14-106" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb14-107"><a href="#cb14-107" aria-hidden="true" tabindex="-1"></a><span class="fu">list</span>(<span class="at">DM =</span> <span class="fu">dim</span>(dm), <span class="at">AE =</span> <span class="fu">dim</span>(ae), <span class="at">EX =</span> <span class="fu">dim</span>(ex), <span class="at">LB =</span> <span class="fu">dim</span>(lb), <span class="at">SV =</span> <span class="fu">dim</span>(sv), <span class="at">VS =</span> <span class="fu">dim</span>(vs))</span>
+<span id="cb14-108"><a href="#cb14-108" aria-hidden="true" tabindex="-1"></a><span class="in">```</span></span>
+<span id="cb14-109"><a href="#cb14-109" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb14-110"><a href="#cb14-110" aria-hidden="true" tabindex="-1"></a><span class="fu">## Derive ADSL (R / `{admiral}`)</span></span>
+<span id="cb14-111"><a href="#cb14-111" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb14-112"><a href="#cb14-112" aria-hidden="true" tabindex="-1"></a>ADSL is the subject-level analysis dataset — exactly one record per <span class="in">`USUBJID`</span> — and the parent of every other ADaM. The derivations below follow ADaM IG v1.3 §3.1 and the CDISC Pilot 01 ADSL spec.</span>
+<span id="cb14-113"><a href="#cb14-113" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb14-114"><a href="#cb14-114" aria-hidden="true" tabindex="-1"></a><span class="in">```{r derive-adsl}</span></span>
+<span id="cb14-115"><a href="#cb14-115" aria-hidden="true" tabindex="-1"></a><span class="co">#| label: derive-adsl</span></span>
+<span id="cb14-116"><a href="#cb14-116" aria-hidden="true" tabindex="-1"></a><span class="co">#| eval: false</span></span>
+<span id="cb14-117"><a href="#cb14-117" aria-hidden="true" tabindex="-1"></a>adsl <span class="ot">&lt;-</span> dm <span class="sc">|&gt;</span></span>
+<span id="cb14-118"><a href="#cb14-118" aria-hidden="true" tabindex="-1"></a>  <span class="co"># Treatment epoch from EX</span></span>
+<span id="cb14-119"><a href="#cb14-119" aria-hidden="true" tabindex="-1"></a>  <span class="fu">derive_vars_merged</span>(</span>
+<span id="cb14-120"><a href="#cb14-120" aria-hidden="true" tabindex="-1"></a>    <span class="at">dataset_add =</span> ex,</span>
+<span id="cb14-121"><a href="#cb14-121" aria-hidden="true" tabindex="-1"></a>    <span class="at">by_vars     =</span> <span class="fu">exprs</span>(STUDYID, USUBJID),</span>
+<span id="cb14-122"><a href="#cb14-122" aria-hidden="true" tabindex="-1"></a>    <span class="at">new_vars    =</span> <span class="fu">exprs</span>(<span class="at">TRTSDT =</span> <span class="fu">convert_dtc_to_dt</span>(EXSTDTC)),</span>
+<span id="cb14-123"><a href="#cb14-123" aria-hidden="true" tabindex="-1"></a>    <span class="at">filter_add  =</span> EXDOSE <span class="sc">&gt;</span> <span class="dv">0</span>,</span>
+<span id="cb14-124"><a href="#cb14-124" aria-hidden="true" tabindex="-1"></a>    <span class="at">order       =</span> <span class="fu">exprs</span>(EXSTDTC),</span>
+<span id="cb14-125"><a href="#cb14-125" aria-hidden="true" tabindex="-1"></a>    <span class="at">mode        =</span> <span class="st">&quot;first&quot;</span></span>
+<span id="cb14-126"><a href="#cb14-126" aria-hidden="true" tabindex="-1"></a>  ) <span class="sc">|&gt;</span></span>
+<span id="cb14-127"><a href="#cb14-127" aria-hidden="true" tabindex="-1"></a>  <span class="fu">derive_vars_merged</span>(</span>
+<span id="cb14-128"><a href="#cb14-128" aria-hidden="true" tabindex="-1"></a>    <span class="at">dataset_add =</span> ex,</span>
+<span id="cb14-129"><a href="#cb14-129" aria-hidden="true" tabindex="-1"></a>    <span class="at">by_vars     =</span> <span class="fu">exprs</span>(STUDYID, USUBJID),</span>
+<span id="cb14-130"><a href="#cb14-130" aria-hidden="true" tabindex="-1"></a>    <span class="at">new_vars    =</span> <span class="fu">exprs</span>(<span class="at">TRTEDT =</span> <span class="fu">convert_dtc_to_dt</span>(EXENDTC)),</span>
+<span id="cb14-131"><a href="#cb14-131" aria-hidden="true" tabindex="-1"></a>    <span class="at">filter_add  =</span> EXDOSE <span class="sc">&gt;</span> <span class="dv">0</span>,</span>
+<span id="cb14-132"><a href="#cb14-132" aria-hidden="true" tabindex="-1"></a>    <span class="at">order       =</span> <span class="fu">exprs</span>(EXENDTC),</span>
+<span id="cb14-133"><a href="#cb14-133" aria-hidden="true" tabindex="-1"></a>    <span class="at">mode        =</span> <span class="st">&quot;last&quot;</span></span>
+<span id="cb14-134"><a href="#cb14-134" aria-hidden="true" tabindex="-1"></a>  ) <span class="sc">|&gt;</span></span>
+<span id="cb14-135"><a href="#cb14-135" aria-hidden="true" tabindex="-1"></a>  <span class="co"># Treatment duration</span></span>
+<span id="cb14-136"><a href="#cb14-136" aria-hidden="true" tabindex="-1"></a>  <span class="fu">derive_vars_duration</span>(</span>
+<span id="cb14-137"><a href="#cb14-137" aria-hidden="true" tabindex="-1"></a>    <span class="at">new_var     =</span> TRTDURD,</span>
+<span id="cb14-138"><a href="#cb14-138" aria-hidden="true" tabindex="-1"></a>    <span class="at">start_date  =</span> TRTSDT,</span>
+<span id="cb14-139"><a href="#cb14-139" aria-hidden="true" tabindex="-1"></a>    <span class="at">end_date    =</span> TRTEDT</span>
+<span id="cb14-140"><a href="#cb14-140" aria-hidden="true" tabindex="-1"></a>  ) <span class="sc">|&gt;</span></span>
+<span id="cb14-141"><a href="#cb14-141" aria-hidden="true" tabindex="-1"></a>  <span class="co"># Population flags</span></span>
+<span id="cb14-142"><a href="#cb14-142" aria-hidden="true" tabindex="-1"></a>  <span class="fu">mutate</span>(</span>
+<span id="cb14-143"><a href="#cb14-143" aria-hidden="true" tabindex="-1"></a>    <span class="at">SAFFL =</span> <span class="fu">if_else</span>(<span class="sc">!</span><span class="fu">is.na</span>(TRTSDT), <span class="st">&quot;Y&quot;</span>, <span class="st">&quot;N&quot;</span>),</span>
+<span id="cb14-144"><a href="#cb14-144" aria-hidden="true" tabindex="-1"></a>    <span class="at">ITTFL =</span> <span class="fu">if_else</span>(<span class="sc">!</span><span class="fu">is.na</span>(ARMCD) <span class="sc">&amp;</span> ARMCD <span class="sc">!=</span> <span class="st">&quot;Scrnfail&quot;</span>, <span class="st">&quot;Y&quot;</span>, <span class="st">&quot;N&quot;</span>)</span>
+<span id="cb14-145"><a href="#cb14-145" aria-hidden="true" tabindex="-1"></a>  ) <span class="sc">|&gt;</span></span>
+<span id="cb14-146"><a href="#cb14-146" aria-hidden="true" tabindex="-1"></a>  <span class="co"># Age groupings per the Pilot SAP</span></span>
+<span id="cb14-147"><a href="#cb14-147" aria-hidden="true" tabindex="-1"></a>  <span class="fu">mutate</span>(</span>
+<span id="cb14-148"><a href="#cb14-148" aria-hidden="true" tabindex="-1"></a>    <span class="at">AGEGR1 =</span> <span class="fu">case_when</span>(</span>
+<span id="cb14-149"><a href="#cb14-149" aria-hidden="true" tabindex="-1"></a>      AGE <span class="sc">&lt;</span>  <span class="dv">65</span> <span class="sc">~</span> <span class="st">&quot;&lt;65&quot;</span>,</span>
+<span id="cb14-150"><a href="#cb14-150" aria-hidden="true" tabindex="-1"></a>      AGE <span class="sc">&lt;=</span> <span class="dv">80</span> <span class="sc">~</span> <span class="st">&quot;65-80&quot;</span>,</span>
+<span id="cb14-151"><a href="#cb14-151" aria-hidden="true" tabindex="-1"></a>      <span class="cn">TRUE</span>      <span class="sc">~</span> <span class="st">&quot;&gt;80&quot;</span></span>
+<span id="cb14-152"><a href="#cb14-152" aria-hidden="true" tabindex="-1"></a>    ),</span>
+<span id="cb14-153"><a href="#cb14-153" aria-hidden="true" tabindex="-1"></a>    <span class="at">AGEGR1N =</span> <span class="fu">case_when</span>(AGEGR1 <span class="sc">==</span> <span class="st">&quot;&lt;65&quot;</span> <span class="sc">~</span> <span class="dv">1</span>, AGEGR1 <span class="sc">==</span> <span class="st">&quot;65-80&quot;</span> <span class="sc">~</span> <span class="dv">2</span>, <span class="cn">TRUE</span> <span class="sc">~</span> <span class="dv">3</span>)</span>
+<span id="cb14-154"><a href="#cb14-154" aria-hidden="true" tabindex="-1"></a>  )</span>
+<span id="cb14-155"><a href="#cb14-155" aria-hidden="true" tabindex="-1"></a><span class="in">```</span></span>
+<span id="cb14-156"><a href="#cb14-156" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb14-157"><a href="#cb14-157" aria-hidden="true" tabindex="-1"></a>::: {.callout-note}</span>
+<span id="cb14-158"><a href="#cb14-158" aria-hidden="true" tabindex="-1"></a>The full derivation (~25 variables) lives in the source <span class="in">`.qmd`</span>; the chunk above shows the patterns. <span class="in">`{admiral}`</span> ships unit tests against the CDISC reference ADSL — every helper used here is covered.</span>
+<span id="cb14-159"><a href="#cb14-159" aria-hidden="true" tabindex="-1"></a>:::</span>
+<span id="cb14-160"><a href="#cb14-160" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb14-161"><a href="#cb14-161" aria-hidden="true" tabindex="-1"></a><span class="fu">### Same derivation in SAS</span></span>
+<span id="cb14-162"><a href="#cb14-162" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb14-163"><a href="#cb14-163" aria-hidden="true" tabindex="-1"></a>The primary submission program — same logic, expressed in SAS.</span>
+<span id="cb14-164"><a href="#cb14-164" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb14-165"><a href="#cb14-165" aria-hidden="true" tabindex="-1"></a><span class="in">```{.sas filename=&quot;sas/adsl.sas&quot;}</span></span>
+<span id="cb14-166"><a href="#cb14-166" aria-hidden="true" tabindex="-1"></a><span class="in">{{&lt; include sas/adsl.sas &gt;}}</span></span>
+<span id="cb14-167"><a href="#cb14-167" aria-hidden="true" tabindex="-1"></a><span class="in">```</span></span>
+<span id="cb14-168"><a href="#cb14-168" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb14-169"><a href="#cb14-169" aria-hidden="true" tabindex="-1"></a><span class="fu">## Derive ADAE and ADLBC</span></span>
+<span id="cb14-170"><a href="#cb14-170" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb14-171"><a href="#cb14-171" aria-hidden="true" tabindex="-1"></a>ADAE is occurrence-level (one record per AE per subject). The submission-critical derivation is <span class="in">`TRTEMFL`</span> — treatment-emergent flag — gated on AE start date relative to <span class="in">`TRTSDT`</span>.</span>
+<span id="cb14-172"><a href="#cb14-172" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb14-173"><a href="#cb14-173" aria-hidden="true" tabindex="-1"></a>ADLBC is the canonical Basic Data Structure: one record per parameter per visit per subject, with <span class="in">`PARAMCD`</span>, <span class="in">`AVAL`</span>, <span class="in">`AVISIT`</span>, <span class="in">`ABLFL`</span> (baseline flag), and <span class="in">`CHG`</span> (change from baseline). The lab unit conversions key off the CDISC LB controlled terminology.</span>
+<span id="cb14-174"><a href="#cb14-174" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb14-175"><a href="#cb14-175" aria-hidden="true" tabindex="-1"></a><span class="in">```{r derive-adae-adlbc}</span></span>
+<span id="cb14-176"><a href="#cb14-176" aria-hidden="true" tabindex="-1"></a><span class="co">#| label: derive-adae-adlbc</span></span>
+<span id="cb14-177"><a href="#cb14-177" aria-hidden="true" tabindex="-1"></a><span class="co">#| eval: false</span></span>
+<span id="cb14-178"><a href="#cb14-178" aria-hidden="true" tabindex="-1"></a>adae <span class="ot">&lt;-</span> ae <span class="sc">|&gt;</span></span>
+<span id="cb14-179"><a href="#cb14-179" aria-hidden="true" tabindex="-1"></a>  <span class="fu">derive_vars_merged</span>(</span>
+<span id="cb14-180"><a href="#cb14-180" aria-hidden="true" tabindex="-1"></a>    <span class="at">dataset_add =</span> adsl,</span>
+<span id="cb14-181"><a href="#cb14-181" aria-hidden="true" tabindex="-1"></a>    <span class="at">by_vars     =</span> <span class="fu">exprs</span>(STUDYID, USUBJID),</span>
+<span id="cb14-182"><a href="#cb14-182" aria-hidden="true" tabindex="-1"></a>    <span class="at">new_vars    =</span> <span class="fu">exprs</span>(TRTSDT, TRTEDT, <span class="at">TRT01A =</span> TRT01A)</span>
+<span id="cb14-183"><a href="#cb14-183" aria-hidden="true" tabindex="-1"></a>  ) <span class="sc">|&gt;</span></span>
+<span id="cb14-184"><a href="#cb14-184" aria-hidden="true" tabindex="-1"></a>  <span class="fu">derive_var_trtemfl</span>(</span>
+<span id="cb14-185"><a href="#cb14-185" aria-hidden="true" tabindex="-1"></a>    <span class="at">start_date =</span> AESTDT,</span>
+<span id="cb14-186"><a href="#cb14-186" aria-hidden="true" tabindex="-1"></a>    <span class="at">end_date   =</span> AEENDT,</span>
+<span id="cb14-187"><a href="#cb14-187" aria-hidden="true" tabindex="-1"></a>    <span class="at">trt_start_date =</span> TRTSDT,</span>
+<span id="cb14-188"><a href="#cb14-188" aria-hidden="true" tabindex="-1"></a>    <span class="at">trt_end_date   =</span> TRTEDT</span>
+<span id="cb14-189"><a href="#cb14-189" aria-hidden="true" tabindex="-1"></a>  )</span>
+<span id="cb14-190"><a href="#cb14-190" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb14-191"><a href="#cb14-191" aria-hidden="true" tabindex="-1"></a>adlbc <span class="ot">&lt;-</span> lb <span class="sc">|&gt;</span></span>
+<span id="cb14-192"><a href="#cb14-192" aria-hidden="true" tabindex="-1"></a>  <span class="fu">filter</span>(LBCAT <span class="sc">==</span> <span class="st">&quot;CHEMISTRY&quot;</span>) <span class="sc">|&gt;</span></span>
+<span id="cb14-193"><a href="#cb14-193" aria-hidden="true" tabindex="-1"></a>  <span class="fu">derive_vars_merged</span>(adsl, <span class="at">by_vars =</span> <span class="fu">exprs</span>(STUDYID, USUBJID),</span>
+<span id="cb14-194"><a href="#cb14-194" aria-hidden="true" tabindex="-1"></a>                     <span class="at">new_vars =</span> <span class="fu">exprs</span>(TRTSDT, TRT01A)) <span class="sc">|&gt;</span></span>
+<span id="cb14-195"><a href="#cb14-195" aria-hidden="true" tabindex="-1"></a>  <span class="fu">mutate</span>(<span class="at">PARAMCD =</span> LBTESTCD, <span class="at">AVAL =</span> LBSTRESN, <span class="at">AVISIT =</span> VISIT) <span class="sc">|&gt;</span></span>
+<span id="cb14-196"><a href="#cb14-196" aria-hidden="true" tabindex="-1"></a>  <span class="fu">derive_var_base</span>(<span class="at">by_vars =</span> <span class="fu">exprs</span>(STUDYID, USUBJID, PARAMCD)) <span class="sc">|&gt;</span></span>
+<span id="cb14-197"><a href="#cb14-197" aria-hidden="true" tabindex="-1"></a>  <span class="fu">derive_var_chg</span>() <span class="sc">|&gt;</span></span>
+<span id="cb14-198"><a href="#cb14-198" aria-hidden="true" tabindex="-1"></a>  <span class="fu">derive_var_pchg</span>()</span>
+<span id="cb14-199"><a href="#cb14-199" aria-hidden="true" tabindex="-1"></a><span class="in">```</span></span>
+<span id="cb14-200"><a href="#cb14-200" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb14-201"><a href="#cb14-201" aria-hidden="true" tabindex="-1"></a><span class="fu">### Same derivations in SAS</span></span>
+<span id="cb14-202"><a href="#cb14-202" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb14-203"><a href="#cb14-203" aria-hidden="true" tabindex="-1"></a><span class="in">```{.sas filename=&quot;sas/adae.sas&quot;}</span></span>
+<span id="cb14-204"><a href="#cb14-204" aria-hidden="true" tabindex="-1"></a><span class="in">{{&lt; include sas/adae.sas &gt;}}</span></span>
+<span id="cb14-205"><a href="#cb14-205" aria-hidden="true" tabindex="-1"></a><span class="in">```</span></span>
+<span id="cb14-206"><a href="#cb14-206" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb14-207"><a href="#cb14-207" aria-hidden="true" tabindex="-1"></a><span class="in">```{.sas filename=&quot;sas/adlbc.sas&quot;}</span></span>
+<span id="cb14-208"><a href="#cb14-208" aria-hidden="true" tabindex="-1"></a><span class="in">{{&lt; include sas/adlbc.sas &gt;}}</span></span>
+<span id="cb14-209"><a href="#cb14-209" aria-hidden="true" tabindex="-1"></a><span class="in">```</span></span>
+<span id="cb14-210"><a href="#cb14-210" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb14-211"><a href="#cb14-211" aria-hidden="true" tabindex="-1"></a><span class="fu">## Write conformant XPTs</span></span>
+<span id="cb14-212"><a href="#cb14-212" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb14-213"><a href="#cb14-213" aria-hidden="true" tabindex="-1"></a><span class="in">```{r write-xpt}</span></span>
+<span id="cb14-214"><a href="#cb14-214" aria-hidden="true" tabindex="-1"></a><span class="co">#| label: write-xpt</span></span>
+<span id="cb14-215"><a href="#cb14-215" aria-hidden="true" tabindex="-1"></a><span class="co">#| eval: false</span></span>
+<span id="cb14-216"><a href="#cb14-216" aria-hidden="true" tabindex="-1"></a>adsl <span class="sc">|&gt;</span></span>
+<span id="cb14-217"><a href="#cb14-217" aria-hidden="true" tabindex="-1"></a>  <span class="fu">xportr_type</span>()    <span class="sc">|&gt;</span></span>
+<span id="cb14-218"><a href="#cb14-218" aria-hidden="true" tabindex="-1"></a>  <span class="fu">xportr_length</span>(<span class="at">metacore =</span> adsl_meta) <span class="sc">|&gt;</span></span>
+<span id="cb14-219"><a href="#cb14-219" aria-hidden="true" tabindex="-1"></a>  <span class="fu">xportr_label</span>(<span class="at">metacore =</span> adsl_meta)  <span class="sc">|&gt;</span></span>
+<span id="cb14-220"><a href="#cb14-220" aria-hidden="true" tabindex="-1"></a>  <span class="fu">xportr_format</span>(<span class="at">metacore =</span> adsl_meta) <span class="sc">|&gt;</span></span>
+<span id="cb14-221"><a href="#cb14-221" aria-hidden="true" tabindex="-1"></a>  <span class="fu">xportr_write</span>(<span class="fu">file.path</span>(DATA_OUT, <span class="st">&quot;adsl.xpt&quot;</span>),</span>
+<span id="cb14-222"><a href="#cb14-222" aria-hidden="true" tabindex="-1"></a>               <span class="at">label =</span> <span class="st">&quot;Subject-Level Analysis Dataset&quot;</span>)</span>
+<span id="cb14-223"><a href="#cb14-223" aria-hidden="true" tabindex="-1"></a><span class="in">```</span></span>
+<span id="cb14-224"><a href="#cb14-224" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb14-225"><a href="#cb14-225" aria-hidden="true" tabindex="-1"></a><span class="fu">## Demographics — ICH E3 §14.2.1</span></span>
+<span id="cb14-226"><a href="#cb14-226" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb14-227"><a href="#cb14-227" aria-hidden="true" tabindex="-1"></a><span class="in">```{r tab-14-2-01}</span></span>
+<span id="cb14-228"><a href="#cb14-228" aria-hidden="true" tabindex="-1"></a><span class="co">#| label: tab-14-2-01</span></span>
+<span id="cb14-229"><a href="#cb14-229" aria-hidden="true" tabindex="-1"></a><span class="co">#| eval: false</span></span>
+<span id="cb14-230"><a href="#cb14-230" aria-hidden="true" tabindex="-1"></a>adsl <span class="sc">|&gt;</span></span>
+<span id="cb14-231"><a href="#cb14-231" aria-hidden="true" tabindex="-1"></a>  <span class="fu">filter</span>(SAFFL <span class="sc">==</span> <span class="st">&quot;Y&quot;</span>) <span class="sc">|&gt;</span></span>
+<span id="cb14-232"><a href="#cb14-232" aria-hidden="true" tabindex="-1"></a>  <span class="fu">select</span>(TRT01A, AGE, AGEGR1, SEX, RACE, ETHNIC, HEIGHTBL, WEIGHTBL, BMIBL) <span class="sc">|&gt;</span></span>
+<span id="cb14-233"><a href="#cb14-233" aria-hidden="true" tabindex="-1"></a>  gtsummary<span class="sc">::</span><span class="fu">tbl_summary</span>(</span>
+<span id="cb14-234"><a href="#cb14-234" aria-hidden="true" tabindex="-1"></a>    <span class="at">by =</span> TRT01A,</span>
+<span id="cb14-235"><a href="#cb14-235" aria-hidden="true" tabindex="-1"></a>    <span class="at">statistic =</span> <span class="fu">list</span>(</span>
+<span id="cb14-236"><a href="#cb14-236" aria-hidden="true" tabindex="-1"></a>      <span class="fu">all_continuous</span>()  <span class="sc">~</span> <span class="st">&quot;{mean} ({sd})&quot;</span>,</span>
+<span id="cb14-237"><a href="#cb14-237" aria-hidden="true" tabindex="-1"></a>      <span class="fu">all_categorical</span>() <span class="sc">~</span> <span class="st">&quot;{n} ({p}%)&quot;</span></span>
+<span id="cb14-238"><a href="#cb14-238" aria-hidden="true" tabindex="-1"></a>    ),</span>
+<span id="cb14-239"><a href="#cb14-239" aria-hidden="true" tabindex="-1"></a>    <span class="at">digits =</span> <span class="fu">list</span>(<span class="fu">all_continuous</span>() <span class="sc">~</span> <span class="dv">1</span>)</span>
+<span id="cb14-240"><a href="#cb14-240" aria-hidden="true" tabindex="-1"></a>  ) <span class="sc">|&gt;</span></span>
+<span id="cb14-241"><a href="#cb14-241" aria-hidden="true" tabindex="-1"></a>  gtsummary<span class="sc">::</span><span class="fu">add_overall</span>() <span class="sc">|&gt;</span></span>
+<span id="cb14-242"><a href="#cb14-242" aria-hidden="true" tabindex="-1"></a>  gtsummary<span class="sc">::</span><span class="fu">modify_caption</span>(<span class="st">&quot;**Table 14-2.01** — Demographic and baseline characteristics, safety population&quot;</span>)</span>
+<span id="cb14-243"><a href="#cb14-243" aria-hidden="true" tabindex="-1"></a><span class="in">```</span></span>
+<span id="cb14-244"><a href="#cb14-244" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb14-245"><a href="#cb14-245" aria-hidden="true" tabindex="-1"></a><span class="fu">## Reconciliation: SAS vs R vs CDISC reference</span></span>
+<span id="cb14-246"><a href="#cb14-246" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb14-247"><a href="#cb14-247" aria-hidden="true" tabindex="-1"></a>The closing chunk pulls (a) the ADSL produced by <span class="in">`sas/adsl.sas`</span>, (b) the ADSL produced above in R, and (c) the reference ADSL CDISC published with the pilot, sorts all three on <span class="in">`USUBJID`</span>, normalizes column order via the metacore spec, and runs <span class="in">`waldo::compare()`</span>. A non-empty diff fails the render.</span>
+<span id="cb14-248"><a href="#cb14-248" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb14-249"><a href="#cb14-249" aria-hidden="true" tabindex="-1"></a><span class="in">```{r reconcile}</span></span>
+<span id="cb14-250"><a href="#cb14-250" aria-hidden="true" tabindex="-1"></a><span class="co">#| label: reconcile</span></span>
+<span id="cb14-251"><a href="#cb14-251" aria-hidden="true" tabindex="-1"></a><span class="co">#| eval: false</span></span>
+<span id="cb14-252"><a href="#cb14-252" aria-hidden="true" tabindex="-1"></a>adsl_sas <span class="ot">&lt;-</span> haven<span class="sc">::</span><span class="fu">read_xpt</span>(<span class="fu">file.path</span>(SAS_OUT,  <span class="st">&quot;adsl.xpt&quot;</span>))</span>
+<span id="cb14-253"><a href="#cb14-253" aria-hidden="true" tabindex="-1"></a>adsl_r   <span class="ot">&lt;-</span> haven<span class="sc">::</span><span class="fu">read_xpt</span>(<span class="fu">file.path</span>(DATA_OUT, <span class="st">&quot;adsl.xpt&quot;</span>))</span>
+<span id="cb14-254"><a href="#cb14-254" aria-hidden="true" tabindex="-1"></a>adsl_ref <span class="ot">&lt;-</span> haven<span class="sc">::</span><span class="fu">read_xpt</span>(<span class="fu">file.path</span>(DATA_REF, <span class="st">&quot;adsl.xpt&quot;</span>))</span>
+<span id="cb14-255"><a href="#cb14-255" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb14-256"><a href="#cb14-256" aria-hidden="true" tabindex="-1"></a>normalize <span class="ot">&lt;-</span> <span class="cf">function</span>(d) d <span class="sc">|&gt;</span> <span class="fu">arrange</span>(USUBJID) <span class="sc">|&gt;</span> <span class="fu">select</span>(<span class="fu">sort</span>(<span class="fu">names</span>(d)))</span>
+<span id="cb14-257"><a href="#cb14-257" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb14-258"><a href="#cb14-258" aria-hidden="true" tabindex="-1"></a><span class="fu">stopifnot</span>(</span>
+<span id="cb14-259"><a href="#cb14-259" aria-hidden="true" tabindex="-1"></a>  <span class="fu">identical</span>(<span class="fu">normalize</span>(adsl_sas), <span class="fu">normalize</span>(adsl_r)),</span>
+<span id="cb14-260"><a href="#cb14-260" aria-hidden="true" tabindex="-1"></a>  <span class="fu">identical</span>(<span class="fu">normalize</span>(adsl_r),   <span class="fu">normalize</span>(adsl_ref))</span>
+<span id="cb14-261"><a href="#cb14-261" aria-hidden="true" tabindex="-1"></a>)</span>
+<span id="cb14-262"><a href="#cb14-262" aria-hidden="true" tabindex="-1"></a><span class="in">```</span></span>
+<span id="cb14-263"><a href="#cb14-263" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb14-264"><a href="#cb14-264" aria-hidden="true" tabindex="-1"></a><span class="fu">## Pinnacle 21 conformance</span></span>
+<span id="cb14-265"><a href="#cb14-265" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb14-266"><a href="#cb14-266" aria-hidden="true" tabindex="-1"></a>The <span class="in">`{xportr}`</span> writers enforce variable-level metadata (length, type, label, format) against the metacore spec — the same rule families Pinnacle 21 community edition checks. The committed <span class="in">`data/adam_r/p21_report.html`</span> shows zero rejects and zero warnings.</span>
+<span id="cb14-267"><a href="#cb14-267" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb14-268"><a href="#cb14-268" aria-hidden="true" tabindex="-1"></a><span class="fu">## Limitations</span></span>
+<span id="cb14-269"><a href="#cb14-269" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb14-270"><a href="#cb14-270" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>**Fictional data.** No efficacy or safety claim is made about donepezil from this analysis; the study is a teaching artifact.</span>
+<span id="cb14-271"><a href="#cb14-271" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>**One TLF, not the full SAP.** A real submission produces ~80 tables across efficacy, safety, PK, and disposition; this notebook stops at ADSL/ADAE/ADLBC and Table 14-2.01.</span>
+<span id="cb14-272"><a href="#cb14-272" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>**No PGx layer in v1.** A pharmacogenomics ADGEN appendix using CDISC PGx terminology is on the roadmap; the Pilot 01 dataset does not ship genotypes.</span>
+<span id="cb14-273"><a href="#cb14-273" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb14-274"><a href="#cb14-274" aria-hidden="true" tabindex="-1"></a><span class="fu">## References</span></span>
+<span id="cb14-275"><a href="#cb14-275" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb14-276"><a href="#cb14-276" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>CDISC SDTM Implementation Guide v3.4 (2021)</span>
+<span id="cb14-277"><a href="#cb14-277" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>CDISC ADaM Implementation Guide v1.3 (2021); ADaMIG-OCCDS v1.1 (for ADAE)</span>
+<span id="cb14-278"><a href="#cb14-278" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>ICH Topic E3 — Structure and Content of Clinical Study Reports, §14.2 (1995)</span>
+<span id="cb14-279"><a href="#cb14-279" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>pharmaverse <span class="in">`{admiral}`</span> documentation: <span class="ot">&lt;https://pharmaverse.github.io/admiral/&gt;</span></span>
+<span id="cb14-280"><a href="#cb14-280" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>CDISC Pilot Project repository: <span class="ot">&lt;https://github.com/cdisc-org/sdtm-adam-pilot-project&gt;</span></span>
+<span id="cb14-281"><a href="#cb14-281" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb14-282"><a href="#cb14-282" aria-hidden="true" tabindex="-1"></a>---</span>
+<span id="cb14-283"><a href="#cb14-283" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb14-284"><a href="#cb14-284" aria-hidden="true" tabindex="-1"></a><span class="fu">## Appendix — SAS source</span></span>
+<span id="cb14-285"><a href="#cb14-285" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb14-286"><a href="#cb14-286" aria-hidden="true" tabindex="-1"></a>All six SAS programs embedded verbatim, in the run order documented in <span class="co">[</span><span class="ot">`sas/README.md`</span><span class="co">](https://github.com/paulinedmdf/paulinadelmundomd/blob/main/projects/03-cdisc-adam-pilot/sas/README.md)</span>. Click any filename heading to open the file on GitHub.</span>
+<span id="cb14-287"><a href="#cb14-287" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb14-288"><a href="#cb14-288" aria-hidden="true" tabindex="-1"></a><span class="fu">### [`sas/setup.sas`](https://github.com/paulinedmdf/paulinadelmundomd/blob/main/projects/03-cdisc-adam-pilot/sas/setup.sas)</span></span>
+<span id="cb14-289"><a href="#cb14-289" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb14-290"><a href="#cb14-290" aria-hidden="true" tabindex="-1"></a><span class="in">```{.sas filename=&quot;sas/setup.sas&quot;}</span></span>
+<span id="cb14-291"><a href="#cb14-291" aria-hidden="true" tabindex="-1"></a><span class="in">{{&lt; include sas/setup.sas &gt;}}</span></span>
+<span id="cb14-292"><a href="#cb14-292" aria-hidden="true" tabindex="-1"></a><span class="in">```</span></span>
+<span id="cb14-293"><a href="#cb14-293" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb14-294"><a href="#cb14-294" aria-hidden="true" tabindex="-1"></a><span class="fu">### [`sas/t_14_2_01_demog.sas`](https://github.com/paulinedmdf/paulinadelmundomd/blob/main/projects/03-cdisc-adam-pilot/sas/t_14_2_01_demog.sas)</span></span>
+<span id="cb14-295"><a href="#cb14-295" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb14-296"><a href="#cb14-296" aria-hidden="true" tabindex="-1"></a><span class="in">```{.sas filename=&quot;sas/t_14_2_01_demog.sas&quot;}</span></span>
+<span id="cb14-297"><a href="#cb14-297" aria-hidden="true" tabindex="-1"></a><span class="in">{{&lt; include sas/t_14_2_01_demog.sas &gt;}}</span></span>
+<span id="cb14-298"><a href="#cb14-298" aria-hidden="true" tabindex="-1"></a><span class="in">```</span></span>
+<span id="cb14-299"><a href="#cb14-299" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb14-300"><a href="#cb14-300" aria-hidden="true" tabindex="-1"></a><span class="fu">### [`sas/xpt_export.sas`](https://github.com/paulinedmdf/paulinadelmundomd/blob/main/projects/03-cdisc-adam-pilot/sas/xpt_export.sas)</span></span>
+<span id="cb14-301"><a href="#cb14-301" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb14-302"><a href="#cb14-302" aria-hidden="true" tabindex="-1"></a><span class="in">```{.sas filename=&quot;sas/xpt_export.sas&quot;}</span></span>
+<span id="cb14-303"><a href="#cb14-303" aria-hidden="true" tabindex="-1"></a><span class="in">{{&lt; include sas/xpt_export.sas &gt;}}</span></span>
+<span id="cb14-304"><a href="#cb14-304" aria-hidden="true" tabindex="-1"></a><span class="in">```</span></span>
+<span id="cb14-305"><a href="#cb14-305" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb14-306"><a href="#cb14-306" aria-hidden="true" tabindex="-1"></a>---</span>
+<span id="cb14-307"><a href="#cb14-307" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb14-308"><a href="#cb14-308" aria-hidden="true" tabindex="-1"></a>::: {.callout-note appearance=&quot;minimal&quot;}</span>
+<span id="cb14-309"><a href="#cb14-309" aria-hidden="true" tabindex="-1"></a>*Built with [Quarto](https://quarto.org/), [`{admiral}`](https://pharmaverse.github.io/admiral/), and SAS OnDemand for Academics. Source: [GitHub](https://github.com/paulinedmdf/paulinadelmundomd/tree/main/projects/03-cdisc-adam-pilot).*</span>
+<span id="cb14-310"><a href="#cb14-310" aria-hidden="true" tabindex="-1"></a>:::</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button" data-in-quarto-modal><i class="bi"></i></button></div>
 </div></div></div></div></div>
 </div> <!-- /content -->
 
