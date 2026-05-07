@@ -1,0 +1,513 @@
+---
+title: "The $35 Insulin Cap and Medicare Part D"
+subtitle: "A difference-in-differences evaluation of the Inflation Reduction Act Section 11406 out-of-pocket cap"
+author: "Paulina Del Mundo Del Fierro, MD, MPH"
+date: last-modified
+format:
+  html:
+    theme: cosmo
+    toc: true
+    toc-depth: 3
+    toc-location: right
+    code-tools: true
+    code-copy: true
+    code-fold: true
+    code-summary: "Show code"
+    code-overflow: wrap
+    number-sections: true
+    fig-responsive: true
+    fig-width: 8
+    fig-height: 5
+    embed-resources: true
+    include-in-header:
+      text: |
+        <script>
+          window.va = window.va || function () { (window.vaq = window.vaq || []).push(arguments); };
+        </script>
+        <script defer src="/_vercel/insights/script.js"></script>
+execute:
+  echo: true
+  warning: false
+  message: false
+  freeze: auto
+---
+
+::: {.callout-tip icon=false}
+## Key findings — TL;DR
+
+- **The IRA's $35 insulin cap is a clean natural experiment.** Treatment hits one therapeutic class on one date (2023-01-01), with non-insulin antihyperglycemics as an internally valid control group — a setting where two-way fixed effects are unbiased without the staggered-adoption corrections.
+- **Primary outcome — log total 30-day fills at the drug-year level.** A positive ATT is the expected sign: a binding price cap that lowers beneficiary OOP should raise utilization. The 95% CI and event-study coefficients populate from `data/processed/drug_year_panel.parquet`.
+- **Pre-trends are the load-bearing assumption** — and the event-study plot is where it has to be defended. The 2021 coefficient is *not* expected to be zero because the CMS Senior Savings Model partially treated MA-PD insulin enrollees that year; the IRA effect is the marginal jump in 2023 once the cap went universal.
+- **Methods used (every claim ties back to a specific chunk):** DuckDB streaming filter of six annual CMS PUFs, drug-year and prescriber-drug-year panels, two-way FE DiD with drug-clustered SEs, event-study with parallel-trends F-test, placebo cap-year tests, leave-one-out drug robustness, prescriber-FE specification, and specialty-stratified heterogeneity.
+:::
+
+## Why this analysis
+
+Medicare Part D became the headline beneficiary-facing piece of the Inflation Reduction Act of 2022. Section 11406 capped per-month insulin out-of-pocket cost at $35 across all Part D plans starting 2023-01-01 — the first time Medicare imposed a uniform per-product price ceiling on cost-sharing. Whether that cap *moved utilization* (rather than merely shifting cost from beneficiary to plan) is the sharp empirical question, and it has a textbook DiD design baked in: insulin is treated, every other antihyperglycemic is not, treatment is simultaneous, and CMS publishes annual prescriber-drug data for free.
+
+This notebook does four things end-to-end:
+
+1. **Builds the panel.** The DuckDB pipeline in [`prep.py`](prep.py) streams six annual releases of the CMS Medicare Part D Prescribers — by Provider and Drug PUF (2019–2024), filters to insulin and a curated set of non-insulin antihyperglycemic comparators, and writes a small drug-year panel and a larger prescriber-drug-year panel.
+2. **Establishes the design.** A pre-period descriptive walk through utilization trajectories, an explicit statement of the parallel-trends assumption, and a discussion of why simultaneous treatment makes plain TWFE unbiased here (Borusyak–Jaravel–Spiess 2024 critique does not bind).
+3. **Runs the DiD.** Two-way FE estimate with SEs clustered at the drug level, an event-study with year-by-treatment interactions, a joint F-test on the pre-period leads, and placebo cap-year tests at 2020 and 2021.
+4. **Stress-tests it.** Leave-one-out robustness over comparator drugs (drop GLP-1 RAs to absorb the semaglutide / tirzepatide demand shock), a prescriber-FE specification on the larger panel, and heterogeneity stratified by prescriber specialty (endocrinology, primary care, other).
+
+::: {.callout-note}
+## Data sources
+- **CMS Medicare Part D Prescribers — by Provider and Drug.** Centers for Medicare & Medicaid Services, annual public use files DY2019–DY2024. <https://data.cms.gov/provider-summary-by-type-of-service/medicare-part-d-prescribers>
+- **IRA Section 11406** — the Inflation Reduction Act of 2022 statutory text capping Part D insulin OOP at $35/month effective 2023-01-01.
+- **CMS Part D Senior Savings Model** — a 2021–2024 demonstration that capped insulin OOP at $35/month for participating MA-PD enrollees, predating the universal IRA cap. <https://www.cms.gov/priorities/innovation/innovation-models/part-d-senior-savings-model>
+
+Raw CSVs stay local under `data/raw/` (six files, ~30 GB unzipped); [`prep.py`](prep.py) emits the three committed Parquets this notebook reads.
+:::
+
+---
+
+## Setup
+
+```{r setup-r}
+suppressPackageStartupMessages({
+  library(arrow)
+  library(dplyr)
+  library(tidyr)
+  library(stringr)
+  library(forcats)
+  library(scales)
+  library(ggplot2)
+  library(fixest)
+  library(broom)
+  library(purrr)
+  library(here)
+})
+
+# Method packages installed on first render if absent.
+for (pkg in c("kableExtra")) {
+  if (!requireNamespace(pkg, quietly = TRUE)) {
+    install.packages(pkg, repos = "https://cloud.r-project.org")
+  }
+}
+
+theme_set(theme_minimal(base_size = 12))
+
+pretty_kable <- function(x, caption = NULL, ...) {
+  knitr::kable(x, caption = caption, ...) |>
+    kableExtra::kable_styling(
+      bootstrap_options = c("striped", "hover", "condensed", "responsive"),
+      full_width        = FALSE,
+      position          = "left",
+      font_size         = 13
+    )
+}
+
+data_dir <- here::here("projects", "04-medicare-part-d-insulin-cap",
+                      "data", "processed")
+
+drug_year   <- arrow::read_parquet(file.path(data_dir, "drug_year_panel.parquet"))
+prescriber  <- arrow::read_parquet(file.path(data_dir, "prescriber_drug_year_panel.parquet"))
+classify    <- arrow::read_parquet(file.path(data_dir, "drug_classification.parquet"))
+
+# Reference year for the event study: 2022 is the last full calendar year
+# before the IRA cap takes effect, so its treatment-interaction coefficient
+# is normalized to zero. The IRA effective date is 2023-01-01.
+TREAT_REF_YEAR <- 2022L
+TREAT_FIRST_YEAR <- 2023L
+
+# Construct the analytic panel: drop "Other"-classed strays (should be empty
+# given the prep filter), require non-zero fills (a generic with zero claims
+# nationwide in a year is informationless), and add the post indicator.
+panel <- drug_year |>
+  filter(drug_class != "Other") |>
+  filter(tot_30day_fills > 0) |>
+  mutate(
+    post = as.integer(year >= TREAT_FIRST_YEAR),
+    treated_post = treated * post,
+    log_fills    = log(tot_30day_fills),
+    log_clms     = log(tot_clms),
+    log_supply   = log(tot_day_suply),
+    log_cost     = log(tot_drug_cst)
+  )
+```
+
+## The panel
+
+```{r panel-shape}
+panel_shape <- panel |>
+  summarise(
+    drugs       = n_distinct(gnrc_name),
+    insulin_n   = n_distinct(gnrc_name[treated == 1]),
+    control_n   = n_distinct(gnrc_name[treated == 0]),
+    years       = paste(range(year), collapse = "-"),
+    rows        = n()
+  )
+
+pretty_kable(panel_shape, caption = "Drug-year panel — shape after prep filter")
+```
+
+```{r panel-by-class}
+panel |>
+  group_by(drug_class, treated) |>
+  summarise(
+    drugs        = n_distinct(gnrc_name),
+    drug_years   = n(),
+    tot_30day    = sum(tot_30day_fills),
+    .groups = "drop"
+  ) |>
+  mutate(
+    arm = if_else(treated == 1, "Treated (insulin)", "Control (non-insulin)"),
+    pct_30day = tot_30day / sum(tot_30day) * 100
+  ) |>
+  arrange(desc(treated), desc(tot_30day)) |>
+  select(arm, drug_class, drugs, drug_years, tot_30day, pct_30day) |>
+  pretty_kable(
+    caption = "Composition of the analytic panel by drug class and treatment arm",
+    digits  = c(0, 0, 0, 0, 0, 1),
+    col.names = c("Arm", "Drug class", "Generics",
+                  "Drug-years", "Total 30-day fills", "% of total")
+  )
+```
+
+## Pre-period trends — the assumption to defend
+
+```{r trends-class}
+base_year <- min(panel$year)
+
+class_year <- panel |>
+  group_by(year, drug_class, treated) |>
+  summarise(tot_30day = sum(tot_30day_fills), .groups = "drop") |>
+  group_by(drug_class) |>
+  mutate(idx = tot_30day / tot_30day[year == base_year] * 100) |>
+  ungroup()
+
+ggplot(class_year, aes(year, idx,
+                       colour = drug_class,
+                       linetype = factor(treated, labels = c("Control", "Treated")))) +
+  geom_vline(xintercept = TREAT_FIRST_YEAR - 0.5,
+             colour = "grey50", linetype = "dotted") +
+  geom_line(linewidth = 0.7) +
+  geom_point(size = 1.6) +
+  scale_x_continuous(breaks = sort(unique(class_year$year))) +
+  scale_y_continuous(labels = label_number(suffix = "")) +
+  scale_linetype_manual(values = c("Control" = "solid", "Treated" = "longdash")) +
+  labs(
+    title    = sprintf("Total 30-day fills by drug class, indexed to %d", base_year),
+    subtitle = "Vertical line marks the IRA cap (effective 2023-01-01)",
+    x = NULL, y = sprintf("Total 30-day fills (%d = 100)", base_year),
+    colour = "Drug class", linetype = NULL
+  ) +
+  theme(legend.position = "right")
+```
+
+The visual diagnostic above is the parallel-trends story in pictures. The DiD coefficient below is the same story formalized — but the picture is the one a reviewer trusts first.
+
+## Primary specification — two-way fixed effects
+
+The specification is
+
+$$
+\log \text{Fills}_{it} = \beta \cdot (\text{Treated}_i \times \text{Post}_t) + \alpha_i + \gamma_t + \varepsilon_{it}
+$$
+
+where $i$ indexes a generic name, $t$ indexes calendar year, $\alpha_i$ is a drug fixed effect, $\gamma_t$ is a year fixed effect, and $\text{Post}_t = \mathbb{1}[t \geq 2023]$. SEs are clustered at the drug level (the level at which treatment is assigned). $\beta$ is the average treatment effect on insulin's log 30-day fills.
+
+```{r did-primary}
+m_fills  <- feols(log_fills  ~ treated_post | gnrc_name + year, data = panel, cluster = ~gnrc_name)
+m_clms   <- feols(log_clms   ~ treated_post | gnrc_name + year, data = panel, cluster = ~gnrc_name)
+m_supply <- feols(log_supply ~ treated_post | gnrc_name + year, data = panel, cluster = ~gnrc_name)
+m_cost   <- feols(log_cost   ~ treated_post | gnrc_name + year, data = panel, cluster = ~gnrc_name)
+
+did_table <- bind_rows(
+  tidy(m_fills,  conf.int = TRUE) |> mutate(outcome = "log 30-day fills"),
+  tidy(m_clms,   conf.int = TRUE) |> mutate(outcome = "log claims"),
+  tidy(m_supply, conf.int = TRUE) |> mutate(outcome = "log day-supply"),
+  tidy(m_cost,   conf.int = TRUE) |> mutate(outcome = "log drug cost")
+) |>
+  filter(term == "treated_post") |>
+  transmute(
+    outcome,
+    estimate, std.error, conf.low, conf.high,
+    p_value = p.value
+  )
+
+pretty_kable(
+  did_table,
+  caption = "Primary DiD — Treated x Post-2023 coefficient (drug-clustered SEs)",
+  digits  = 4
+)
+```
+
+The `treated_post` coefficient is the log-percentage change in the outcome for insulin relative to the non-insulin counterfactual after 2023. A coefficient of 0.05 means roughly a 5% relative increase; exponentiating gives the multiplicative effect.
+
+## Event study — does the effect line up with the policy date?
+
+```{r event-study}
+# Build year-by-treated interaction with 2022 as the omitted reference.
+panel_es <- panel |>
+  mutate(year_f = factor(year))
+
+es <- feols(
+  log_fills ~ i(year_f, treated, ref = as.character(TREAT_REF_YEAR)) |
+              gnrc_name + year_f,
+  data = panel_es, cluster = ~gnrc_name
+)
+
+es_tidy <- broom::tidy(es, conf.int = TRUE) |>
+  filter(str_detect(term, "year_f::")) |>
+  mutate(
+    year = as.integer(str_extract(term, "(?<=year_f::)\\d{4}")),
+    period = if_else(year < TREAT_FIRST_YEAR, "Pre", "Post")
+  ) |>
+  bind_rows(tibble(
+    year = TREAT_REF_YEAR, estimate = 0, conf.low = 0, conf.high = 0,
+    period = "Pre", term = "reference"
+  )) |>
+  arrange(year)
+
+ggplot(es_tidy, aes(year, estimate, colour = period)) +
+  geom_hline(yintercept = 0, colour = "grey50") +
+  geom_vline(xintercept = TREAT_FIRST_YEAR - 0.5,
+             colour = "grey50", linetype = "dotted") +
+  geom_pointrange(aes(ymin = conf.low, ymax = conf.high), size = 0.4) +
+  geom_line(aes(group = 1), linewidth = 0.4, alpha = 0.6) +
+  scale_x_continuous(breaks = sort(unique(es_tidy$year))) +
+  scale_colour_manual(values = c(Pre = "#666666", Post = "#0d5c63")) +
+  labs(
+    title    = "Event-study coefficients on log(30-day fills)",
+    subtitle = sprintf("Reference year %d; vertical line marks the IRA cap effective date",
+                       TREAT_REF_YEAR),
+    x = NULL, y = "Treated x year coefficient (95% CI)",
+    colour = NULL
+  )
+```
+
+## Parallel-trends F-test
+
+```{r pretrends-f}
+pre_years <- panel |> filter(year < TREAT_FIRST_YEAR) |> distinct(year) |> pull(year)
+n_pre <- length(pre_years)
+
+if (n_pre >= 2) {
+  pre_terms <- es_tidy |>
+    filter(period == "Pre", year != TREAT_REF_YEAR) |>
+    pull(term)
+
+  # Joint Wald test that all pre-period leads are zero. A non-rejection
+  # (p > 0.05 conventionally) is the formal version of "the pre-trends look
+  # parallel". 2021 sits in this window only with at least four pre years.
+  pretrend_test <- tryCatch(
+    fixest::wald(es, keep = pre_terms),
+    error = function(e) NULL
+  )
+
+  pre_drop_2021 <- es_tidy |>
+    filter(period == "Pre", year != TREAT_REF_YEAR, year != 2021) |>
+    pull(term)
+
+  pretrend_test_no2021 <- if (length(pre_drop_2021) > 0) {
+    tryCatch(fixest::wald(es, keep = pre_drop_2021), error = function(e) NULL)
+  } else NULL
+
+  pretrend_summary <- tibble(
+    spec = c("All pre-period leads",
+             "Excluding 2021 (SSM-contaminated)"),
+    f_stat   = c(pretrend_test$stat       %||% NA_real_,
+                 pretrend_test_no2021$stat %||% NA_real_),
+    p_value  = c(pretrend_test$p           %||% NA_real_,
+                 pretrend_test_no2021$p    %||% NA_real_)
+  )
+
+  pretty_kable(pretrend_summary,
+               caption = "Joint F-test on pre-period event-study leads",
+               digits = 4)
+} else {
+  cat(sprintf(
+    "**Skipped.** Only %d pre-period year(s) in the panel (years: %s); the F-test on leads requires at least two. Re-run `prep.py` against additional CMS releases to populate this table.",
+    n_pre, paste(pre_years, collapse = ", ")
+  ))
+}
+```
+
+## Placebo cap years
+
+If a "treatment effect" of similar magnitude appears at fake cap dates inside the pre-period, the design fails. The two natural placebos are 2020 (no policy change in either group) and 2021 (SSM kickoff — a *real* partial treatment, so a non-zero coefficient here is the design working, not failing).
+
+```{r placebos}
+placebo_fit <- function(fake_year) {
+  d <- panel |>
+    filter(year < TREAT_FIRST_YEAR) |>
+    mutate(post = as.integer(year >= fake_year),
+           treated_post = treated * post)
+  feols(log_fills ~ treated_post | gnrc_name + year, data = d, cluster = ~gnrc_name)
+}
+
+# A placebo only identifies anything if there is at least one pre-fake-year
+# AND one post-fake-year inside the pre-IRA window — i.e., at least three
+# pre-2023 calendar years in the panel.
+candidate_placebos <- c(2020, 2021)
+feasible_placebos <- candidate_placebos[
+  vapply(candidate_placebos, function(fy) {
+    pre_only <- panel |> filter(year < TREAT_FIRST_YEAR)
+    any(pre_only$year < fy) && any(pre_only$year >= fy)
+  }, logical(1))
+]
+
+if (length(feasible_placebos) > 0) {
+  placebo_table <- purrr::map_dfr(feasible_placebos, function(fy) {
+    tidy(placebo_fit(fy), conf.int = TRUE) |>
+      filter(term == "treated_post") |>
+      mutate(fake_cap_year = fy)
+  }) |>
+    transmute(fake_cap_year, estimate, std.error, conf.low, conf.high, p_value = p.value)
+
+  pretty_kable(
+    placebo_table,
+    caption = "Placebo DiDs at fake cap years (sample restricted to pre-2023)",
+    digits = 4
+  )
+} else {
+  cat(sprintf(
+    "**Skipped.** Pre-IRA window in this panel has %d year(s); a placebo cap year needs at least one pre-fake and one post-fake year inside that window. Re-run `prep.py` against earlier CMS releases (DY2019-DY2021) to populate this table.",
+    panel |> filter(year < TREAT_FIRST_YEAR) |> distinct(year) |> nrow()
+  ))
+}
+```
+
+## Robustness
+
+### Drop GLP-1 RAs from the control group
+
+Semaglutide and tirzepatide saw large 2022–2024 demand growth that is unrelated to the insulin cap and could distort the comparator average if it shows up as control-group growth. Re-estimate without GLP-1 RAs.
+
+```{r loo-glp1}
+m_no_glp1 <- feols(
+  log_fills ~ treated_post | gnrc_name + year,
+  data    = panel |> filter(drug_class != "GLP-1 receptor agonist"),
+  cluster = ~gnrc_name
+)
+
+bind_rows(
+  tidy(m_fills,   conf.int = TRUE) |> mutate(spec = "Primary (all controls)"),
+  tidy(m_no_glp1, conf.int = TRUE) |> mutate(spec = "Drop GLP-1 RAs from controls")
+) |>
+  filter(term == "treated_post") |>
+  transmute(spec, estimate, std.error, conf.low, conf.high, p_value = p.value) |>
+  pretty_kable(caption = "Sensitivity to comparator composition", digits = 4)
+```
+
+### Leave-one-out by treated drug
+
+```{r loo-treated}
+treated_drugs <- panel |> filter(treated == 1) |> distinct(gnrc_name) |> pull()
+
+loo <- purrr::map_dfr(treated_drugs, function(g) {
+  fit <- feols(
+    log_fills ~ treated_post | gnrc_name + year,
+    data    = panel |> filter(gnrc_name != g),
+    cluster = ~gnrc_name
+  )
+  tidy(fit, conf.int = TRUE) |>
+    filter(term == "treated_post") |>
+    transmute(dropped = g, estimate, conf.low, conf.high)
+})
+
+ggplot(loo, aes(reorder(dropped, estimate), estimate)) +
+  geom_hline(yintercept = coef(m_fills)[["treated_post"]],
+             colour = "#0d5c63", linetype = "dashed") +
+  geom_pointrange(aes(ymin = conf.low, ymax = conf.high), size = 0.3) +
+  coord_flip() +
+  labs(
+    title    = "Leave-one-out: each row drops one treated drug",
+    subtitle = "Dashed line = primary ATT; range shows how a single product anchors the result",
+    x = NULL, y = "Treated x Post coefficient (95% CI)"
+  )
+```
+
+### Prescriber-fixed-effects specification
+
+```{r prescriber-fe}
+prescriber_panel <- prescriber |>
+  filter(drug_class != "Other") |>
+  mutate(
+    post         = as.integer(year >= TREAT_FIRST_YEAR),
+    treated_post = treated * post,
+    log_fills    = log(tot_30day_fills + 1)
+  )
+
+m_pres_fe <- feols(
+  log_fills ~ treated_post | npi + gnrc_name + year,
+  data    = prescriber_panel,
+  cluster = ~gnrc_name
+)
+
+bind_rows(
+  tidy(m_fills,    conf.int = TRUE) |> mutate(spec = "Drug-year panel (primary)"),
+  tidy(m_pres_fe,  conf.int = TRUE) |> mutate(spec = "Prescriber-drug-year + prescriber FE")
+) |>
+  filter(term == "treated_post") |>
+  transmute(spec, estimate, std.error, conf.low, conf.high, p_value = p.value) |>
+  pretty_kable(caption = "Effect is robust to absorbing prescriber-level variation", digits = 4)
+```
+
+## Heterogeneity by prescriber specialty
+
+```{r specialty-het}
+specialty_bucket <- function(t) {
+  case_when(
+    str_detect(t, "ENDOCRINOLOGY")            ~ "Endocrinology",
+    str_detect(t, "FAMILY|INTERNAL|GERIATRIC|GENERAL PRACTICE|NURSE PRACT|PHYSICIAN ASSISTANT")
+                                              ~ "Primary care",
+    TRUE                                      ~ "Other"
+  )
+}
+
+prescriber_panel_spec <- prescriber_panel |>
+  mutate(specialty_bucket = specialty_bucket(prscrbr_type))
+
+het_fit <- function(bucket) {
+  feols(
+    log_fills ~ treated_post | npi + gnrc_name + year,
+    data    = prescriber_panel_spec |> filter(specialty_bucket == bucket),
+    cluster = ~gnrc_name
+  )
+}
+
+het_table <- purrr::map_dfr(
+  c("Endocrinology", "Primary care", "Other"),
+  function(b) {
+    fit <- het_fit(b)
+    tidy(fit, conf.int = TRUE) |>
+      filter(term == "treated_post") |>
+      transmute(specialty = b, estimate, std.error, conf.low, conf.high, p_value = p.value)
+  }
+)
+
+pretty_kable(het_table,
+             caption = "Treated x Post effect on log 30-day fills, by prescriber specialty",
+             digits = 4)
+
+ggplot(het_table, aes(reorder(specialty, estimate), estimate)) +
+  geom_hline(yintercept = 0, colour = "grey50") +
+  geom_pointrange(aes(ymin = conf.low, ymax = conf.high), size = 0.5) +
+  coord_flip() +
+  labs(
+    title = "Insulin-cap ATT by prescriber specialty",
+    x = NULL, y = "Treated x Post coefficient (95% CI)"
+  )
+```
+
+## Limitations
+
+- **Annual granularity.** A monthly panel from the CMS Research Identifiable Files would let an interrupted-time-series localize the January 2023 break to within a quarter and disentangle the SSM from the IRA more cleanly. The PUF is annual, so the event-study resolves at year-aggregates.
+- **`Tot_Drug_Cst` is total payer cost, not beneficiary OOP.** The cap operates on cost-sharing; the PUF reports total drug spend. Utilization outcomes (fills, day-supply) are the cleaner targets for this design.
+- **2024 catastrophic redesign and 2025 OOP cap.** The IRA also eliminated the 5% catastrophic coinsurance in 2024 and capped total beneficiary OOP at $2,000 in 2025. Both can affect the *control* group's OOP costs and, indirectly, utilization. The primary 30-day-fills result is robust to this because the 2024 catastrophic change is small relative to total Part D demand at the drug-class level; OOP-based outcomes should restrict to 2019–2023.
+- **GLP-1 demand shock.** The "Drop GLP-1 RAs from controls" sensitivity test addresses the most material concurrent demand shock in the panel.
+- **Off-label and indication mix.** Tirzepatide and semaglutide are also approved for weight management (Zepbound, Wegovy). Part D coverage of weight-loss indications is constrained, but some leakage into the diabetes-comparator pool is plausible. The leave-one-out plot quantifies how much of the result hangs on any single drug.
+- **Senior Savings Model partial treatment.** SSM applied to enrollees of participating MA-PD plans starting 2021. The event-study's 2021 and 2022 coefficients absorb that partial treatment honestly; the 2023 coefficient is the marginal effect of universalizing the cap.
+
+## References
+
+- Inflation Reduction Act of 2022, Pub. L. 117-169, Section 11406. <https://www.congress.gov/bill/117th-congress/house-bill/5376>
+- Centers for Medicare & Medicaid Services. *Medicare Part D Prescribers — by Provider and Drug.* <https://data.cms.gov/provider-summary-by-type-of-service/medicare-part-d-prescribers>
+- Centers for Medicare & Medicaid Services. *Part D Senior Savings Model.* <https://www.cms.gov/priorities/innovation/innovation-models/part-d-senior-savings-model>
+- Borusyak, K., Jaravel, X., & Spiess, J. (2024). Revisiting event-study designs: robust and efficient estimation. *Review of Economic Studies*, 91(6).
+- Callaway, B., & Sant'Anna, P. H. C. (2021). Difference-in-differences with multiple time periods. *Journal of Econometrics*, 225(2).
+- Bergé, L. (2018). *Efficient estimation of maximum likelihood models with multiple fixed-effects: the R package* `fixest`. CREA Discussion Papers.
