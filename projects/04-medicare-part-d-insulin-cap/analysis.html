@@ -7,7 +7,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
 
 <meta name="author" content="Paulina Del Mundo Del Fierro, MD, MPH">
-<meta name="dcterms.date" content="2026-05-06">
+<meta name="dcterms.date" content="2026-05-07">
 
 <title>The $35 Insulin Cap and Medicare Part D</title>
 <style>
@@ -2594,7 +2594,19 @@ window.Quarto = {
   </ul></li>
   <li><a href="#heterogeneity-by-prescriber-specialty" id="toc-heterogeneity-by-prescriber-specialty" class="nav-link" data-scroll-target="#heterogeneity-by-prescriber-specialty"><span class="header-section-number">10</span> Heterogeneity by prescriber specialty</a></li>
   <li><a href="#limitations" id="toc-limitations" class="nav-link" data-scroll-target="#limitations"><span class="header-section-number">11</span> Limitations</a></li>
-  <li><a href="#references" id="toc-references" class="nav-link" data-scroll-target="#references"><span class="header-section-number">12</span> References</a></li>
+  <li><a href="#methods-primer" id="toc-methods-primer" class="nav-link" data-scroll-target="#methods-primer"><span class="header-section-number">12</span> Methods primer</a>
+  <ul class="collapse">
+  <li><a href="#difference-in-differences-did" id="toc-difference-in-differences-did" class="nav-link" data-scroll-target="#difference-in-differences-did"><span class="header-section-number">12.1</span> Difference-in-differences (DiD)</a></li>
+  <li><a href="#fixed-effects-fe" id="toc-fixed-effects-fe" class="nav-link" data-scroll-target="#fixed-effects-fe"><span class="header-section-number">12.2</span> Fixed effects (FE)</a></li>
+  <li><a href="#the-treated-post-interaction-term" id="toc-the-treated-post-interaction-term" class="nav-link" data-scroll-target="#the-treated-post-interaction-term"><span class="header-section-number">12.3</span> The treated × post interaction term</a></li>
+  <li><a href="#event-study" id="toc-event-study" class="nav-link" data-scroll-target="#event-study"><span class="header-section-number">12.4</span> Event-study</a></li>
+  <li><a href="#standard-errors-and-clustering" id="toc-standard-errors-and-clustering" class="nav-link" data-scroll-target="#standard-errors-and-clustering"><span class="header-section-number">12.5</span> Standard errors and clustering</a></li>
+  <li><a href="#placebo-tests" id="toc-placebo-tests" class="nav-link" data-scroll-target="#placebo-tests"><span class="header-section-number">12.6</span> Placebo tests</a></li>
+  <li><a href="#wald-f-test-on-event-study-leads" id="toc-wald-f-test-on-event-study-leads" class="nav-link" data-scroll-target="#wald-f-test-on-event-study-leads"><span class="header-section-number">12.7</span> Wald F-test on event-study leads</a></li>
+  <li><a href="#att-vs-itt" id="toc-att-vs-itt" class="nav-link" data-scroll-target="#att-vs-itt"><span class="header-section-number">12.8</span> ATT vs ITT</a></li>
+  <li><a href="#why-twfe-is-unbiased-here-and-isnt-always" id="toc-why-twfe-is-unbiased-here-and-isnt-always" class="nav-link" data-scroll-target="#why-twfe-is-unbiased-here-and-isnt-always"><span class="header-section-number">12.9</span> Why TWFE is unbiased here (and isn’t always)</a></li>
+  </ul></li>
+  <li><a href="#references" id="toc-references" class="nav-link" data-scroll-target="#references"><span class="header-section-number">13</span> References</a></li>
   </ul>
 </nav>
 </div>
@@ -2620,7 +2632,7 @@ window.Quarto = {
     <div>
     <div class="quarto-title-meta-heading">Published</div>
     <div class="quarto-title-meta-contents">
-      <p class="date">May 6, 2026</p>
+      <p class="date">May 7, 2026</p>
     </div>
   </div>
   
@@ -2643,10 +2655,10 @@ window.Quarto = {
 </div>
 <div class="callout-body-container callout-body">
 <ul>
-<li><strong>The IRA’s $35 insulin cap is a clean natural experiment.</strong> Treatment hits one therapeutic class on one date (2023-01-01), with non-insulin antihyperglycemics as an internally valid control group — a setting where two-way fixed effects are unbiased without the staggered-adoption corrections.</li>
-<li><strong>Primary outcome — log total 30-day fills at the drug-year level.</strong> A positive ATT is the expected sign: a binding price cap that lowers beneficiary OOP should raise utilization. The 95% CI and event-study coefficients populate from <code>data/processed/drug_year_panel.parquet</code>.</li>
+<li><strong>The IRA’s $35 insulin cap is a clean natural experiment.</strong> Treatment hits one therapeutic class on one date (2023-01-01), with non-insulin antihyperglycemics as an internally valid control group — a setting where <strong>two-way fixed effects (TWFE)</strong> are unbiased without the staggered-adoption corrections that more complex DiD designs require.</li>
+<li><strong>Primary outcome — log total 30-day fills at the drug-year level.</strong> A positive <strong>ATT (average treatment effect on the treated)</strong> is the expected sign: a binding price cap that lowers beneficiary out-of-pocket cost should raise utilization. The 95% CI and event-study coefficients populate from <code>data/processed/drug_year_panel.parquet</code>.</li>
 <li><strong>Pre-trends are the load-bearing assumption</strong> — and the event-study plot is where it has to be defended. The 2021 coefficient is <em>not</em> expected to be zero because the CMS Senior Savings Model partially treated MA-PD insulin enrollees that year; the IRA effect is the marginal jump in 2023 once the cap went universal.</li>
-<li><strong>Methods used (every claim ties back to a specific chunk):</strong> DuckDB streaming filter of six annual CMS PUFs, drug-year and prescriber-drug-year panels, two-way FE DiD with drug-clustered SEs, event-study with parallel-trends F-test, placebo cap-year tests, leave-one-out drug robustness, prescriber-FE specification, and specialty-stratified heterogeneity.</li>
+<li><strong>Methods used (every claim ties back to a specific chunk):</strong> DuckDB streaming filter of the CMS Part D Prescriber PUFs, drug-year and prescriber-drug-year panels, TWFE DiD with drug-clustered SEs, event-study with a parallel-trends F-test, placebo cap-year tests, leave-one-out drug robustness, prescriber-FE specification, and specialty-stratified heterogeneity. Each step has an inline “<strong>Why this test?</strong>” callout explaining what it tests and why it earns its place at this specific moment in the analysis.</li>
 </ul>
 </div>
 </div>
@@ -2932,6 +2944,25 @@ window.Quarto = {
 </div>
 </div>
 <p>The visual diagnostic above is the parallel-trends story in pictures. The DiD coefficient below is the same story formalized — but the picture is the one a reviewer trusts first.</p>
+<div class="callout callout-style-default callout-note callout-titled">
+<div class="callout-header d-flex align-content-center">
+<div class="callout-icon-container">
+<i class="callout-icon"></i>
+</div>
+<div class="callout-title-container flex-fill">
+<span class="screen-reader-only">Note</span>Why difference-in-differences, and why “parallel trends” is the whole game
+</div>
+</div>
+<div class="callout-body-container callout-body">
+<p>A <strong>difference-in-differences (DiD)</strong> asks: <em>did the gap between the treated and untreated groups change after the policy, beyond what was already changing before?</em> Concretely, we take two differences:</p>
+<ol type="1">
+<li><strong>Within-group change</strong>: insulin volume in 2023 minus insulin volume in 2022.</li>
+<li><strong>Between-group difference of those changes</strong>: the insulin within-group change minus the equivalent within-group change for non-insulin antihyperglycemics.</li>
+</ol>
+<p>If the gap between groups was stable in the pre-period and then jumped in the post-period, the jump is the causal effect of the policy <em>under one assumption</em> — the <strong>parallel-trends assumption</strong>. Parallel trends says: in the absence of the policy, the gap between treated and control would have continued to evolve in parallel. We can never observe the counterfactual (“what would insulin have done in 2023 without the cap?”), so we use the control group’s actual 2023 trajectory as the stand-in. That stand-in is only valid if pre-period gaps were stable.</p>
+<p>This is why every DiD analysis from here forward is, in some sense, an argument about whether parallel trends hold. The point estimate is one regression coefficient. The credibility of that coefficient depends on whatever evidence we can muster — visual, formal, placebo — that the assumption isn’t violated. (Card &amp; Krueger 1994; Angrist &amp; Pischke 2009)</p>
+</div>
+</div>
 </section>
 <section id="primary-specification-two-way-fixed-effects" class="level2" data-number="5">
 <h2 data-number="5" class="anchored" data-anchor-id="primary-specification-two-way-fixed-effects"><span class="header-section-number">5</span> Primary specification — two-way fixed effects</h2>
@@ -2939,7 +2970,22 @@ window.Quarto = {
 <p><span class="math display">\[
 \log \text{Fills}_{it} = \beta \cdot (\text{Treated}_i \times \text{Post}_t) + \alpha_i + \gamma_t + \varepsilon_{it}
 \]</span></p>
-<p>where <span class="math inline">\(i\)</span> indexes a generic name, <span class="math inline">\(t\)</span> indexes calendar year, <span class="math inline">\(\alpha_i\)</span> is a drug fixed effect, <span class="math inline">\(\gamma_t\)</span> is a year fixed effect, and <span class="math inline">\(\text{Post}_t = \mathbb{1}[t \geq 2023]\)</span>. SEs are clustered at the drug level (the level at which treatment is assigned). <span class="math inline">\(\beta\)</span> is the average treatment effect on insulin’s log 30-day fills.</p>
+<p>where <span class="math inline">\(i\)</span> indexes a generic name, <span class="math inline">\(t\)</span> indexes calendar year, <span class="math inline">\(\alpha_i\)</span> is a drug fixed effect, <span class="math inline">\(\gamma_t\)</span> is a year fixed effect, and <span class="math inline">\(\text{Post}_t = \mathbb{1}[t \geq 2023]\)</span>. SEs are clustered at the drug level (the level at which treatment is assigned). <span class="math inline">\(\beta\)</span> is the average treatment effect on the treated (ATT) — the relative change in insulin’s log 30-day fills caused by the policy.</p>
+<div class="callout callout-style-default callout-note callout-titled">
+<div class="callout-header d-flex align-content-center">
+<div class="callout-icon-container">
+<i class="callout-icon"></i>
+</div>
+<div class="callout-title-container flex-fill">
+<span class="screen-reader-only">Note</span>Why two-way fixed effects, and why cluster the SEs at the drug level?
+</div>
+</div>
+<div class="callout-body-container callout-body">
+<p><strong>Drug fixed effects (<span class="math inline">\(\alpha_i\)</span>)</strong> absorb every time-invariant difference between drugs. Insulin glargine is a much higher-volume drug than insulin glulisine, and metformin dwarfs them both — but those baseline differences don’t vary across years, so they get soaked up by the drug FE. What’s left after the drug FE is <em>each drug’s deviation from its own average over time.</em></p>
+<p><strong>Year fixed effects (<span class="math inline">\(\gamma_t\)</span>)</strong> absorb every nationwide shock that hit all drugs equally — formulary tier changes, pandemic-era prescribing shifts, broad reimbursement adjustments. After the year FE, what’s left is <em>each drug-year’s deviation from its drug’s average AND from the year’s average.</em> The TWFE estimator is identifying the treatment effect from exactly this residual variation: the “extra” change in insulin specifically, in 2023 specifically, beyond what the drug-level and year-level baselines predict.</p>
+<p><strong>Clustering SEs at the drug level</strong> corrects for the fact that observations within the same drug across years are not statistically independent. Insulin glargine in 2022 and insulin glargine in 2023 share unobserved supply, formulary, and demand factors. Naive (“classical”) SEs would treat each drug-year as independent and produce confidence intervals that are too narrow — a known recipe for false-positive findings. We cluster at the level at which treatment is assigned (the drug); that’s the standard rule. (Cameron &amp; Miller 2015; Abadie et al. 2023)</p>
+</div>
+</div>
 <div class="cell">
 <details class="code-fold">
 <summary>Show code</summary>
@@ -3019,10 +3065,29 @@ window.Quarto = {
 </div>
 </div>
 </div>
-<p>The <code>treated_post</code> coefficient is the log-percentage change in the outcome for insulin relative to the non-insulin counterfactual after 2023. A coefficient of 0.05 means roughly a 5% relative increase; exponentiating gives the multiplicative effect.</p>
+<p>The <code>treated_post</code> coefficient is the log-percentage change in the outcome for insulin relative to the non-insulin counterfactual after 2023. Because the outcome is logged, the coefficient is approximately a relative change: <span class="math inline">\(\beta = 0.05\)</span> implies roughly <span class="math inline">\(\exp(0.05) - 1 \approx 5.1\%\)</span> more 30-day fills for insulin than the control-group counterfactual predicts. A negative coefficient says the opposite — insulin grew <em>less</em> than controls.</p>
 </section>
 <section id="event-study-does-the-effect-line-up-with-the-policy-date" class="level2" data-number="6">
 <h2 data-number="6" class="anchored" data-anchor-id="event-study-does-the-effect-line-up-with-the-policy-date"><span class="header-section-number">6</span> Event study — does the effect line up with the policy date?</h2>
+<div class="callout callout-style-default callout-note callout-titled">
+<div class="callout-header d-flex align-content-center">
+<div class="callout-icon-container">
+<i class="callout-icon"></i>
+</div>
+<div class="callout-title-container flex-fill">
+<span class="screen-reader-only">Note</span>Why an event-study, when we already have a single DiD number?
+</div>
+</div>
+<div class="callout-body-container callout-body">
+<p>The DiD compresses the entire treatment effect into one number — the average jump after 2023. That’s useful for headlines but hides three things a careful reader wants to see:</p>
+<ol type="1">
+<li><strong>Pre-trends.</strong> Were treated and control already moving apart <em>before</em> the policy? An event-study traces the treated-vs-control gap <em>year by year</em>, with the year right before treatment normalized to zero. Pre-period coefficients should hover near zero if parallel trends hold; if they drift, the DiD point estimate is contaminated by a pre-existing trend that has nothing to do with the policy.</li>
+<li><strong>Anticipation.</strong> Markets sometimes respond before a policy takes effect — manufacturers, plans, and prescribers anticipated the IRA cap from August 2022 (when the bill was signed) onward. If insulin’s 2022 coefficient is already non-zero, that’s evidence of anticipation, and the DiD’s “post” coefficient is a mix of anticipation + actual policy impact.</li>
+<li><strong>Timing of the response.</strong> Did the effect appear sharply in 2023 or build over multiple post-years? A pile of post-period coefficients lets you see the dose-response curve over time, not just the average.</li>
+</ol>
+<p>Mechanically, the event-study replaces the single <span class="math inline">\(\text{Treated} \times \text{Post}\)</span> term with <span class="math inline">\(\text{Treated} \times \mathbb{1}[t = k]\)</span> interactions for each year <span class="math inline">\(k\)</span>, omitting one reference year (here, 2022 — the last full pre-IRA calendar year). Each coefficient reads as: <em>the gap between insulin and control in year <span class="math inline">\(k\)</span>, relative to the gap in 2022.</em> (Sun &amp; Abraham 2021; Borusyak, Jaravel &amp; Spiess 2024)</p>
+</div>
+</div>
 <div class="cell">
 <details class="code-fold">
 <summary>Show code</summary>
@@ -3075,6 +3140,25 @@ window.Quarto = {
 </section>
 <section id="parallel-trends-f-test" class="level2" data-number="7">
 <h2 data-number="7" class="anchored" data-anchor-id="parallel-trends-f-test"><span class="header-section-number">7</span> Parallel-trends F-test</h2>
+<div class="callout callout-style-default callout-note callout-titled">
+<div class="callout-header d-flex align-content-center">
+<div class="callout-icon-container">
+<i class="callout-icon"></i>
+</div>
+<div class="callout-title-container flex-fill">
+<span class="screen-reader-only">Note</span>Why the parallel-trends F-test, and why a non-rejection isn’t proof
+</div>
+</div>
+<div class="callout-body-container callout-body">
+<p>The event-study plot is a visual check; the F-test is the formal statement. A <strong>joint Wald F-test</strong> asks whether <em>all the pre-period coefficients are jointly equal to zero.</em> If we cannot reject that joint null, the data are at least consistent with parallel trends. If we <em>do</em> reject — meaning at least one pre-period coefficient is reliably different from zero — the parallel-trends assumption has measurable violations, and the post-period DiD coefficient is no longer a clean treatment effect.</p>
+<p>Two important asymmetries in how to read this test:</p>
+<ol type="1">
+<li><strong>A non-rejection (<span class="math inline">\(p &gt; 0.05\)</span>) does not prove parallel trends.</strong> It only fails to falsify them. Underpowered designs with few pre-period years and noisy outcomes will fail to reject <em>any</em> null. A small number of pre-period coefficients (this smoke test has only one) makes the test almost guaranteed to fail to reject — which is why we explicitly note when the test is statistically meaningful and when it is essentially uninformative.</li>
+<li><strong>A rejection (<span class="math inline">\(p &lt; 0.05\)</span>) is fatal in a way that’s hard to fix.</strong> You can sometimes argue the design is still valid (e.g., if the violation is in a single drug you can drop it via leave-one-out), but the burden of proof shifts to the analyst. Many published DiD papers fail at exactly this check, which is why this section is run <em>before</em> anyone is allowed to interpret the post-period coefficient.</li>
+</ol>
+<p>We run the F-test twice: once on all pre-period leads, and once dropping 2021 (which is partially treated by the CMS Senior Savings Model and therefore would be expected to deviate from zero even under valid parallel trends). The second test is the cleaner check.</p>
+</div>
+</div>
 <div class="cell">
 <details class="code-fold">
 <summary>Show code</summary>
@@ -3128,7 +3212,25 @@ window.Quarto = {
 </section>
 <section id="placebo-cap-years" class="level2" data-number="8">
 <h2 data-number="8" class="anchored" data-anchor-id="placebo-cap-years"><span class="header-section-number">8</span> Placebo cap years</h2>
-<p>If a “treatment effect” of similar magnitude appears at fake cap dates inside the pre-period, the design fails. The two natural placebos are 2020 (no policy change in either group) and 2021 (SSM kickoff — a <em>real</em> partial treatment, so a non-zero coefficient here is the design working, not failing).</p>
+<div class="callout callout-style-default callout-note callout-titled">
+<div class="callout-header d-flex align-content-center">
+<div class="callout-icon-container">
+<i class="callout-icon"></i>
+</div>
+<div class="callout-title-container flex-fill">
+<span class="screen-reader-only">Note</span>Why placebos earn their place by trying to break the design
+</div>
+</div>
+<div class="callout-body-container callout-body">
+<p>A <strong>placebo test</strong> asks the most adversarial question we can ask of the design: <em>what if I pretend the cap took effect in a year when no policy actually changed?</em> If we re-run the same DiD with a fake cap date inside the pre-IRA window and the estimator obediently produces a “treatment effect” of similar magnitude, the design is detecting random noise that pre-existed the real policy — and the actual 2023 coefficient is not credibly the effect of the cap. If the placebo coefficient is near zero, the design is at least not fooled by random fluctuation.</p>
+<p>There are two kinds of placebo dates worth running:</p>
+<ol type="1">
+<li><strong>Pure placebos</strong> — fake cap years when nothing actually changed. 2020 is the cleanest example here: no insulin-specific policy, no insulin demand shock that we know of. A near-zero placebo coefficient at 2020 is reassurance that the design isn’t picking up phantom trends.</li>
+<li><strong>Known partial-treatment placebos</strong> — years when a real but smaller policy was in effect. <strong>2021 is a <em>partial-treatment</em> placebo, not a pure one</strong>: the CMS Senior Savings Model demonstration extended a $35 insulin cap to participating MA-PD plans starting 2021-01-01. So a non-zero 2021 placebo is the design <em>correctly detecting</em> a known smaller version of the same intervention — evidence the estimator works, not evidence it’s broken.</li>
+</ol>
+<p>Reading the table below: a near-zero 2020 coefficient is good news; a positive 2021 coefficient (if estimable in the panel) tells the SSM story. Either an unexpectedly large 2020 or an unexpectedly <em>negative</em> 2021 would be a red flag. (Athey &amp; Imbens 2017)</p>
+</div>
+</div>
 <div class="cell">
 <details class="code-fold">
 <summary>Show code</summary>
@@ -3180,7 +3282,21 @@ window.Quarto = {
 <h2 data-number="9" class="anchored" data-anchor-id="robustness"><span class="header-section-number">9</span> Robustness</h2>
 <section id="drop-glp-1-ras-from-the-control-group" class="level3" data-number="9.1">
 <h3 data-number="9.1" class="anchored" data-anchor-id="drop-glp-1-ras-from-the-control-group"><span class="header-section-number">9.1</span> Drop GLP-1 RAs from the control group</h3>
-<p>Semaglutide and tirzepatide saw large 2022–2024 demand growth that is unrelated to the insulin cap and could distort the comparator average if it shows up as control-group growth. Re-estimate without GLP-1 RAs.</p>
+<div class="callout callout-style-default callout-note callout-titled">
+<div class="callout-header d-flex align-content-center">
+<div class="callout-icon-container">
+<i class="callout-icon"></i>
+</div>
+<div class="callout-title-container flex-fill">
+<span class="screen-reader-only">Note</span>Why robustness to comparator composition matters
+</div>
+</div>
+<div class="callout-body-container callout-body">
+<p>Parallel trends is a property of <em>the specific control group you chose</em>. It can hold for some drugs and fail for others. Imagine the entire non-insulin antihyperglycemic group is fine <em>except</em> for one therapeutic class that experienced a huge concurrent demand shock unrelated to the insulin cap. That class’s growth pulls the control mean upward in 2023, which drags the DiD coefficient downward — making the insulin effect look smaller (or more negative) than it really is.</p>
+<p>That’s exactly what’s happening here with the <strong>GLP-1 receptor agonists</strong>. Semaglutide (Ozempic) and tirzepatide (Mounjaro / Zepbound) experienced a massive supply-constrained demand surge starting in 2022, driven largely by weight-management prescribing. That growth has nothing to do with the insulin cap. If we leave GLP-1s in the control group, their +60% YoY fill volume sets a counterfactual that insulin would never have matched even if the cap had been generous. The DiD reads negative, but the negativity is GLP-1 contamination, not an insulin response.</p>
+<p>The fix is mechanical: re-estimate with GLP-1 RAs removed from the control group. The remaining controls (metformin, sulfonylureas, DPP-4i, SGLT2i, thiazolidinediones) are not under a similar concurrent shock. If the insulin coefficient flips toward positive when GLP-1s are dropped, that is the GLP-1 contamination story showing itself. The right primary specification depends on which control set you defend as parallel-trends-credible — and the smoke-test sample size here is small enough that <em>neither</em> spec produces a precise estimate, but the <em>direction</em> of the flip is informative.</p>
+</div>
+</div>
 <div class="cell">
 <details class="code-fold">
 <summary>Show code</summary>
@@ -3237,6 +3353,21 @@ window.Quarto = {
 </section>
 <section id="leave-one-out-by-treated-drug" class="level3" data-number="9.2">
 <h3 data-number="9.2" class="anchored" data-anchor-id="leave-one-out-by-treated-drug"><span class="header-section-number">9.2</span> Leave-one-out by treated drug</h3>
+<div class="callout callout-style-default callout-note callout-titled">
+<div class="callout-header d-flex align-content-center">
+<div class="callout-icon-container">
+<i class="callout-icon"></i>
+</div>
+<div class="callout-title-container flex-fill">
+<span class="screen-reader-only">Note</span>Why a single drug can drive an entire result
+</div>
+</div>
+<div class="callout-body-container callout-body">
+<p>Insulin glargine alone accounts for roughly 45% of all insulin 30-day fills in the panel. Insulin lispro and insulin aspart are each another ~13%. Together, three products account for about 70% of treated-arm volume. If any of those three has an idiosyncratic 2023 story — a manufacturer rebate change, a formulary tier shift, a supply disruption, a brand-to-biosimilar switch — that single drug’s trajectory could be the entire DiD point estimate.</p>
+<p><strong>Leave-one-out (LOO)</strong> robustness re-estimates the DiD a dozen times, dropping one treated drug at a time. The plot shows each estimate alongside the primary estimate. The width of the LOO range is the diagnostic: if the LOO estimates cluster tightly around the primary line, no single product is anchoring the result. If one specific drop pulls the estimate noticeably toward zero (or away from zero), that drug deserves a second look — and ideally a separate paragraph in the limitations section.</p>
+<p>LOO is the simplest possible influence diagnostic. It doesn’t replace formal tools like Cook’s distance, but in a panel this small it’s more interpretable: every line in the plot is “what would the answer be if we’d never had this product?”</p>
+</div>
+</div>
 <div class="cell">
 <details class="code-fold">
 <summary>Show code</summary>
@@ -3275,6 +3406,21 @@ window.Quarto = {
 </section>
 <section id="prescriber-fixed-effects-specification" class="level3" data-number="9.3">
 <h3 data-number="9.3" class="anchored" data-anchor-id="prescriber-fixed-effects-specification"><span class="header-section-number">9.3</span> Prescriber-fixed-effects specification</h3>
+<div class="callout callout-style-default callout-note callout-titled">
+<div class="callout-header d-flex align-content-center">
+<div class="callout-icon-container">
+<i class="callout-icon"></i>
+</div>
+<div class="callout-title-container flex-fill">
+<span class="screen-reader-only">Note</span>Why a prescriber fixed effect changes the question being asked
+</div>
+</div>
+<div class="callout-body-container callout-body">
+<p>At the drug-year level, you cannot tell whether insulin volume rose because (a) <strong>existing insulin prescribers wrote more scripts each</strong>, (b) <strong>new prescribers entered the insulin market</strong>, or (c) <strong>the mix of who prescribes insulin shifted</strong> (e.g., endocrinologists left Part D billing and primary-care doctors picked it up). All three would look identical in the aggregate panel.</p>
+<p>Adding an <strong>NPI fixed effect</strong> absorbs every time-invariant difference between prescribers — their specialty, their geography, their typical panel size, their baseline propensity to use insulin at all. After the prescriber FE, the regression is identifying the treatment effect <em>within prescriber</em>: did the same prescriber who wrote 50 insulin scripts in 2022 write more in 2023, beyond what the year-FE-adjusted control trajectory predicts?</p>
+<p>That’s a stronger and more interpretable question. It rules out compositional explanations entirely. If the prescriber-FE estimate matches the drug-level estimate, the drug-level result is not a compositional artifact. If they diverge, the divergence is itself the finding — it tells you whether the policy moved the <em>intensive margin</em> (existing prescribers writing more) or the <em>extensive margin</em> (different prescribers entering the market). Both are real policy effects; they just have different downstream implications. (Wooldridge 2010, Ch. 10)</p>
+</div>
+</div>
 <div class="cell">
 <details class="code-fold">
 <summary>Show code</summary>
@@ -3340,6 +3486,21 @@ window.Quarto = {
 </section>
 <section id="heterogeneity-by-prescriber-specialty" class="level2" data-number="10">
 <h2 data-number="10" class="anchored" data-anchor-id="heterogeneity-by-prescriber-specialty"><span class="header-section-number">10</span> Heterogeneity by prescriber specialty</h2>
+<div class="callout callout-style-default callout-note callout-titled">
+<div class="callout-header d-flex align-content-center">
+<div class="callout-icon-container">
+<i class="callout-icon"></i>
+</div>
+<div class="callout-title-container flex-fill">
+<span class="screen-reader-only">Note</span>Why average effects can hide important variation
+</div>
+</div>
+<div class="callout-body-container callout-body">
+<p>The headline ATT averages over every prescriber in the panel — endocrinologists, primary-care physicians, PAs, NPs, and assorted other specialties. But the policy may not have hit each specialty’s patient panel equally. <strong>Endocrinology patients</strong> were more likely to already have access to manufacturer patient-assistance programs and structured care management before the cap, so the marginal cost-sharing relief from the cap is smaller for them. <strong>Primary-care patients</strong> were more likely to face the un-mitigated $300+ list-price OOP that the cap actually displaced; the cap’s marginal effect on their behavior should be larger.</p>
+<p>If the cap had a uniform effect, all three specialty buckets should produce similar coefficients. If the cap mattered most where pre-cap OOP was highest, primary-care should show a larger effect than endocrinology. <strong>Stratifying by specialty is the cleanest way to see this</strong> — the alternative would be a triple interaction in a single model, which is harder to read and produces less interpretable standard errors at small sample sizes.</p>
+<p>The split below uses three buckets: explicit endocrinology, explicit primary care (family medicine, internal medicine, geriatrics, general practice, NPs, PAs), and everything else. The “Other” bucket is mostly cardiology, nephrology, and hospitalists — specialties that prescribe insulin but in lower volumes than the first two groups.</p>
+</div>
+</div>
 <div class="cell">
 <details class="code-fold">
 <summary>Show code</summary>
@@ -3451,15 +3612,65 @@ window.Quarto = {
 <li><strong>Senior Savings Model partial treatment.</strong> SSM applied to enrollees of participating MA-PD plans starting 2021. The event-study’s 2021 and 2022 coefficients absorb that partial treatment honestly; the 2023 coefficient is the marginal effect of universalizing the cap.</li>
 </ul>
 </section>
-<section id="references" class="level2" data-number="12">
-<h2 data-number="12" class="anchored" data-anchor-id="references"><span class="header-section-number">12</span> References</h2>
+<section id="methods-primer" class="level2" data-number="12">
+<h2 data-number="12" class="anchored" data-anchor-id="methods-primer"><span class="header-section-number">12</span> Methods primer</h2>
+<p>A one-stop reference for the design vocabulary used above. Skip this if you’ve taken an applied-econometrics course; otherwise, every concept the analysis depends on is here in plain language.</p>
+<section id="difference-in-differences-did" class="level3" data-number="12.1">
+<h3 data-number="12.1" class="anchored" data-anchor-id="difference-in-differences-did"><span class="header-section-number">12.1</span> Difference-in-differences (DiD)</h3>
+<p>The simplest possible policy-evaluation tool when you can’t randomize. Take two groups (treated and control), measure each one before and after the policy, and compare the <em>change</em> in the treated group’s outcome to the <em>change</em> in the control’s. The treatment effect is the gap between those two changes — the “difference of the differences.” It works because subtracting the control’s change removes any nationwide trend that affected both groups equally, leaving only the treated-group-specific deviation.</p>
+<p>The validity of DiD rests entirely on <strong>parallel trends</strong>: the assumption that, in the absence of the policy, the gap between the two groups would have evolved the same way it had been evolving before. We can never observe the counterfactual, so we use pre-period parallelism as the strongest available signal that this assumption is plausible.</p>
+</section>
+<section id="fixed-effects-fe" class="level3" data-number="12.2">
+<h3 data-number="12.2" class="anchored" data-anchor-id="fixed-effects-fe"><span class="header-section-number">12.2</span> Fixed effects (FE)</h3>
+<p>A statistical trick for “absorbing” persistent differences between units so they don’t contaminate the coefficient of interest. A <strong>drug fixed effect</strong> absorbs every time-invariant difference between drugs — baseline volume, formulary placement, prescriber familiarity. A <strong>year fixed effect</strong> absorbs every nationwide shock that hit all drugs equally — pandemic effects, broad reimbursement changes. After both, what remains is each drug-year’s deviation from its drug’s average AND from its year’s average. That residual variation is what identifies the treatment effect.</p>
+<p>The “two-way” in <strong>two-way fixed effects (TWFE)</strong> just means you’re using both kinds of FE simultaneously. In the right setting (simultaneous treatment, parallel trends) this estimator is equivalent to the canonical 2×2 DiD, just expressed as a regression so you can run robustness checks more easily.</p>
+</section>
+<section id="the-treated-post-interaction-term" class="level3" data-number="12.3">
+<h3 data-number="12.3" class="anchored" data-anchor-id="the-treated-post-interaction-term"><span class="header-section-number">12.3</span> The treated × post interaction term</h3>
+<p>In a DiD regression, the coefficient on <strong><code>treated × post</code></strong> is the treatment effect. It’s a 0/1 indicator for “this observation is in the treated group AND in the post-treatment period.” All four DiD cells (treated-pre, treated-post, control-pre, control-post) get an indicator value, and only the treated-post cell gets a 1. The coefficient on that indicator therefore captures the “extra” effect of being simultaneously treated and post — exactly what we want.</p>
+</section>
+<section id="event-study" class="level3" data-number="12.4">
+<h3 data-number="12.4" class="anchored" data-anchor-id="event-study"><span class="header-section-number">12.4</span> Event-study</h3>
+<p>A finer-grained DiD where instead of one <code>treated × post</code> interaction, you create one interaction per year — <code>treated × 2019</code>, <code>treated × 2020</code>, …, <code>treated × 2024</code> — and omit one reference year (here, 2022, the last full pre-policy year). Each coefficient reads as: <em>the gap between treated and control in this year, relative to the gap in the reference year.</em> Pre-period coefficients should be near zero if parallel trends hold; post-period coefficients trace the shape of the response.</p>
+</section>
+<section id="standard-errors-and-clustering" class="level3" data-number="12.5">
+<h3 data-number="12.5" class="anchored" data-anchor-id="standard-errors-and-clustering"><span class="header-section-number">12.5</span> Standard errors and clustering</h3>
+<p>A <strong>standard error (SE)</strong> is the precision of an estimate. A <strong>clustered SE</strong> corrects for the fact that observations within a “cluster” (same drug across years, same patient across visits, same firm across quarters) are statistically dependent — they share unobserved factors that move them together. Treating dependent observations as independent makes SEs too small, which inflates t-statistics and produces false-positive findings. The standard rule is to cluster at the level at which treatment is assigned. Since the IRA cap is assigned at the drug level, we cluster at the drug level.</p>
+</section>
+<section id="placebo-tests" class="level3" data-number="12.6">
+<h3 data-number="12.6" class="anchored" data-anchor-id="placebo-tests"><span class="header-section-number">12.6</span> Placebo tests</h3>
+<p>A test that runs the entire estimation procedure with a <em>fake</em> treatment — a fake date, a fake group, a fake outcome — under conditions where any “effect” must be artifactual. A null placebo is reassurance: the design isn’t picking up phantom signals. A non-null placebo is a warning: something in the design is generating the appearance of effects where none should exist.</p>
+</section>
+<section id="wald-f-test-on-event-study-leads" class="level3" data-number="12.7">
+<h3 data-number="12.7" class="anchored" data-anchor-id="wald-f-test-on-event-study-leads"><span class="header-section-number">12.7</span> Wald F-test on event-study leads</h3>
+<p>A formal test of the parallel-trends assumption. The <strong>Wald F-test</strong> asks whether a set of coefficients is jointly equal to zero. Applied to the pre-period event-study coefficients (“leads”), it asks: <em>are the pre-period treated-control gaps jointly indistinguishable from zero, year by year?</em> A non-rejection (<span class="math inline">\(p &gt; 0.05\)</span>) is consistent with parallel trends; a rejection (<span class="math inline">\(p &lt; 0.05\)</span>) means there’s a real pre-existing trend differential, and the post-period DiD coefficient is contaminated.</p>
+</section>
+<section id="att-vs-itt" class="level3" data-number="12.8">
+<h3 data-number="12.8" class="anchored" data-anchor-id="att-vs-itt"><span class="header-section-number">12.8</span> ATT vs ITT</h3>
+<p><strong>ATT</strong> = average treatment effect on the <em>treated</em> — the effect of the policy on the population that actually got it. <strong>ITT</strong> = intention-to-treat — the effect on the population that was <em>eligible</em> for the policy, regardless of whether they got it. With the IRA cap, treatment compliance is mechanical (the cap applies uniformly to every Part D claim for a covered insulin), so the ATT is the relevant estimand and ITT/ATT distinctions don’t bite.</p>
+</section>
+<section id="why-twfe-is-unbiased-here-and-isnt-always" class="level3" data-number="12.9">
+<h3 data-number="12.9" class="anchored" data-anchor-id="why-twfe-is-unbiased-here-and-isnt-always"><span class="header-section-number">12.9</span> Why TWFE is unbiased here (and isn’t always)</h3>
+<p>A 2021 wave of econometrics papers (Goodman-Bacon, Callaway–Sant’Anna, Sun–Abraham, de Chaisemartin–D’Haultfœuille) showed that TWFE estimators can be badly biased when treatment is <em>staggered</em> — when different units enter treatment at different times. The bias arises from “forbidden comparisons” between earlier-treated and later-treated units. <strong>None of that applies here</strong>: every insulin product is treated on the same date (2023-01-01), and no control drug is ever treated. Treatment timing is binary and simultaneous. Plain TWFE is fine. The Borusyak–Jaravel–Spiess and Callaway–Sant’Anna estimators would produce numerically identical results in this setting; they’re listed in the references for completeness.</p>
+<hr>
+</section>
+</section>
+<section id="references" class="level2" data-number="13">
+<h2 data-number="13" class="anchored" data-anchor-id="references"><span class="header-section-number">13</span> References</h2>
 <ul>
 <li>Inflation Reduction Act of 2022, Pub. L. 117-169, Section 11406. <a href="https://www.congress.gov/bill/117th-congress/house-bill/5376" class="uri">https://www.congress.gov/bill/117th-congress/house-bill/5376</a></li>
 <li>Centers for Medicare &amp; Medicaid Services. <em>Medicare Part D Prescribers — by Provider and Drug.</em> <a href="https://data.cms.gov/provider-summary-by-type-of-service/medicare-part-d-prescribers" class="uri">https://data.cms.gov/provider-summary-by-type-of-service/medicare-part-d-prescribers</a></li>
 <li>Centers for Medicare &amp; Medicaid Services. <em>Part D Senior Savings Model.</em> <a href="https://www.cms.gov/priorities/innovation/innovation-models/part-d-senior-savings-model" class="uri">https://www.cms.gov/priorities/innovation/innovation-models/part-d-senior-savings-model</a></li>
+<li>Abadie, A., Athey, S., Imbens, G. W., &amp; Wooldridge, J. M. (2023). When should you adjust standard errors for clustering? <em>Quarterly Journal of Economics</em>, 138(1).</li>
+<li>Angrist, J. D., &amp; Pischke, J.-S. (2009). <em>Mostly Harmless Econometrics: An Empiricist’s Companion.</em> Princeton University Press.</li>
+<li>Athey, S., &amp; Imbens, G. W. (2017). The state of applied econometrics: causality and policy evaluation. <em>Journal of Economic Perspectives</em>, 31(2).</li>
+<li>Bergé, L. (2018). <em>Efficient estimation of maximum likelihood models with multiple fixed-effects: the R package</em> <code>fixest</code>. CREA Discussion Papers.</li>
 <li>Borusyak, K., Jaravel, X., &amp; Spiess, J. (2024). Revisiting event-study designs: robust and efficient estimation. <em>Review of Economic Studies</em>, 91(6).</li>
 <li>Callaway, B., &amp; Sant’Anna, P. H. C. (2021). Difference-in-differences with multiple time periods. <em>Journal of Econometrics</em>, 225(2).</li>
-<li>Bergé, L. (2018). <em>Efficient estimation of maximum likelihood models with multiple fixed-effects: the R package</em> <code>fixest</code>. CREA Discussion Papers.</li>
+<li>Cameron, A. C., &amp; Miller, D. L. (2015). A practitioner’s guide to cluster-robust inference. <em>Journal of Human Resources</em>, 50(2).</li>
+<li>Card, D., &amp; Krueger, A. B. (1994). Minimum wages and employment: a case study of the fast-food industry in New Jersey and Pennsylvania. <em>American Economic Review</em>, 84(4).</li>
+<li>Sun, L., &amp; Abraham, S. (2021). Estimating dynamic treatment effects in event studies with heterogeneous treatment effects. <em>Journal of Econometrics</em>, 225(2).</li>
+<li>Wooldridge, J. M. (2010). <em>Econometric Analysis of Cross Section and Panel Data</em> (2nd ed.). MIT Press.</li>
 </ul>
 <!-- -->
 
@@ -3955,10 +4166,10 @@ window.Quarto = {
 <span id="cb16-35"><a href="#cb16-35" aria-hidden="true" tabindex="-1"></a>::: {.callout-tip icon=false}</span>
 <span id="cb16-36"><a href="#cb16-36" aria-hidden="true" tabindex="-1"></a><span class="fu">## Key findings — TL;DR</span></span>
 <span id="cb16-37"><a href="#cb16-37" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb16-38"><a href="#cb16-38" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>**The IRA&#39;s $35 insulin cap is a clean natural experiment.** Treatment hits one therapeutic class on one date (2023-01-01), with non-insulin antihyperglycemics as an internally valid control group — a setting where two-way fixed effects are unbiased without the staggered-adoption corrections.</span>
-<span id="cb16-39"><a href="#cb16-39" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>**Primary outcome — log total 30-day fills at the drug-year level.** A positive ATT is the expected sign: a binding price cap that lowers beneficiary OOP should raise utilization. The 95% CI and event-study coefficients populate from <span class="in">`data/processed/drug_year_panel.parquet`</span>.</span>
+<span id="cb16-38"><a href="#cb16-38" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>**The IRA&#39;s $35 insulin cap is a clean natural experiment.** Treatment hits one therapeutic class on one date (2023-01-01), with non-insulin antihyperglycemics as an internally valid control group — a setting where **two-way fixed effects (TWFE)** are unbiased without the staggered-adoption corrections that more complex DiD designs require.</span>
+<span id="cb16-39"><a href="#cb16-39" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>**Primary outcome — log total 30-day fills at the drug-year level.** A positive **ATT (average treatment effect on the treated)** is the expected sign: a binding price cap that lowers beneficiary out-of-pocket cost should raise utilization. The 95% CI and event-study coefficients populate from <span class="in">`data/processed/drug_year_panel.parquet`</span>.</span>
 <span id="cb16-40"><a href="#cb16-40" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>**Pre-trends are the load-bearing assumption** — and the event-study plot is where it has to be defended. The 2021 coefficient is *not* expected to be zero because the CMS Senior Savings Model partially treated MA-PD insulin enrollees that year; the IRA effect is the marginal jump in 2023 once the cap went universal.</span>
-<span id="cb16-41"><a href="#cb16-41" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>**Methods used (every claim ties back to a specific chunk):** DuckDB streaming filter of six annual CMS PUFs, drug-year and prescriber-drug-year panels, two-way FE DiD with drug-clustered SEs, event-study with parallel-trends F-test, placebo cap-year tests, leave-one-out drug robustness, prescriber-FE specification, and specialty-stratified heterogeneity.</span>
+<span id="cb16-41"><a href="#cb16-41" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>**Methods used (every claim ties back to a specific chunk):** DuckDB streaming filter of the CMS Part D Prescriber PUFs, drug-year and prescriber-drug-year panels, TWFE DiD with drug-clustered SEs, event-study with a parallel-trends F-test, placebo cap-year tests, leave-one-out drug robustness, prescriber-FE specification, and specialty-stratified heterogeneity. Each step has an inline &quot;**Why this test?**&quot; callout explaining what it tests and why it earns its place at this specific moment in the analysis.</span>
 <span id="cb16-42"><a href="#cb16-42" aria-hidden="true" tabindex="-1"></a>:::</span>
 <span id="cb16-43"><a href="#cb16-43" aria-hidden="true" tabindex="-1"></a></span>
 <span id="cb16-44"><a href="#cb16-44" aria-hidden="true" tabindex="-1"></a><span class="fu">## Why this analysis</span></span>
@@ -4119,318 +4330,468 @@ window.Quarto = {
 <span id="cb16-199"><a href="#cb16-199" aria-hidden="true" tabindex="-1"></a></span>
 <span id="cb16-200"><a href="#cb16-200" aria-hidden="true" tabindex="-1"></a>The visual diagnostic above is the parallel-trends story in pictures. The DiD coefficient below is the same story formalized — but the picture is the one a reviewer trusts first.</span>
 <span id="cb16-201"><a href="#cb16-201" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb16-202"><a href="#cb16-202" aria-hidden="true" tabindex="-1"></a><span class="fu">## Primary specification — two-way fixed effects</span></span>
-<span id="cb16-203"><a href="#cb16-203" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb16-204"><a href="#cb16-204" aria-hidden="true" tabindex="-1"></a>The specification is</span>
-<span id="cb16-205"><a href="#cb16-205" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb16-206"><a href="#cb16-206" aria-hidden="true" tabindex="-1"></a>$$</span>
-<span id="cb16-207"><a href="#cb16-207" aria-hidden="true" tabindex="-1"></a>\log \text{Fills}_{it} = \beta \cdot (\text{Treated}_i \times \text{Post}_t) + \alpha_i + \gamma_t + \varepsilon_{it}</span>
-<span id="cb16-208"><a href="#cb16-208" aria-hidden="true" tabindex="-1"></a>$$</span>
+<span id="cb16-202"><a href="#cb16-202" aria-hidden="true" tabindex="-1"></a>::: {.callout-note}</span>
+<span id="cb16-203"><a href="#cb16-203" aria-hidden="true" tabindex="-1"></a><span class="fu">## Why difference-in-differences, and why &quot;parallel trends&quot; is the whole game</span></span>
+<span id="cb16-204"><a href="#cb16-204" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb16-205"><a href="#cb16-205" aria-hidden="true" tabindex="-1"></a>A **difference-in-differences (DiD)** asks: *did the gap between the treated and untreated groups change after the policy, beyond what was already changing before?* Concretely, we take two differences:</span>
+<span id="cb16-206"><a href="#cb16-206" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb16-207"><a href="#cb16-207" aria-hidden="true" tabindex="-1"></a><span class="ss">1. </span>**Within-group change**: insulin volume in 2023 minus insulin volume in 2022.</span>
+<span id="cb16-208"><a href="#cb16-208" aria-hidden="true" tabindex="-1"></a><span class="ss">2. </span>**Between-group difference of those changes**: the insulin within-group change minus the equivalent within-group change for non-insulin antihyperglycemics.</span>
 <span id="cb16-209"><a href="#cb16-209" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb16-210"><a href="#cb16-210" aria-hidden="true" tabindex="-1"></a>where $i$ indexes a generic name, $t$ indexes calendar year, $\alpha_i$ is a drug fixed effect, $\gamma_t$ is a year fixed effect, and $\text{Post}_t = \mathbb{1}<span class="co">[</span><span class="ot">t \geq 2023</span><span class="co">]</span>$. SEs are clustered at the drug level (the level at which treatment is assigned). $\beta$ is the average treatment effect on insulin&#39;s log 30-day fills.</span>
+<span id="cb16-210"><a href="#cb16-210" aria-hidden="true" tabindex="-1"></a>If the gap between groups was stable in the pre-period and then jumped in the post-period, the jump is the causal effect of the policy *under one assumption* — the **parallel-trends assumption**. Parallel trends says: in the absence of the policy, the gap between treated and control would have continued to evolve in parallel. We can never observe the counterfactual (&quot;what would insulin have done in 2023 without the cap?&quot;), so we use the control group&#39;s actual 2023 trajectory as the stand-in. That stand-in is only valid if pre-period gaps were stable.</span>
 <span id="cb16-211"><a href="#cb16-211" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb16-212"><a href="#cb16-212" aria-hidden="true" tabindex="-1"></a><span class="in">```{r did-primary}</span></span>
-<span id="cb16-213"><a href="#cb16-213" aria-hidden="true" tabindex="-1"></a>m_fills  <span class="ot">&lt;-</span> <span class="fu">feols</span>(log_fills  <span class="sc">~</span> treated_post <span class="sc">|</span> gnrc_name <span class="sc">+</span> year, <span class="at">data =</span> panel, <span class="at">cluster =</span> <span class="sc">~</span>gnrc_name)</span>
-<span id="cb16-214"><a href="#cb16-214" aria-hidden="true" tabindex="-1"></a>m_clms   <span class="ot">&lt;-</span> <span class="fu">feols</span>(log_clms   <span class="sc">~</span> treated_post <span class="sc">|</span> gnrc_name <span class="sc">+</span> year, <span class="at">data =</span> panel, <span class="at">cluster =</span> <span class="sc">~</span>gnrc_name)</span>
-<span id="cb16-215"><a href="#cb16-215" aria-hidden="true" tabindex="-1"></a>m_supply <span class="ot">&lt;-</span> <span class="fu">feols</span>(log_supply <span class="sc">~</span> treated_post <span class="sc">|</span> gnrc_name <span class="sc">+</span> year, <span class="at">data =</span> panel, <span class="at">cluster =</span> <span class="sc">~</span>gnrc_name)</span>
-<span id="cb16-216"><a href="#cb16-216" aria-hidden="true" tabindex="-1"></a>m_cost   <span class="ot">&lt;-</span> <span class="fu">feols</span>(log_cost   <span class="sc">~</span> treated_post <span class="sc">|</span> gnrc_name <span class="sc">+</span> year, <span class="at">data =</span> panel, <span class="at">cluster =</span> <span class="sc">~</span>gnrc_name)</span>
-<span id="cb16-217"><a href="#cb16-217" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb16-218"><a href="#cb16-218" aria-hidden="true" tabindex="-1"></a>did_table <span class="ot">&lt;-</span> <span class="fu">bind_rows</span>(</span>
-<span id="cb16-219"><a href="#cb16-219" aria-hidden="true" tabindex="-1"></a>  <span class="fu">tidy</span>(m_fills,  <span class="at">conf.int =</span> <span class="cn">TRUE</span>) <span class="sc">|&gt;</span> <span class="fu">mutate</span>(<span class="at">outcome =</span> <span class="st">&quot;log 30-day fills&quot;</span>),</span>
-<span id="cb16-220"><a href="#cb16-220" aria-hidden="true" tabindex="-1"></a>  <span class="fu">tidy</span>(m_clms,   <span class="at">conf.int =</span> <span class="cn">TRUE</span>) <span class="sc">|&gt;</span> <span class="fu">mutate</span>(<span class="at">outcome =</span> <span class="st">&quot;log claims&quot;</span>),</span>
-<span id="cb16-221"><a href="#cb16-221" aria-hidden="true" tabindex="-1"></a>  <span class="fu">tidy</span>(m_supply, <span class="at">conf.int =</span> <span class="cn">TRUE</span>) <span class="sc">|&gt;</span> <span class="fu">mutate</span>(<span class="at">outcome =</span> <span class="st">&quot;log day-supply&quot;</span>),</span>
-<span id="cb16-222"><a href="#cb16-222" aria-hidden="true" tabindex="-1"></a>  <span class="fu">tidy</span>(m_cost,   <span class="at">conf.int =</span> <span class="cn">TRUE</span>) <span class="sc">|&gt;</span> <span class="fu">mutate</span>(<span class="at">outcome =</span> <span class="st">&quot;log drug cost&quot;</span>)</span>
-<span id="cb16-223"><a href="#cb16-223" aria-hidden="true" tabindex="-1"></a>) <span class="sc">|&gt;</span></span>
-<span id="cb16-224"><a href="#cb16-224" aria-hidden="true" tabindex="-1"></a>  <span class="fu">filter</span>(term <span class="sc">==</span> <span class="st">&quot;treated_post&quot;</span>) <span class="sc">|&gt;</span></span>
-<span id="cb16-225"><a href="#cb16-225" aria-hidden="true" tabindex="-1"></a>  <span class="fu">transmute</span>(</span>
-<span id="cb16-226"><a href="#cb16-226" aria-hidden="true" tabindex="-1"></a>    outcome,</span>
-<span id="cb16-227"><a href="#cb16-227" aria-hidden="true" tabindex="-1"></a>    estimate, std.error, conf.low, conf.high,</span>
-<span id="cb16-228"><a href="#cb16-228" aria-hidden="true" tabindex="-1"></a>    <span class="at">p_value =</span> p.value</span>
-<span id="cb16-229"><a href="#cb16-229" aria-hidden="true" tabindex="-1"></a>  )</span>
-<span id="cb16-230"><a href="#cb16-230" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb16-231"><a href="#cb16-231" aria-hidden="true" tabindex="-1"></a><span class="fu">pretty_kable</span>(</span>
-<span id="cb16-232"><a href="#cb16-232" aria-hidden="true" tabindex="-1"></a>  did_table,</span>
-<span id="cb16-233"><a href="#cb16-233" aria-hidden="true" tabindex="-1"></a>  <span class="at">caption =</span> <span class="st">&quot;Primary DiD — Treated x Post-2023 coefficient (drug-clustered SEs)&quot;</span>,</span>
-<span id="cb16-234"><a href="#cb16-234" aria-hidden="true" tabindex="-1"></a>  <span class="at">digits  =</span> <span class="dv">4</span></span>
-<span id="cb16-235"><a href="#cb16-235" aria-hidden="true" tabindex="-1"></a>)</span>
-<span id="cb16-236"><a href="#cb16-236" aria-hidden="true" tabindex="-1"></a><span class="in">```</span></span>
-<span id="cb16-237"><a href="#cb16-237" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb16-238"><a href="#cb16-238" aria-hidden="true" tabindex="-1"></a>The <span class="in">`treated_post`</span> coefficient is the log-percentage change in the outcome for insulin relative to the non-insulin counterfactual after 2023. A coefficient of 0.05 means roughly a 5% relative increase; exponentiating gives the multiplicative effect.</span>
-<span id="cb16-239"><a href="#cb16-239" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb16-240"><a href="#cb16-240" aria-hidden="true" tabindex="-1"></a><span class="fu">## Event study — does the effect line up with the policy date?</span></span>
-<span id="cb16-241"><a href="#cb16-241" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb16-242"><a href="#cb16-242" aria-hidden="true" tabindex="-1"></a><span class="in">```{r event-study}</span></span>
-<span id="cb16-243"><a href="#cb16-243" aria-hidden="true" tabindex="-1"></a><span class="co"># Build year-by-treated interaction with 2022 as the omitted reference.</span></span>
-<span id="cb16-244"><a href="#cb16-244" aria-hidden="true" tabindex="-1"></a>panel_es <span class="ot">&lt;-</span> panel <span class="sc">|&gt;</span></span>
-<span id="cb16-245"><a href="#cb16-245" aria-hidden="true" tabindex="-1"></a>  <span class="fu">mutate</span>(<span class="at">year_f =</span> <span class="fu">factor</span>(year))</span>
-<span id="cb16-246"><a href="#cb16-246" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb16-247"><a href="#cb16-247" aria-hidden="true" tabindex="-1"></a>es <span class="ot">&lt;-</span> <span class="fu">feols</span>(</span>
-<span id="cb16-248"><a href="#cb16-248" aria-hidden="true" tabindex="-1"></a>  log_fills <span class="sc">~</span> <span class="fu">i</span>(year_f, treated, <span class="at">ref =</span> <span class="fu">as.character</span>(TREAT_REF_YEAR)) <span class="sc">|</span></span>
-<span id="cb16-249"><a href="#cb16-249" aria-hidden="true" tabindex="-1"></a>              gnrc_name <span class="sc">+</span> year_f,</span>
-<span id="cb16-250"><a href="#cb16-250" aria-hidden="true" tabindex="-1"></a>  <span class="at">data =</span> panel_es, <span class="at">cluster =</span> <span class="sc">~</span>gnrc_name</span>
-<span id="cb16-251"><a href="#cb16-251" aria-hidden="true" tabindex="-1"></a>)</span>
-<span id="cb16-252"><a href="#cb16-252" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb16-253"><a href="#cb16-253" aria-hidden="true" tabindex="-1"></a>es_tidy <span class="ot">&lt;-</span> broom<span class="sc">::</span><span class="fu">tidy</span>(es, <span class="at">conf.int =</span> <span class="cn">TRUE</span>) <span class="sc">|&gt;</span></span>
-<span id="cb16-254"><a href="#cb16-254" aria-hidden="true" tabindex="-1"></a>  <span class="fu">filter</span>(<span class="fu">str_detect</span>(term, <span class="st">&quot;year_f::&quot;</span>)) <span class="sc">|&gt;</span></span>
-<span id="cb16-255"><a href="#cb16-255" aria-hidden="true" tabindex="-1"></a>  <span class="fu">mutate</span>(</span>
-<span id="cb16-256"><a href="#cb16-256" aria-hidden="true" tabindex="-1"></a>    <span class="at">year =</span> <span class="fu">as.integer</span>(<span class="fu">str_extract</span>(term, <span class="st">&quot;(?&lt;=year_f::)</span><span class="sc">\\</span><span class="st">d{4}&quot;</span>)),</span>
-<span id="cb16-257"><a href="#cb16-257" aria-hidden="true" tabindex="-1"></a>    <span class="at">period =</span> <span class="fu">if_else</span>(year <span class="sc">&lt;</span> TREAT_FIRST_YEAR, <span class="st">&quot;Pre&quot;</span>, <span class="st">&quot;Post&quot;</span>)</span>
-<span id="cb16-258"><a href="#cb16-258" aria-hidden="true" tabindex="-1"></a>  ) <span class="sc">|&gt;</span></span>
-<span id="cb16-259"><a href="#cb16-259" aria-hidden="true" tabindex="-1"></a>  <span class="fu">bind_rows</span>(<span class="fu">tibble</span>(</span>
-<span id="cb16-260"><a href="#cb16-260" aria-hidden="true" tabindex="-1"></a>    <span class="at">year =</span> TREAT_REF_YEAR, <span class="at">estimate =</span> <span class="dv">0</span>, <span class="at">conf.low =</span> <span class="dv">0</span>, <span class="at">conf.high =</span> <span class="dv">0</span>,</span>
-<span id="cb16-261"><a href="#cb16-261" aria-hidden="true" tabindex="-1"></a>    <span class="at">period =</span> <span class="st">&quot;Pre&quot;</span>, <span class="at">term =</span> <span class="st">&quot;reference&quot;</span></span>
-<span id="cb16-262"><a href="#cb16-262" aria-hidden="true" tabindex="-1"></a>  )) <span class="sc">|&gt;</span></span>
-<span id="cb16-263"><a href="#cb16-263" aria-hidden="true" tabindex="-1"></a>  <span class="fu">arrange</span>(year)</span>
+<span id="cb16-212"><a href="#cb16-212" aria-hidden="true" tabindex="-1"></a>This is why every DiD analysis from here forward is, in some sense, an argument about whether parallel trends hold. The point estimate is one regression coefficient. The credibility of that coefficient depends on whatever evidence we can muster — visual, formal, placebo — that the assumption isn&#39;t violated. (Card &amp; Krueger 1994; Angrist &amp; Pischke 2009)</span>
+<span id="cb16-213"><a href="#cb16-213" aria-hidden="true" tabindex="-1"></a>:::</span>
+<span id="cb16-214"><a href="#cb16-214" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb16-215"><a href="#cb16-215" aria-hidden="true" tabindex="-1"></a><span class="fu">## Primary specification — two-way fixed effects</span></span>
+<span id="cb16-216"><a href="#cb16-216" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb16-217"><a href="#cb16-217" aria-hidden="true" tabindex="-1"></a>The specification is</span>
+<span id="cb16-218"><a href="#cb16-218" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb16-219"><a href="#cb16-219" aria-hidden="true" tabindex="-1"></a>$$</span>
+<span id="cb16-220"><a href="#cb16-220" aria-hidden="true" tabindex="-1"></a>\log \text{Fills}_{it} = \beta \cdot (\text{Treated}_i \times \text{Post}_t) + \alpha_i + \gamma_t + \varepsilon_{it}</span>
+<span id="cb16-221"><a href="#cb16-221" aria-hidden="true" tabindex="-1"></a>$$</span>
+<span id="cb16-222"><a href="#cb16-222" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb16-223"><a href="#cb16-223" aria-hidden="true" tabindex="-1"></a>where $i$ indexes a generic name, $t$ indexes calendar year, $\alpha_i$ is a drug fixed effect, $\gamma_t$ is a year fixed effect, and $\text{Post}_t = \mathbb{1}<span class="co">[</span><span class="ot">t \geq 2023</span><span class="co">]</span>$. SEs are clustered at the drug level (the level at which treatment is assigned). $\beta$ is the average treatment effect on the treated (ATT) — the relative change in insulin&#39;s log 30-day fills caused by the policy.</span>
+<span id="cb16-224"><a href="#cb16-224" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb16-225"><a href="#cb16-225" aria-hidden="true" tabindex="-1"></a>::: {.callout-note}</span>
+<span id="cb16-226"><a href="#cb16-226" aria-hidden="true" tabindex="-1"></a><span class="fu">## Why two-way fixed effects, and why cluster the SEs at the drug level?</span></span>
+<span id="cb16-227"><a href="#cb16-227" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb16-228"><a href="#cb16-228" aria-hidden="true" tabindex="-1"></a>**Drug fixed effects ($\alpha_i$)** absorb every time-invariant difference between drugs. Insulin glargine is a much higher-volume drug than insulin glulisine, and metformin dwarfs them both — but those baseline differences don&#39;t vary across years, so they get soaked up by the drug FE. What&#39;s left after the drug FE is *each drug&#39;s deviation from its own average over time.*</span>
+<span id="cb16-229"><a href="#cb16-229" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb16-230"><a href="#cb16-230" aria-hidden="true" tabindex="-1"></a>**Year fixed effects ($\gamma_t$)** absorb every nationwide shock that hit all drugs equally — formulary tier changes, pandemic-era prescribing shifts, broad reimbursement adjustments. After the year FE, what&#39;s left is *each drug-year&#39;s deviation from its drug&#39;s average AND from the year&#39;s average.* The TWFE estimator is identifying the treatment effect from exactly this residual variation: the &quot;extra&quot; change in insulin specifically, in 2023 specifically, beyond what the drug-level and year-level baselines predict.</span>
+<span id="cb16-231"><a href="#cb16-231" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb16-232"><a href="#cb16-232" aria-hidden="true" tabindex="-1"></a>**Clustering SEs at the drug level** corrects for the fact that observations within the same drug across years are not statistically independent. Insulin glargine in 2022 and insulin glargine in 2023 share unobserved supply, formulary, and demand factors. Naive (&quot;classical&quot;) SEs would treat each drug-year as independent and produce confidence intervals that are too narrow — a known recipe for false-positive findings. We cluster at the level at which treatment is assigned (the drug); that&#39;s the standard rule. (Cameron &amp; Miller 2015; Abadie et al. 2023)</span>
+<span id="cb16-233"><a href="#cb16-233" aria-hidden="true" tabindex="-1"></a>:::</span>
+<span id="cb16-234"><a href="#cb16-234" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb16-235"><a href="#cb16-235" aria-hidden="true" tabindex="-1"></a><span class="in">```{r did-primary}</span></span>
+<span id="cb16-236"><a href="#cb16-236" aria-hidden="true" tabindex="-1"></a>m_fills  <span class="ot">&lt;-</span> <span class="fu">feols</span>(log_fills  <span class="sc">~</span> treated_post <span class="sc">|</span> gnrc_name <span class="sc">+</span> year, <span class="at">data =</span> panel, <span class="at">cluster =</span> <span class="sc">~</span>gnrc_name)</span>
+<span id="cb16-237"><a href="#cb16-237" aria-hidden="true" tabindex="-1"></a>m_clms   <span class="ot">&lt;-</span> <span class="fu">feols</span>(log_clms   <span class="sc">~</span> treated_post <span class="sc">|</span> gnrc_name <span class="sc">+</span> year, <span class="at">data =</span> panel, <span class="at">cluster =</span> <span class="sc">~</span>gnrc_name)</span>
+<span id="cb16-238"><a href="#cb16-238" aria-hidden="true" tabindex="-1"></a>m_supply <span class="ot">&lt;-</span> <span class="fu">feols</span>(log_supply <span class="sc">~</span> treated_post <span class="sc">|</span> gnrc_name <span class="sc">+</span> year, <span class="at">data =</span> panel, <span class="at">cluster =</span> <span class="sc">~</span>gnrc_name)</span>
+<span id="cb16-239"><a href="#cb16-239" aria-hidden="true" tabindex="-1"></a>m_cost   <span class="ot">&lt;-</span> <span class="fu">feols</span>(log_cost   <span class="sc">~</span> treated_post <span class="sc">|</span> gnrc_name <span class="sc">+</span> year, <span class="at">data =</span> panel, <span class="at">cluster =</span> <span class="sc">~</span>gnrc_name)</span>
+<span id="cb16-240"><a href="#cb16-240" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb16-241"><a href="#cb16-241" aria-hidden="true" tabindex="-1"></a>did_table <span class="ot">&lt;-</span> <span class="fu">bind_rows</span>(</span>
+<span id="cb16-242"><a href="#cb16-242" aria-hidden="true" tabindex="-1"></a>  <span class="fu">tidy</span>(m_fills,  <span class="at">conf.int =</span> <span class="cn">TRUE</span>) <span class="sc">|&gt;</span> <span class="fu">mutate</span>(<span class="at">outcome =</span> <span class="st">&quot;log 30-day fills&quot;</span>),</span>
+<span id="cb16-243"><a href="#cb16-243" aria-hidden="true" tabindex="-1"></a>  <span class="fu">tidy</span>(m_clms,   <span class="at">conf.int =</span> <span class="cn">TRUE</span>) <span class="sc">|&gt;</span> <span class="fu">mutate</span>(<span class="at">outcome =</span> <span class="st">&quot;log claims&quot;</span>),</span>
+<span id="cb16-244"><a href="#cb16-244" aria-hidden="true" tabindex="-1"></a>  <span class="fu">tidy</span>(m_supply, <span class="at">conf.int =</span> <span class="cn">TRUE</span>) <span class="sc">|&gt;</span> <span class="fu">mutate</span>(<span class="at">outcome =</span> <span class="st">&quot;log day-supply&quot;</span>),</span>
+<span id="cb16-245"><a href="#cb16-245" aria-hidden="true" tabindex="-1"></a>  <span class="fu">tidy</span>(m_cost,   <span class="at">conf.int =</span> <span class="cn">TRUE</span>) <span class="sc">|&gt;</span> <span class="fu">mutate</span>(<span class="at">outcome =</span> <span class="st">&quot;log drug cost&quot;</span>)</span>
+<span id="cb16-246"><a href="#cb16-246" aria-hidden="true" tabindex="-1"></a>) <span class="sc">|&gt;</span></span>
+<span id="cb16-247"><a href="#cb16-247" aria-hidden="true" tabindex="-1"></a>  <span class="fu">filter</span>(term <span class="sc">==</span> <span class="st">&quot;treated_post&quot;</span>) <span class="sc">|&gt;</span></span>
+<span id="cb16-248"><a href="#cb16-248" aria-hidden="true" tabindex="-1"></a>  <span class="fu">transmute</span>(</span>
+<span id="cb16-249"><a href="#cb16-249" aria-hidden="true" tabindex="-1"></a>    outcome,</span>
+<span id="cb16-250"><a href="#cb16-250" aria-hidden="true" tabindex="-1"></a>    estimate, std.error, conf.low, conf.high,</span>
+<span id="cb16-251"><a href="#cb16-251" aria-hidden="true" tabindex="-1"></a>    <span class="at">p_value =</span> p.value</span>
+<span id="cb16-252"><a href="#cb16-252" aria-hidden="true" tabindex="-1"></a>  )</span>
+<span id="cb16-253"><a href="#cb16-253" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb16-254"><a href="#cb16-254" aria-hidden="true" tabindex="-1"></a><span class="fu">pretty_kable</span>(</span>
+<span id="cb16-255"><a href="#cb16-255" aria-hidden="true" tabindex="-1"></a>  did_table,</span>
+<span id="cb16-256"><a href="#cb16-256" aria-hidden="true" tabindex="-1"></a>  <span class="at">caption =</span> <span class="st">&quot;Primary DiD — Treated x Post-2023 coefficient (drug-clustered SEs)&quot;</span>,</span>
+<span id="cb16-257"><a href="#cb16-257" aria-hidden="true" tabindex="-1"></a>  <span class="at">digits  =</span> <span class="dv">4</span></span>
+<span id="cb16-258"><a href="#cb16-258" aria-hidden="true" tabindex="-1"></a>)</span>
+<span id="cb16-259"><a href="#cb16-259" aria-hidden="true" tabindex="-1"></a><span class="in">```</span></span>
+<span id="cb16-260"><a href="#cb16-260" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb16-261"><a href="#cb16-261" aria-hidden="true" tabindex="-1"></a>The <span class="in">`treated_post`</span> coefficient is the log-percentage change in the outcome for insulin relative to the non-insulin counterfactual after 2023. Because the outcome is logged, the coefficient is approximately a relative change: $\beta = 0.05$ implies roughly $\exp(0.05) - 1 \approx 5.1\%$ more 30-day fills for insulin than the control-group counterfactual predicts. A negative coefficient says the opposite — insulin grew *less* than controls.</span>
+<span id="cb16-262"><a href="#cb16-262" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb16-263"><a href="#cb16-263" aria-hidden="true" tabindex="-1"></a><span class="fu">## Event study — does the effect line up with the policy date?</span></span>
 <span id="cb16-264"><a href="#cb16-264" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb16-265"><a href="#cb16-265" aria-hidden="true" tabindex="-1"></a><span class="fu">ggplot</span>(es_tidy, <span class="fu">aes</span>(year, estimate, <span class="at">colour =</span> period)) <span class="sc">+</span></span>
-<span id="cb16-266"><a href="#cb16-266" aria-hidden="true" tabindex="-1"></a>  <span class="fu">geom_hline</span>(<span class="at">yintercept =</span> <span class="dv">0</span>, <span class="at">colour =</span> <span class="st">&quot;grey50&quot;</span>) <span class="sc">+</span></span>
-<span id="cb16-267"><a href="#cb16-267" aria-hidden="true" tabindex="-1"></a>  <span class="fu">geom_vline</span>(<span class="at">xintercept =</span> TREAT_FIRST_YEAR <span class="sc">-</span> <span class="fl">0.5</span>,</span>
-<span id="cb16-268"><a href="#cb16-268" aria-hidden="true" tabindex="-1"></a>             <span class="at">colour =</span> <span class="st">&quot;grey50&quot;</span>, <span class="at">linetype =</span> <span class="st">&quot;dotted&quot;</span>) <span class="sc">+</span></span>
-<span id="cb16-269"><a href="#cb16-269" aria-hidden="true" tabindex="-1"></a>  <span class="fu">geom_pointrange</span>(<span class="fu">aes</span>(<span class="at">ymin =</span> conf.low, <span class="at">ymax =</span> conf.high), <span class="at">size =</span> <span class="fl">0.4</span>) <span class="sc">+</span></span>
-<span id="cb16-270"><a href="#cb16-270" aria-hidden="true" tabindex="-1"></a>  <span class="fu">geom_line</span>(<span class="fu">aes</span>(<span class="at">group =</span> <span class="dv">1</span>), <span class="at">linewidth =</span> <span class="fl">0.4</span>, <span class="at">alpha =</span> <span class="fl">0.6</span>) <span class="sc">+</span></span>
-<span id="cb16-271"><a href="#cb16-271" aria-hidden="true" tabindex="-1"></a>  <span class="fu">scale_x_continuous</span>(<span class="at">breaks =</span> <span class="fu">sort</span>(<span class="fu">unique</span>(es_tidy<span class="sc">$</span>year))) <span class="sc">+</span></span>
-<span id="cb16-272"><a href="#cb16-272" aria-hidden="true" tabindex="-1"></a>  <span class="fu">scale_colour_manual</span>(<span class="at">values =</span> <span class="fu">c</span>(<span class="at">Pre =</span> <span class="st">&quot;#666666&quot;</span>, <span class="at">Post =</span> <span class="st">&quot;#0d5c63&quot;</span>)) <span class="sc">+</span></span>
-<span id="cb16-273"><a href="#cb16-273" aria-hidden="true" tabindex="-1"></a>  <span class="fu">labs</span>(</span>
-<span id="cb16-274"><a href="#cb16-274" aria-hidden="true" tabindex="-1"></a>    <span class="at">title    =</span> <span class="st">&quot;Event-study coefficients on log(30-day fills)&quot;</span>,</span>
-<span id="cb16-275"><a href="#cb16-275" aria-hidden="true" tabindex="-1"></a>    <span class="at">subtitle =</span> <span class="fu">sprintf</span>(<span class="st">&quot;Reference year %d; vertical line marks the IRA cap effective date&quot;</span>,</span>
-<span id="cb16-276"><a href="#cb16-276" aria-hidden="true" tabindex="-1"></a>                       TREAT_REF_YEAR),</span>
-<span id="cb16-277"><a href="#cb16-277" aria-hidden="true" tabindex="-1"></a>    <span class="at">x =</span> <span class="cn">NULL</span>, <span class="at">y =</span> <span class="st">&quot;Treated x year coefficient (95% CI)&quot;</span>,</span>
-<span id="cb16-278"><a href="#cb16-278" aria-hidden="true" tabindex="-1"></a>    <span class="at">colour =</span> <span class="cn">NULL</span></span>
-<span id="cb16-279"><a href="#cb16-279" aria-hidden="true" tabindex="-1"></a>  )</span>
-<span id="cb16-280"><a href="#cb16-280" aria-hidden="true" tabindex="-1"></a><span class="in">```</span></span>
+<span id="cb16-265"><a href="#cb16-265" aria-hidden="true" tabindex="-1"></a>::: {.callout-note}</span>
+<span id="cb16-266"><a href="#cb16-266" aria-hidden="true" tabindex="-1"></a><span class="fu">## Why an event-study, when we already have a single DiD number?</span></span>
+<span id="cb16-267"><a href="#cb16-267" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb16-268"><a href="#cb16-268" aria-hidden="true" tabindex="-1"></a>The DiD compresses the entire treatment effect into one number — the average jump after 2023. That&#39;s useful for headlines but hides three things a careful reader wants to see:</span>
+<span id="cb16-269"><a href="#cb16-269" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb16-270"><a href="#cb16-270" aria-hidden="true" tabindex="-1"></a><span class="ss">1. </span>**Pre-trends.** Were treated and control already moving apart *before* the policy? An event-study traces the treated-vs-control gap *year by year*, with the year right before treatment normalized to zero. Pre-period coefficients should hover near zero if parallel trends hold; if they drift, the DiD point estimate is contaminated by a pre-existing trend that has nothing to do with the policy.</span>
+<span id="cb16-271"><a href="#cb16-271" aria-hidden="true" tabindex="-1"></a><span class="ss">2. </span>**Anticipation.** Markets sometimes respond before a policy takes effect — manufacturers, plans, and prescribers anticipated the IRA cap from August 2022 (when the bill was signed) onward. If insulin&#39;s 2022 coefficient is already non-zero, that&#39;s evidence of anticipation, and the DiD&#39;s &quot;post&quot; coefficient is a mix of anticipation + actual policy impact.</span>
+<span id="cb16-272"><a href="#cb16-272" aria-hidden="true" tabindex="-1"></a><span class="ss">3. </span>**Timing of the response.** Did the effect appear sharply in 2023 or build over multiple post-years? A pile of post-period coefficients lets you see the dose-response curve over time, not just the average.</span>
+<span id="cb16-273"><a href="#cb16-273" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb16-274"><a href="#cb16-274" aria-hidden="true" tabindex="-1"></a>Mechanically, the event-study replaces the single $\text{Treated} \times \text{Post}$ term with $\text{Treated} \times \mathbb{1}<span class="co">[</span><span class="ot">t = k</span><span class="co">]</span>$ interactions for each year $k$, omitting one reference year (here, 2022 — the last full pre-IRA calendar year). Each coefficient reads as: *the gap between insulin and control in year $k$, relative to the gap in 2022.* (Sun &amp; Abraham 2021; Borusyak, Jaravel &amp; Spiess 2024)</span>
+<span id="cb16-275"><a href="#cb16-275" aria-hidden="true" tabindex="-1"></a>:::</span>
+<span id="cb16-276"><a href="#cb16-276" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb16-277"><a href="#cb16-277" aria-hidden="true" tabindex="-1"></a><span class="in">```{r event-study}</span></span>
+<span id="cb16-278"><a href="#cb16-278" aria-hidden="true" tabindex="-1"></a><span class="co"># Build year-by-treated interaction with 2022 as the omitted reference.</span></span>
+<span id="cb16-279"><a href="#cb16-279" aria-hidden="true" tabindex="-1"></a>panel_es <span class="ot">&lt;-</span> panel <span class="sc">|&gt;</span></span>
+<span id="cb16-280"><a href="#cb16-280" aria-hidden="true" tabindex="-1"></a>  <span class="fu">mutate</span>(<span class="at">year_f =</span> <span class="fu">factor</span>(year))</span>
 <span id="cb16-281"><a href="#cb16-281" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb16-282"><a href="#cb16-282" aria-hidden="true" tabindex="-1"></a><span class="fu">## Parallel-trends F-test</span></span>
-<span id="cb16-283"><a href="#cb16-283" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb16-284"><a href="#cb16-284" aria-hidden="true" tabindex="-1"></a><span class="in">```{r pretrends-f}</span></span>
-<span id="cb16-285"><a href="#cb16-285" aria-hidden="true" tabindex="-1"></a>pre_years <span class="ot">&lt;-</span> panel <span class="sc">|&gt;</span> <span class="fu">filter</span>(year <span class="sc">&lt;</span> TREAT_FIRST_YEAR) <span class="sc">|&gt;</span> <span class="fu">distinct</span>(year) <span class="sc">|&gt;</span> <span class="fu">pull</span>(year)</span>
-<span id="cb16-286"><a href="#cb16-286" aria-hidden="true" tabindex="-1"></a>n_pre <span class="ot">&lt;-</span> <span class="fu">length</span>(pre_years)</span>
+<span id="cb16-282"><a href="#cb16-282" aria-hidden="true" tabindex="-1"></a>es <span class="ot">&lt;-</span> <span class="fu">feols</span>(</span>
+<span id="cb16-283"><a href="#cb16-283" aria-hidden="true" tabindex="-1"></a>  log_fills <span class="sc">~</span> <span class="fu">i</span>(year_f, treated, <span class="at">ref =</span> <span class="fu">as.character</span>(TREAT_REF_YEAR)) <span class="sc">|</span></span>
+<span id="cb16-284"><a href="#cb16-284" aria-hidden="true" tabindex="-1"></a>              gnrc_name <span class="sc">+</span> year_f,</span>
+<span id="cb16-285"><a href="#cb16-285" aria-hidden="true" tabindex="-1"></a>  <span class="at">data =</span> panel_es, <span class="at">cluster =</span> <span class="sc">~</span>gnrc_name</span>
+<span id="cb16-286"><a href="#cb16-286" aria-hidden="true" tabindex="-1"></a>)</span>
 <span id="cb16-287"><a href="#cb16-287" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb16-288"><a href="#cb16-288" aria-hidden="true" tabindex="-1"></a><span class="cf">if</span> (n_pre <span class="sc">&gt;=</span> <span class="dv">2</span>) {</span>
-<span id="cb16-289"><a href="#cb16-289" aria-hidden="true" tabindex="-1"></a>  pre_terms <span class="ot">&lt;-</span> es_tidy <span class="sc">|&gt;</span></span>
-<span id="cb16-290"><a href="#cb16-290" aria-hidden="true" tabindex="-1"></a>    <span class="fu">filter</span>(period <span class="sc">==</span> <span class="st">&quot;Pre&quot;</span>, year <span class="sc">!=</span> TREAT_REF_YEAR) <span class="sc">|&gt;</span></span>
-<span id="cb16-291"><a href="#cb16-291" aria-hidden="true" tabindex="-1"></a>    <span class="fu">pull</span>(term)</span>
-<span id="cb16-292"><a href="#cb16-292" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb16-293"><a href="#cb16-293" aria-hidden="true" tabindex="-1"></a>  <span class="co"># Joint Wald test that all pre-period leads are zero. A non-rejection</span></span>
-<span id="cb16-294"><a href="#cb16-294" aria-hidden="true" tabindex="-1"></a>  <span class="co"># (p &gt; 0.05 conventionally) is the formal version of &quot;the pre-trends look</span></span>
-<span id="cb16-295"><a href="#cb16-295" aria-hidden="true" tabindex="-1"></a>  <span class="co"># parallel&quot;. 2021 sits in this window only with at least four pre years.</span></span>
-<span id="cb16-296"><a href="#cb16-296" aria-hidden="true" tabindex="-1"></a>  pretrend_test <span class="ot">&lt;-</span> <span class="fu">tryCatch</span>(</span>
-<span id="cb16-297"><a href="#cb16-297" aria-hidden="true" tabindex="-1"></a>    fixest<span class="sc">::</span><span class="fu">wald</span>(es, <span class="at">keep =</span> pre_terms),</span>
-<span id="cb16-298"><a href="#cb16-298" aria-hidden="true" tabindex="-1"></a>    <span class="at">error =</span> <span class="cf">function</span>(e) <span class="cn">NULL</span></span>
-<span id="cb16-299"><a href="#cb16-299" aria-hidden="true" tabindex="-1"></a>  )</span>
-<span id="cb16-300"><a href="#cb16-300" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb16-301"><a href="#cb16-301" aria-hidden="true" tabindex="-1"></a>  pre_drop_2021 <span class="ot">&lt;-</span> es_tidy <span class="sc">|&gt;</span></span>
-<span id="cb16-302"><a href="#cb16-302" aria-hidden="true" tabindex="-1"></a>    <span class="fu">filter</span>(period <span class="sc">==</span> <span class="st">&quot;Pre&quot;</span>, year <span class="sc">!=</span> TREAT_REF_YEAR, year <span class="sc">!=</span> <span class="dv">2021</span>) <span class="sc">|&gt;</span></span>
-<span id="cb16-303"><a href="#cb16-303" aria-hidden="true" tabindex="-1"></a>    <span class="fu">pull</span>(term)</span>
-<span id="cb16-304"><a href="#cb16-304" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb16-305"><a href="#cb16-305" aria-hidden="true" tabindex="-1"></a>  pretrend_test_no2021 <span class="ot">&lt;-</span> <span class="cf">if</span> (<span class="fu">length</span>(pre_drop_2021) <span class="sc">&gt;</span> <span class="dv">0</span>) {</span>
-<span id="cb16-306"><a href="#cb16-306" aria-hidden="true" tabindex="-1"></a>    <span class="fu">tryCatch</span>(fixest<span class="sc">::</span><span class="fu">wald</span>(es, <span class="at">keep =</span> pre_drop_2021), <span class="at">error =</span> <span class="cf">function</span>(e) <span class="cn">NULL</span>)</span>
-<span id="cb16-307"><a href="#cb16-307" aria-hidden="true" tabindex="-1"></a>  } <span class="cf">else</span> <span class="cn">NULL</span></span>
-<span id="cb16-308"><a href="#cb16-308" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb16-309"><a href="#cb16-309" aria-hidden="true" tabindex="-1"></a>  pretrend_summary <span class="ot">&lt;-</span> <span class="fu">tibble</span>(</span>
-<span id="cb16-310"><a href="#cb16-310" aria-hidden="true" tabindex="-1"></a>    <span class="at">spec =</span> <span class="fu">c</span>(<span class="st">&quot;All pre-period leads&quot;</span>,</span>
-<span id="cb16-311"><a href="#cb16-311" aria-hidden="true" tabindex="-1"></a>             <span class="st">&quot;Excluding 2021 (SSM-contaminated)&quot;</span>),</span>
-<span id="cb16-312"><a href="#cb16-312" aria-hidden="true" tabindex="-1"></a>    <span class="at">f_stat   =</span> <span class="fu">c</span>(pretrend_test<span class="sc">$</span>stat       <span class="sc">%||%</span> <span class="cn">NA_real_</span>,</span>
-<span id="cb16-313"><a href="#cb16-313" aria-hidden="true" tabindex="-1"></a>                 pretrend_test_no2021<span class="sc">$</span>stat <span class="sc">%||%</span> <span class="cn">NA_real_</span>),</span>
-<span id="cb16-314"><a href="#cb16-314" aria-hidden="true" tabindex="-1"></a>    <span class="at">p_value  =</span> <span class="fu">c</span>(pretrend_test<span class="sc">$</span>p           <span class="sc">%||%</span> <span class="cn">NA_real_</span>,</span>
-<span id="cb16-315"><a href="#cb16-315" aria-hidden="true" tabindex="-1"></a>                 pretrend_test_no2021<span class="sc">$</span>p    <span class="sc">%||%</span> <span class="cn">NA_real_</span>)</span>
-<span id="cb16-316"><a href="#cb16-316" aria-hidden="true" tabindex="-1"></a>  )</span>
-<span id="cb16-317"><a href="#cb16-317" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb16-318"><a href="#cb16-318" aria-hidden="true" tabindex="-1"></a>  <span class="fu">pretty_kable</span>(pretrend_summary,</span>
-<span id="cb16-319"><a href="#cb16-319" aria-hidden="true" tabindex="-1"></a>               <span class="at">caption =</span> <span class="st">&quot;Joint F-test on pre-period event-study leads&quot;</span>,</span>
-<span id="cb16-320"><a href="#cb16-320" aria-hidden="true" tabindex="-1"></a>               <span class="at">digits =</span> <span class="dv">4</span>)</span>
-<span id="cb16-321"><a href="#cb16-321" aria-hidden="true" tabindex="-1"></a>} <span class="cf">else</span> {</span>
-<span id="cb16-322"><a href="#cb16-322" aria-hidden="true" tabindex="-1"></a>  <span class="fu">cat</span>(<span class="fu">sprintf</span>(</span>
-<span id="cb16-323"><a href="#cb16-323" aria-hidden="true" tabindex="-1"></a>    <span class="st">&quot;**Skipped.** Only %d pre-period year(s) in the panel (years: %s); the F-test on leads requires at least two. Re-run `prep.py` against additional CMS releases to populate this table.&quot;</span>,</span>
-<span id="cb16-324"><a href="#cb16-324" aria-hidden="true" tabindex="-1"></a>    n_pre, <span class="fu">paste</span>(pre_years, <span class="at">collapse =</span> <span class="st">&quot;, &quot;</span>)</span>
-<span id="cb16-325"><a href="#cb16-325" aria-hidden="true" tabindex="-1"></a>  ))</span>
-<span id="cb16-326"><a href="#cb16-326" aria-hidden="true" tabindex="-1"></a>}</span>
-<span id="cb16-327"><a href="#cb16-327" aria-hidden="true" tabindex="-1"></a><span class="in">```</span></span>
+<span id="cb16-288"><a href="#cb16-288" aria-hidden="true" tabindex="-1"></a>es_tidy <span class="ot">&lt;-</span> broom<span class="sc">::</span><span class="fu">tidy</span>(es, <span class="at">conf.int =</span> <span class="cn">TRUE</span>) <span class="sc">|&gt;</span></span>
+<span id="cb16-289"><a href="#cb16-289" aria-hidden="true" tabindex="-1"></a>  <span class="fu">filter</span>(<span class="fu">str_detect</span>(term, <span class="st">&quot;year_f::&quot;</span>)) <span class="sc">|&gt;</span></span>
+<span id="cb16-290"><a href="#cb16-290" aria-hidden="true" tabindex="-1"></a>  <span class="fu">mutate</span>(</span>
+<span id="cb16-291"><a href="#cb16-291" aria-hidden="true" tabindex="-1"></a>    <span class="at">year =</span> <span class="fu">as.integer</span>(<span class="fu">str_extract</span>(term, <span class="st">&quot;(?&lt;=year_f::)</span><span class="sc">\\</span><span class="st">d{4}&quot;</span>)),</span>
+<span id="cb16-292"><a href="#cb16-292" aria-hidden="true" tabindex="-1"></a>    <span class="at">period =</span> <span class="fu">if_else</span>(year <span class="sc">&lt;</span> TREAT_FIRST_YEAR, <span class="st">&quot;Pre&quot;</span>, <span class="st">&quot;Post&quot;</span>)</span>
+<span id="cb16-293"><a href="#cb16-293" aria-hidden="true" tabindex="-1"></a>  ) <span class="sc">|&gt;</span></span>
+<span id="cb16-294"><a href="#cb16-294" aria-hidden="true" tabindex="-1"></a>  <span class="fu">bind_rows</span>(<span class="fu">tibble</span>(</span>
+<span id="cb16-295"><a href="#cb16-295" aria-hidden="true" tabindex="-1"></a>    <span class="at">year =</span> TREAT_REF_YEAR, <span class="at">estimate =</span> <span class="dv">0</span>, <span class="at">conf.low =</span> <span class="dv">0</span>, <span class="at">conf.high =</span> <span class="dv">0</span>,</span>
+<span id="cb16-296"><a href="#cb16-296" aria-hidden="true" tabindex="-1"></a>    <span class="at">period =</span> <span class="st">&quot;Pre&quot;</span>, <span class="at">term =</span> <span class="st">&quot;reference&quot;</span></span>
+<span id="cb16-297"><a href="#cb16-297" aria-hidden="true" tabindex="-1"></a>  )) <span class="sc">|&gt;</span></span>
+<span id="cb16-298"><a href="#cb16-298" aria-hidden="true" tabindex="-1"></a>  <span class="fu">arrange</span>(year)</span>
+<span id="cb16-299"><a href="#cb16-299" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb16-300"><a href="#cb16-300" aria-hidden="true" tabindex="-1"></a><span class="fu">ggplot</span>(es_tidy, <span class="fu">aes</span>(year, estimate, <span class="at">colour =</span> period)) <span class="sc">+</span></span>
+<span id="cb16-301"><a href="#cb16-301" aria-hidden="true" tabindex="-1"></a>  <span class="fu">geom_hline</span>(<span class="at">yintercept =</span> <span class="dv">0</span>, <span class="at">colour =</span> <span class="st">&quot;grey50&quot;</span>) <span class="sc">+</span></span>
+<span id="cb16-302"><a href="#cb16-302" aria-hidden="true" tabindex="-1"></a>  <span class="fu">geom_vline</span>(<span class="at">xintercept =</span> TREAT_FIRST_YEAR <span class="sc">-</span> <span class="fl">0.5</span>,</span>
+<span id="cb16-303"><a href="#cb16-303" aria-hidden="true" tabindex="-1"></a>             <span class="at">colour =</span> <span class="st">&quot;grey50&quot;</span>, <span class="at">linetype =</span> <span class="st">&quot;dotted&quot;</span>) <span class="sc">+</span></span>
+<span id="cb16-304"><a href="#cb16-304" aria-hidden="true" tabindex="-1"></a>  <span class="fu">geom_pointrange</span>(<span class="fu">aes</span>(<span class="at">ymin =</span> conf.low, <span class="at">ymax =</span> conf.high), <span class="at">size =</span> <span class="fl">0.4</span>) <span class="sc">+</span></span>
+<span id="cb16-305"><a href="#cb16-305" aria-hidden="true" tabindex="-1"></a>  <span class="fu">geom_line</span>(<span class="fu">aes</span>(<span class="at">group =</span> <span class="dv">1</span>), <span class="at">linewidth =</span> <span class="fl">0.4</span>, <span class="at">alpha =</span> <span class="fl">0.6</span>) <span class="sc">+</span></span>
+<span id="cb16-306"><a href="#cb16-306" aria-hidden="true" tabindex="-1"></a>  <span class="fu">scale_x_continuous</span>(<span class="at">breaks =</span> <span class="fu">sort</span>(<span class="fu">unique</span>(es_tidy<span class="sc">$</span>year))) <span class="sc">+</span></span>
+<span id="cb16-307"><a href="#cb16-307" aria-hidden="true" tabindex="-1"></a>  <span class="fu">scale_colour_manual</span>(<span class="at">values =</span> <span class="fu">c</span>(<span class="at">Pre =</span> <span class="st">&quot;#666666&quot;</span>, <span class="at">Post =</span> <span class="st">&quot;#0d5c63&quot;</span>)) <span class="sc">+</span></span>
+<span id="cb16-308"><a href="#cb16-308" aria-hidden="true" tabindex="-1"></a>  <span class="fu">labs</span>(</span>
+<span id="cb16-309"><a href="#cb16-309" aria-hidden="true" tabindex="-1"></a>    <span class="at">title    =</span> <span class="st">&quot;Event-study coefficients on log(30-day fills)&quot;</span>,</span>
+<span id="cb16-310"><a href="#cb16-310" aria-hidden="true" tabindex="-1"></a>    <span class="at">subtitle =</span> <span class="fu">sprintf</span>(<span class="st">&quot;Reference year %d; vertical line marks the IRA cap effective date&quot;</span>,</span>
+<span id="cb16-311"><a href="#cb16-311" aria-hidden="true" tabindex="-1"></a>                       TREAT_REF_YEAR),</span>
+<span id="cb16-312"><a href="#cb16-312" aria-hidden="true" tabindex="-1"></a>    <span class="at">x =</span> <span class="cn">NULL</span>, <span class="at">y =</span> <span class="st">&quot;Treated x year coefficient (95% CI)&quot;</span>,</span>
+<span id="cb16-313"><a href="#cb16-313" aria-hidden="true" tabindex="-1"></a>    <span class="at">colour =</span> <span class="cn">NULL</span></span>
+<span id="cb16-314"><a href="#cb16-314" aria-hidden="true" tabindex="-1"></a>  )</span>
+<span id="cb16-315"><a href="#cb16-315" aria-hidden="true" tabindex="-1"></a><span class="in">```</span></span>
+<span id="cb16-316"><a href="#cb16-316" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb16-317"><a href="#cb16-317" aria-hidden="true" tabindex="-1"></a><span class="fu">## Parallel-trends F-test</span></span>
+<span id="cb16-318"><a href="#cb16-318" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb16-319"><a href="#cb16-319" aria-hidden="true" tabindex="-1"></a>::: {.callout-note}</span>
+<span id="cb16-320"><a href="#cb16-320" aria-hidden="true" tabindex="-1"></a><span class="fu">## Why the parallel-trends F-test, and why a non-rejection isn&#39;t proof</span></span>
+<span id="cb16-321"><a href="#cb16-321" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb16-322"><a href="#cb16-322" aria-hidden="true" tabindex="-1"></a>The event-study plot is a visual check; the F-test is the formal statement. A **joint Wald F-test** asks whether *all the pre-period coefficients are jointly equal to zero.* If we cannot reject that joint null, the data are at least consistent with parallel trends. If we *do* reject — meaning at least one pre-period coefficient is reliably different from zero — the parallel-trends assumption has measurable violations, and the post-period DiD coefficient is no longer a clean treatment effect.</span>
+<span id="cb16-323"><a href="#cb16-323" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb16-324"><a href="#cb16-324" aria-hidden="true" tabindex="-1"></a>Two important asymmetries in how to read this test:</span>
+<span id="cb16-325"><a href="#cb16-325" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb16-326"><a href="#cb16-326" aria-hidden="true" tabindex="-1"></a><span class="ss">1. </span>**A non-rejection ($p &gt; 0.05$) does not prove parallel trends.** It only fails to falsify them. Underpowered designs with few pre-period years and noisy outcomes will fail to reject *any* null. A small number of pre-period coefficients (this smoke test has only one) makes the test almost guaranteed to fail to reject — which is why we explicitly note when the test is statistically meaningful and when it is essentially uninformative.</span>
+<span id="cb16-327"><a href="#cb16-327" aria-hidden="true" tabindex="-1"></a><span class="ss">2. </span>**A rejection ($p &lt; 0.05$) is fatal in a way that&#39;s hard to fix.** You can sometimes argue the design is still valid (e.g., if the violation is in a single drug you can drop it via leave-one-out), but the burden of proof shifts to the analyst. Many published DiD papers fail at exactly this check, which is why this section is run *before* anyone is allowed to interpret the post-period coefficient.</span>
 <span id="cb16-328"><a href="#cb16-328" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb16-329"><a href="#cb16-329" aria-hidden="true" tabindex="-1"></a><span class="fu">## Placebo cap years</span></span>
-<span id="cb16-330"><a href="#cb16-330" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb16-331"><a href="#cb16-331" aria-hidden="true" tabindex="-1"></a>If a &quot;treatment effect&quot; of similar magnitude appears at fake cap dates inside the pre-period, the design fails. The two natural placebos are 2020 (no policy change in either group) and 2021 (SSM kickoff — a *real* partial treatment, so a non-zero coefficient here is the design working, not failing).</span>
-<span id="cb16-332"><a href="#cb16-332" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb16-333"><a href="#cb16-333" aria-hidden="true" tabindex="-1"></a><span class="in">```{r placebos}</span></span>
-<span id="cb16-334"><a href="#cb16-334" aria-hidden="true" tabindex="-1"></a>placebo_fit <span class="ot">&lt;-</span> <span class="cf">function</span>(fake_year) {</span>
-<span id="cb16-335"><a href="#cb16-335" aria-hidden="true" tabindex="-1"></a>  d <span class="ot">&lt;-</span> panel <span class="sc">|&gt;</span></span>
-<span id="cb16-336"><a href="#cb16-336" aria-hidden="true" tabindex="-1"></a>    <span class="fu">filter</span>(year <span class="sc">&lt;</span> TREAT_FIRST_YEAR) <span class="sc">|&gt;</span></span>
-<span id="cb16-337"><a href="#cb16-337" aria-hidden="true" tabindex="-1"></a>    <span class="fu">mutate</span>(<span class="at">post =</span> <span class="fu">as.integer</span>(year <span class="sc">&gt;=</span> fake_year),</span>
-<span id="cb16-338"><a href="#cb16-338" aria-hidden="true" tabindex="-1"></a>           <span class="at">treated_post =</span> treated <span class="sc">*</span> post)</span>
-<span id="cb16-339"><a href="#cb16-339" aria-hidden="true" tabindex="-1"></a>  <span class="fu">feols</span>(log_fills <span class="sc">~</span> treated_post <span class="sc">|</span> gnrc_name <span class="sc">+</span> year, <span class="at">data =</span> d, <span class="at">cluster =</span> <span class="sc">~</span>gnrc_name)</span>
-<span id="cb16-340"><a href="#cb16-340" aria-hidden="true" tabindex="-1"></a>}</span>
-<span id="cb16-341"><a href="#cb16-341" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb16-342"><a href="#cb16-342" aria-hidden="true" tabindex="-1"></a><span class="co"># A placebo only identifies anything if there is at least one pre-fake-year</span></span>
-<span id="cb16-343"><a href="#cb16-343" aria-hidden="true" tabindex="-1"></a><span class="co"># AND one post-fake-year inside the pre-IRA window — i.e., at least three</span></span>
-<span id="cb16-344"><a href="#cb16-344" aria-hidden="true" tabindex="-1"></a><span class="co"># pre-2023 calendar years in the panel.</span></span>
-<span id="cb16-345"><a href="#cb16-345" aria-hidden="true" tabindex="-1"></a>candidate_placebos <span class="ot">&lt;-</span> <span class="fu">c</span>(<span class="dv">2020</span>, <span class="dv">2021</span>)</span>
-<span id="cb16-346"><a href="#cb16-346" aria-hidden="true" tabindex="-1"></a>feasible_placebos <span class="ot">&lt;-</span> candidate_placebos[</span>
-<span id="cb16-347"><a href="#cb16-347" aria-hidden="true" tabindex="-1"></a>  <span class="fu">vapply</span>(candidate_placebos, <span class="cf">function</span>(fy) {</span>
-<span id="cb16-348"><a href="#cb16-348" aria-hidden="true" tabindex="-1"></a>    pre_only <span class="ot">&lt;-</span> panel <span class="sc">|&gt;</span> <span class="fu">filter</span>(year <span class="sc">&lt;</span> TREAT_FIRST_YEAR)</span>
-<span id="cb16-349"><a href="#cb16-349" aria-hidden="true" tabindex="-1"></a>    <span class="fu">any</span>(pre_only<span class="sc">$</span>year <span class="sc">&lt;</span> fy) <span class="sc">&amp;&amp;</span> <span class="fu">any</span>(pre_only<span class="sc">$</span>year <span class="sc">&gt;=</span> fy)</span>
-<span id="cb16-350"><a href="#cb16-350" aria-hidden="true" tabindex="-1"></a>  }, <span class="fu">logical</span>(<span class="dv">1</span>))</span>
-<span id="cb16-351"><a href="#cb16-351" aria-hidden="true" tabindex="-1"></a>]</span>
+<span id="cb16-329"><a href="#cb16-329" aria-hidden="true" tabindex="-1"></a>We run the F-test twice: once on all pre-period leads, and once dropping 2021 (which is partially treated by the CMS Senior Savings Model and therefore would be expected to deviate from zero even under valid parallel trends). The second test is the cleaner check.</span>
+<span id="cb16-330"><a href="#cb16-330" aria-hidden="true" tabindex="-1"></a>:::</span>
+<span id="cb16-331"><a href="#cb16-331" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb16-332"><a href="#cb16-332" aria-hidden="true" tabindex="-1"></a><span class="in">```{r pretrends-f}</span></span>
+<span id="cb16-333"><a href="#cb16-333" aria-hidden="true" tabindex="-1"></a>pre_years <span class="ot">&lt;-</span> panel <span class="sc">|&gt;</span> <span class="fu">filter</span>(year <span class="sc">&lt;</span> TREAT_FIRST_YEAR) <span class="sc">|&gt;</span> <span class="fu">distinct</span>(year) <span class="sc">|&gt;</span> <span class="fu">pull</span>(year)</span>
+<span id="cb16-334"><a href="#cb16-334" aria-hidden="true" tabindex="-1"></a>n_pre <span class="ot">&lt;-</span> <span class="fu">length</span>(pre_years)</span>
+<span id="cb16-335"><a href="#cb16-335" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb16-336"><a href="#cb16-336" aria-hidden="true" tabindex="-1"></a><span class="cf">if</span> (n_pre <span class="sc">&gt;=</span> <span class="dv">2</span>) {</span>
+<span id="cb16-337"><a href="#cb16-337" aria-hidden="true" tabindex="-1"></a>  pre_terms <span class="ot">&lt;-</span> es_tidy <span class="sc">|&gt;</span></span>
+<span id="cb16-338"><a href="#cb16-338" aria-hidden="true" tabindex="-1"></a>    <span class="fu">filter</span>(period <span class="sc">==</span> <span class="st">&quot;Pre&quot;</span>, year <span class="sc">!=</span> TREAT_REF_YEAR) <span class="sc">|&gt;</span></span>
+<span id="cb16-339"><a href="#cb16-339" aria-hidden="true" tabindex="-1"></a>    <span class="fu">pull</span>(term)</span>
+<span id="cb16-340"><a href="#cb16-340" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb16-341"><a href="#cb16-341" aria-hidden="true" tabindex="-1"></a>  <span class="co"># Joint Wald test that all pre-period leads are zero. A non-rejection</span></span>
+<span id="cb16-342"><a href="#cb16-342" aria-hidden="true" tabindex="-1"></a>  <span class="co"># (p &gt; 0.05 conventionally) is the formal version of &quot;the pre-trends look</span></span>
+<span id="cb16-343"><a href="#cb16-343" aria-hidden="true" tabindex="-1"></a>  <span class="co"># parallel&quot;. 2021 sits in this window only with at least four pre years.</span></span>
+<span id="cb16-344"><a href="#cb16-344" aria-hidden="true" tabindex="-1"></a>  pretrend_test <span class="ot">&lt;-</span> <span class="fu">tryCatch</span>(</span>
+<span id="cb16-345"><a href="#cb16-345" aria-hidden="true" tabindex="-1"></a>    fixest<span class="sc">::</span><span class="fu">wald</span>(es, <span class="at">keep =</span> pre_terms),</span>
+<span id="cb16-346"><a href="#cb16-346" aria-hidden="true" tabindex="-1"></a>    <span class="at">error =</span> <span class="cf">function</span>(e) <span class="cn">NULL</span></span>
+<span id="cb16-347"><a href="#cb16-347" aria-hidden="true" tabindex="-1"></a>  )</span>
+<span id="cb16-348"><a href="#cb16-348" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb16-349"><a href="#cb16-349" aria-hidden="true" tabindex="-1"></a>  pre_drop_2021 <span class="ot">&lt;-</span> es_tidy <span class="sc">|&gt;</span></span>
+<span id="cb16-350"><a href="#cb16-350" aria-hidden="true" tabindex="-1"></a>    <span class="fu">filter</span>(period <span class="sc">==</span> <span class="st">&quot;Pre&quot;</span>, year <span class="sc">!=</span> TREAT_REF_YEAR, year <span class="sc">!=</span> <span class="dv">2021</span>) <span class="sc">|&gt;</span></span>
+<span id="cb16-351"><a href="#cb16-351" aria-hidden="true" tabindex="-1"></a>    <span class="fu">pull</span>(term)</span>
 <span id="cb16-352"><a href="#cb16-352" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb16-353"><a href="#cb16-353" aria-hidden="true" tabindex="-1"></a><span class="cf">if</span> (<span class="fu">length</span>(feasible_placebos) <span class="sc">&gt;</span> <span class="dv">0</span>) {</span>
-<span id="cb16-354"><a href="#cb16-354" aria-hidden="true" tabindex="-1"></a>  placebo_table <span class="ot">&lt;-</span> purrr<span class="sc">::</span><span class="fu">map_dfr</span>(feasible_placebos, <span class="cf">function</span>(fy) {</span>
-<span id="cb16-355"><a href="#cb16-355" aria-hidden="true" tabindex="-1"></a>    <span class="fu">tidy</span>(<span class="fu">placebo_fit</span>(fy), <span class="at">conf.int =</span> <span class="cn">TRUE</span>) <span class="sc">|&gt;</span></span>
-<span id="cb16-356"><a href="#cb16-356" aria-hidden="true" tabindex="-1"></a>      <span class="fu">filter</span>(term <span class="sc">==</span> <span class="st">&quot;treated_post&quot;</span>) <span class="sc">|&gt;</span></span>
-<span id="cb16-357"><a href="#cb16-357" aria-hidden="true" tabindex="-1"></a>      <span class="fu">mutate</span>(<span class="at">fake_cap_year =</span> fy)</span>
-<span id="cb16-358"><a href="#cb16-358" aria-hidden="true" tabindex="-1"></a>  }) <span class="sc">|&gt;</span></span>
-<span id="cb16-359"><a href="#cb16-359" aria-hidden="true" tabindex="-1"></a>    <span class="fu">transmute</span>(fake_cap_year, estimate, std.error, conf.low, conf.high, <span class="at">p_value =</span> p.value)</span>
-<span id="cb16-360"><a href="#cb16-360" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb16-361"><a href="#cb16-361" aria-hidden="true" tabindex="-1"></a>  <span class="fu">pretty_kable</span>(</span>
-<span id="cb16-362"><a href="#cb16-362" aria-hidden="true" tabindex="-1"></a>    placebo_table,</span>
-<span id="cb16-363"><a href="#cb16-363" aria-hidden="true" tabindex="-1"></a>    <span class="at">caption =</span> <span class="st">&quot;Placebo DiDs at fake cap years (sample restricted to pre-2023)&quot;</span>,</span>
-<span id="cb16-364"><a href="#cb16-364" aria-hidden="true" tabindex="-1"></a>    <span class="at">digits =</span> <span class="dv">4</span></span>
-<span id="cb16-365"><a href="#cb16-365" aria-hidden="true" tabindex="-1"></a>  )</span>
-<span id="cb16-366"><a href="#cb16-366" aria-hidden="true" tabindex="-1"></a>} <span class="cf">else</span> {</span>
-<span id="cb16-367"><a href="#cb16-367" aria-hidden="true" tabindex="-1"></a>  <span class="fu">cat</span>(<span class="fu">sprintf</span>(</span>
-<span id="cb16-368"><a href="#cb16-368" aria-hidden="true" tabindex="-1"></a>    <span class="st">&quot;**Skipped.** Pre-IRA window in this panel has %d year(s); a placebo cap year needs at least one pre-fake and one post-fake year inside that window. Re-run `prep.py` against earlier CMS releases (DY2019-DY2021) to populate this table.&quot;</span>,</span>
-<span id="cb16-369"><a href="#cb16-369" aria-hidden="true" tabindex="-1"></a>    panel <span class="sc">|&gt;</span> <span class="fu">filter</span>(year <span class="sc">&lt;</span> TREAT_FIRST_YEAR) <span class="sc">|&gt;</span> <span class="fu">distinct</span>(year) <span class="sc">|&gt;</span> <span class="fu">nrow</span>()</span>
-<span id="cb16-370"><a href="#cb16-370" aria-hidden="true" tabindex="-1"></a>  ))</span>
-<span id="cb16-371"><a href="#cb16-371" aria-hidden="true" tabindex="-1"></a>}</span>
-<span id="cb16-372"><a href="#cb16-372" aria-hidden="true" tabindex="-1"></a><span class="in">```</span></span>
-<span id="cb16-373"><a href="#cb16-373" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb16-374"><a href="#cb16-374" aria-hidden="true" tabindex="-1"></a><span class="fu">## Robustness</span></span>
-<span id="cb16-375"><a href="#cb16-375" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb16-376"><a href="#cb16-376" aria-hidden="true" tabindex="-1"></a><span class="fu">### Drop GLP-1 RAs from the control group</span></span>
-<span id="cb16-377"><a href="#cb16-377" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb16-378"><a href="#cb16-378" aria-hidden="true" tabindex="-1"></a>Semaglutide and tirzepatide saw large 2022–2024 demand growth that is unrelated to the insulin cap and could distort the comparator average if it shows up as control-group growth. Re-estimate without GLP-1 RAs.</span>
-<span id="cb16-379"><a href="#cb16-379" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb16-380"><a href="#cb16-380" aria-hidden="true" tabindex="-1"></a><span class="in">```{r loo-glp1}</span></span>
-<span id="cb16-381"><a href="#cb16-381" aria-hidden="true" tabindex="-1"></a>m_no_glp1 <span class="ot">&lt;-</span> <span class="fu">feols</span>(</span>
-<span id="cb16-382"><a href="#cb16-382" aria-hidden="true" tabindex="-1"></a>  log_fills <span class="sc">~</span> treated_post <span class="sc">|</span> gnrc_name <span class="sc">+</span> year,</span>
-<span id="cb16-383"><a href="#cb16-383" aria-hidden="true" tabindex="-1"></a>  <span class="at">data    =</span> panel <span class="sc">|&gt;</span> <span class="fu">filter</span>(drug_class <span class="sc">!=</span> <span class="st">&quot;GLP-1 receptor agonist&quot;</span>),</span>
-<span id="cb16-384"><a href="#cb16-384" aria-hidden="true" tabindex="-1"></a>  <span class="at">cluster =</span> <span class="sc">~</span>gnrc_name</span>
-<span id="cb16-385"><a href="#cb16-385" aria-hidden="true" tabindex="-1"></a>)</span>
-<span id="cb16-386"><a href="#cb16-386" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb16-387"><a href="#cb16-387" aria-hidden="true" tabindex="-1"></a><span class="fu">bind_rows</span>(</span>
-<span id="cb16-388"><a href="#cb16-388" aria-hidden="true" tabindex="-1"></a>  <span class="fu">tidy</span>(m_fills,   <span class="at">conf.int =</span> <span class="cn">TRUE</span>) <span class="sc">|&gt;</span> <span class="fu">mutate</span>(<span class="at">spec =</span> <span class="st">&quot;Primary (all controls)&quot;</span>),</span>
-<span id="cb16-389"><a href="#cb16-389" aria-hidden="true" tabindex="-1"></a>  <span class="fu">tidy</span>(m_no_glp1, <span class="at">conf.int =</span> <span class="cn">TRUE</span>) <span class="sc">|&gt;</span> <span class="fu">mutate</span>(<span class="at">spec =</span> <span class="st">&quot;Drop GLP-1 RAs from controls&quot;</span>)</span>
-<span id="cb16-390"><a href="#cb16-390" aria-hidden="true" tabindex="-1"></a>) <span class="sc">|&gt;</span></span>
-<span id="cb16-391"><a href="#cb16-391" aria-hidden="true" tabindex="-1"></a>  <span class="fu">filter</span>(term <span class="sc">==</span> <span class="st">&quot;treated_post&quot;</span>) <span class="sc">|&gt;</span></span>
-<span id="cb16-392"><a href="#cb16-392" aria-hidden="true" tabindex="-1"></a>  <span class="fu">transmute</span>(spec, estimate, std.error, conf.low, conf.high, <span class="at">p_value =</span> p.value) <span class="sc">|&gt;</span></span>
-<span id="cb16-393"><a href="#cb16-393" aria-hidden="true" tabindex="-1"></a>  <span class="fu">pretty_kable</span>(<span class="at">caption =</span> <span class="st">&quot;Sensitivity to comparator composition&quot;</span>, <span class="at">digits =</span> <span class="dv">4</span>)</span>
-<span id="cb16-394"><a href="#cb16-394" aria-hidden="true" tabindex="-1"></a><span class="in">```</span></span>
-<span id="cb16-395"><a href="#cb16-395" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb16-396"><a href="#cb16-396" aria-hidden="true" tabindex="-1"></a><span class="fu">### Leave-one-out by treated drug</span></span>
-<span id="cb16-397"><a href="#cb16-397" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb16-398"><a href="#cb16-398" aria-hidden="true" tabindex="-1"></a><span class="in">```{r loo-treated}</span></span>
-<span id="cb16-399"><a href="#cb16-399" aria-hidden="true" tabindex="-1"></a>treated_drugs <span class="ot">&lt;-</span> panel <span class="sc">|&gt;</span> <span class="fu">filter</span>(treated <span class="sc">==</span> <span class="dv">1</span>) <span class="sc">|&gt;</span> <span class="fu">distinct</span>(gnrc_name) <span class="sc">|&gt;</span> <span class="fu">pull</span>()</span>
+<span id="cb16-353"><a href="#cb16-353" aria-hidden="true" tabindex="-1"></a>  pretrend_test_no2021 <span class="ot">&lt;-</span> <span class="cf">if</span> (<span class="fu">length</span>(pre_drop_2021) <span class="sc">&gt;</span> <span class="dv">0</span>) {</span>
+<span id="cb16-354"><a href="#cb16-354" aria-hidden="true" tabindex="-1"></a>    <span class="fu">tryCatch</span>(fixest<span class="sc">::</span><span class="fu">wald</span>(es, <span class="at">keep =</span> pre_drop_2021), <span class="at">error =</span> <span class="cf">function</span>(e) <span class="cn">NULL</span>)</span>
+<span id="cb16-355"><a href="#cb16-355" aria-hidden="true" tabindex="-1"></a>  } <span class="cf">else</span> <span class="cn">NULL</span></span>
+<span id="cb16-356"><a href="#cb16-356" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb16-357"><a href="#cb16-357" aria-hidden="true" tabindex="-1"></a>  pretrend_summary <span class="ot">&lt;-</span> <span class="fu">tibble</span>(</span>
+<span id="cb16-358"><a href="#cb16-358" aria-hidden="true" tabindex="-1"></a>    <span class="at">spec =</span> <span class="fu">c</span>(<span class="st">&quot;All pre-period leads&quot;</span>,</span>
+<span id="cb16-359"><a href="#cb16-359" aria-hidden="true" tabindex="-1"></a>             <span class="st">&quot;Excluding 2021 (SSM-contaminated)&quot;</span>),</span>
+<span id="cb16-360"><a href="#cb16-360" aria-hidden="true" tabindex="-1"></a>    <span class="at">f_stat   =</span> <span class="fu">c</span>(pretrend_test<span class="sc">$</span>stat       <span class="sc">%||%</span> <span class="cn">NA_real_</span>,</span>
+<span id="cb16-361"><a href="#cb16-361" aria-hidden="true" tabindex="-1"></a>                 pretrend_test_no2021<span class="sc">$</span>stat <span class="sc">%||%</span> <span class="cn">NA_real_</span>),</span>
+<span id="cb16-362"><a href="#cb16-362" aria-hidden="true" tabindex="-1"></a>    <span class="at">p_value  =</span> <span class="fu">c</span>(pretrend_test<span class="sc">$</span>p           <span class="sc">%||%</span> <span class="cn">NA_real_</span>,</span>
+<span id="cb16-363"><a href="#cb16-363" aria-hidden="true" tabindex="-1"></a>                 pretrend_test_no2021<span class="sc">$</span>p    <span class="sc">%||%</span> <span class="cn">NA_real_</span>)</span>
+<span id="cb16-364"><a href="#cb16-364" aria-hidden="true" tabindex="-1"></a>  )</span>
+<span id="cb16-365"><a href="#cb16-365" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb16-366"><a href="#cb16-366" aria-hidden="true" tabindex="-1"></a>  <span class="fu">pretty_kable</span>(pretrend_summary,</span>
+<span id="cb16-367"><a href="#cb16-367" aria-hidden="true" tabindex="-1"></a>               <span class="at">caption =</span> <span class="st">&quot;Joint F-test on pre-period event-study leads&quot;</span>,</span>
+<span id="cb16-368"><a href="#cb16-368" aria-hidden="true" tabindex="-1"></a>               <span class="at">digits =</span> <span class="dv">4</span>)</span>
+<span id="cb16-369"><a href="#cb16-369" aria-hidden="true" tabindex="-1"></a>} <span class="cf">else</span> {</span>
+<span id="cb16-370"><a href="#cb16-370" aria-hidden="true" tabindex="-1"></a>  <span class="fu">cat</span>(<span class="fu">sprintf</span>(</span>
+<span id="cb16-371"><a href="#cb16-371" aria-hidden="true" tabindex="-1"></a>    <span class="st">&quot;**Skipped.** Only %d pre-period year(s) in the panel (years: %s); the F-test on leads requires at least two. Re-run `prep.py` against additional CMS releases to populate this table.&quot;</span>,</span>
+<span id="cb16-372"><a href="#cb16-372" aria-hidden="true" tabindex="-1"></a>    n_pre, <span class="fu">paste</span>(pre_years, <span class="at">collapse =</span> <span class="st">&quot;, &quot;</span>)</span>
+<span id="cb16-373"><a href="#cb16-373" aria-hidden="true" tabindex="-1"></a>  ))</span>
+<span id="cb16-374"><a href="#cb16-374" aria-hidden="true" tabindex="-1"></a>}</span>
+<span id="cb16-375"><a href="#cb16-375" aria-hidden="true" tabindex="-1"></a><span class="in">```</span></span>
+<span id="cb16-376"><a href="#cb16-376" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb16-377"><a href="#cb16-377" aria-hidden="true" tabindex="-1"></a><span class="fu">## Placebo cap years</span></span>
+<span id="cb16-378"><a href="#cb16-378" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb16-379"><a href="#cb16-379" aria-hidden="true" tabindex="-1"></a>::: {.callout-note}</span>
+<span id="cb16-380"><a href="#cb16-380" aria-hidden="true" tabindex="-1"></a><span class="fu">## Why placebos earn their place by trying to break the design</span></span>
+<span id="cb16-381"><a href="#cb16-381" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb16-382"><a href="#cb16-382" aria-hidden="true" tabindex="-1"></a>A **placebo test** asks the most adversarial question we can ask of the design: *what if I pretend the cap took effect in a year when no policy actually changed?* If we re-run the same DiD with a fake cap date inside the pre-IRA window and the estimator obediently produces a &quot;treatment effect&quot; of similar magnitude, the design is detecting random noise that pre-existed the real policy — and the actual 2023 coefficient is not credibly the effect of the cap. If the placebo coefficient is near zero, the design is at least not fooled by random fluctuation.</span>
+<span id="cb16-383"><a href="#cb16-383" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb16-384"><a href="#cb16-384" aria-hidden="true" tabindex="-1"></a>There are two kinds of placebo dates worth running:</span>
+<span id="cb16-385"><a href="#cb16-385" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb16-386"><a href="#cb16-386" aria-hidden="true" tabindex="-1"></a><span class="ss">1. </span>**Pure placebos** — fake cap years when nothing actually changed. 2020 is the cleanest example here: no insulin-specific policy, no insulin demand shock that we know of. A near-zero placebo coefficient at 2020 is reassurance that the design isn&#39;t picking up phantom trends.</span>
+<span id="cb16-387"><a href="#cb16-387" aria-hidden="true" tabindex="-1"></a><span class="ss">2. </span>**Known partial-treatment placebos** — years when a real but smaller policy was in effect. **2021 is a *partial-treatment* placebo, not a pure one**: the CMS Senior Savings Model demonstration extended a $35 insulin cap to participating MA-PD plans starting 2021-01-01. So a non-zero 2021 placebo is the design *correctly detecting* a known smaller version of the same intervention — evidence the estimator works, not evidence it&#39;s broken.</span>
+<span id="cb16-388"><a href="#cb16-388" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb16-389"><a href="#cb16-389" aria-hidden="true" tabindex="-1"></a>Reading the table below: a near-zero 2020 coefficient is good news; a positive 2021 coefficient (if estimable in the panel) tells the SSM story. Either an unexpectedly large 2020 or an unexpectedly *negative* 2021 would be a red flag. (Athey &amp; Imbens 2017)</span>
+<span id="cb16-390"><a href="#cb16-390" aria-hidden="true" tabindex="-1"></a>:::</span>
+<span id="cb16-391"><a href="#cb16-391" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb16-392"><a href="#cb16-392" aria-hidden="true" tabindex="-1"></a><span class="in">```{r placebos}</span></span>
+<span id="cb16-393"><a href="#cb16-393" aria-hidden="true" tabindex="-1"></a>placebo_fit <span class="ot">&lt;-</span> <span class="cf">function</span>(fake_year) {</span>
+<span id="cb16-394"><a href="#cb16-394" aria-hidden="true" tabindex="-1"></a>  d <span class="ot">&lt;-</span> panel <span class="sc">|&gt;</span></span>
+<span id="cb16-395"><a href="#cb16-395" aria-hidden="true" tabindex="-1"></a>    <span class="fu">filter</span>(year <span class="sc">&lt;</span> TREAT_FIRST_YEAR) <span class="sc">|&gt;</span></span>
+<span id="cb16-396"><a href="#cb16-396" aria-hidden="true" tabindex="-1"></a>    <span class="fu">mutate</span>(<span class="at">post =</span> <span class="fu">as.integer</span>(year <span class="sc">&gt;=</span> fake_year),</span>
+<span id="cb16-397"><a href="#cb16-397" aria-hidden="true" tabindex="-1"></a>           <span class="at">treated_post =</span> treated <span class="sc">*</span> post)</span>
+<span id="cb16-398"><a href="#cb16-398" aria-hidden="true" tabindex="-1"></a>  <span class="fu">feols</span>(log_fills <span class="sc">~</span> treated_post <span class="sc">|</span> gnrc_name <span class="sc">+</span> year, <span class="at">data =</span> d, <span class="at">cluster =</span> <span class="sc">~</span>gnrc_name)</span>
+<span id="cb16-399"><a href="#cb16-399" aria-hidden="true" tabindex="-1"></a>}</span>
 <span id="cb16-400"><a href="#cb16-400" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb16-401"><a href="#cb16-401" aria-hidden="true" tabindex="-1"></a>loo <span class="ot">&lt;-</span> purrr<span class="sc">::</span><span class="fu">map_dfr</span>(treated_drugs, <span class="cf">function</span>(g) {</span>
-<span id="cb16-402"><a href="#cb16-402" aria-hidden="true" tabindex="-1"></a>  fit <span class="ot">&lt;-</span> <span class="fu">feols</span>(</span>
-<span id="cb16-403"><a href="#cb16-403" aria-hidden="true" tabindex="-1"></a>    log_fills <span class="sc">~</span> treated_post <span class="sc">|</span> gnrc_name <span class="sc">+</span> year,</span>
-<span id="cb16-404"><a href="#cb16-404" aria-hidden="true" tabindex="-1"></a>    <span class="at">data    =</span> panel <span class="sc">|&gt;</span> <span class="fu">filter</span>(gnrc_name <span class="sc">!=</span> g),</span>
-<span id="cb16-405"><a href="#cb16-405" aria-hidden="true" tabindex="-1"></a>    <span class="at">cluster =</span> <span class="sc">~</span>gnrc_name</span>
-<span id="cb16-406"><a href="#cb16-406" aria-hidden="true" tabindex="-1"></a>  )</span>
-<span id="cb16-407"><a href="#cb16-407" aria-hidden="true" tabindex="-1"></a>  <span class="fu">tidy</span>(fit, <span class="at">conf.int =</span> <span class="cn">TRUE</span>) <span class="sc">|&gt;</span></span>
-<span id="cb16-408"><a href="#cb16-408" aria-hidden="true" tabindex="-1"></a>    <span class="fu">filter</span>(term <span class="sc">==</span> <span class="st">&quot;treated_post&quot;</span>) <span class="sc">|&gt;</span></span>
-<span id="cb16-409"><a href="#cb16-409" aria-hidden="true" tabindex="-1"></a>    <span class="fu">transmute</span>(<span class="at">dropped =</span> g, estimate, conf.low, conf.high)</span>
-<span id="cb16-410"><a href="#cb16-410" aria-hidden="true" tabindex="-1"></a>})</span>
+<span id="cb16-401"><a href="#cb16-401" aria-hidden="true" tabindex="-1"></a><span class="co"># A placebo only identifies anything if there is at least one pre-fake-year</span></span>
+<span id="cb16-402"><a href="#cb16-402" aria-hidden="true" tabindex="-1"></a><span class="co"># AND one post-fake-year inside the pre-IRA window — i.e., at least three</span></span>
+<span id="cb16-403"><a href="#cb16-403" aria-hidden="true" tabindex="-1"></a><span class="co"># pre-2023 calendar years in the panel.</span></span>
+<span id="cb16-404"><a href="#cb16-404" aria-hidden="true" tabindex="-1"></a>candidate_placebos <span class="ot">&lt;-</span> <span class="fu">c</span>(<span class="dv">2020</span>, <span class="dv">2021</span>)</span>
+<span id="cb16-405"><a href="#cb16-405" aria-hidden="true" tabindex="-1"></a>feasible_placebos <span class="ot">&lt;-</span> candidate_placebos[</span>
+<span id="cb16-406"><a href="#cb16-406" aria-hidden="true" tabindex="-1"></a>  <span class="fu">vapply</span>(candidate_placebos, <span class="cf">function</span>(fy) {</span>
+<span id="cb16-407"><a href="#cb16-407" aria-hidden="true" tabindex="-1"></a>    pre_only <span class="ot">&lt;-</span> panel <span class="sc">|&gt;</span> <span class="fu">filter</span>(year <span class="sc">&lt;</span> TREAT_FIRST_YEAR)</span>
+<span id="cb16-408"><a href="#cb16-408" aria-hidden="true" tabindex="-1"></a>    <span class="fu">any</span>(pre_only<span class="sc">$</span>year <span class="sc">&lt;</span> fy) <span class="sc">&amp;&amp;</span> <span class="fu">any</span>(pre_only<span class="sc">$</span>year <span class="sc">&gt;=</span> fy)</span>
+<span id="cb16-409"><a href="#cb16-409" aria-hidden="true" tabindex="-1"></a>  }, <span class="fu">logical</span>(<span class="dv">1</span>))</span>
+<span id="cb16-410"><a href="#cb16-410" aria-hidden="true" tabindex="-1"></a>]</span>
 <span id="cb16-411"><a href="#cb16-411" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb16-412"><a href="#cb16-412" aria-hidden="true" tabindex="-1"></a><span class="fu">ggplot</span>(loo, <span class="fu">aes</span>(<span class="fu">reorder</span>(dropped, estimate), estimate)) <span class="sc">+</span></span>
-<span id="cb16-413"><a href="#cb16-413" aria-hidden="true" tabindex="-1"></a>  <span class="fu">geom_hline</span>(<span class="at">yintercept =</span> <span class="fu">coef</span>(m_fills)[[<span class="st">&quot;treated_post&quot;</span>]],</span>
-<span id="cb16-414"><a href="#cb16-414" aria-hidden="true" tabindex="-1"></a>             <span class="at">colour =</span> <span class="st">&quot;#0d5c63&quot;</span>, <span class="at">linetype =</span> <span class="st">&quot;dashed&quot;</span>) <span class="sc">+</span></span>
-<span id="cb16-415"><a href="#cb16-415" aria-hidden="true" tabindex="-1"></a>  <span class="fu">geom_pointrange</span>(<span class="fu">aes</span>(<span class="at">ymin =</span> conf.low, <span class="at">ymax =</span> conf.high), <span class="at">size =</span> <span class="fl">0.3</span>) <span class="sc">+</span></span>
-<span id="cb16-416"><a href="#cb16-416" aria-hidden="true" tabindex="-1"></a>  <span class="fu">coord_flip</span>() <span class="sc">+</span></span>
-<span id="cb16-417"><a href="#cb16-417" aria-hidden="true" tabindex="-1"></a>  <span class="fu">labs</span>(</span>
-<span id="cb16-418"><a href="#cb16-418" aria-hidden="true" tabindex="-1"></a>    <span class="at">title    =</span> <span class="st">&quot;Leave-one-out: each row drops one treated drug&quot;</span>,</span>
-<span id="cb16-419"><a href="#cb16-419" aria-hidden="true" tabindex="-1"></a>    <span class="at">subtitle =</span> <span class="st">&quot;Dashed line = primary ATT; range shows how a single product anchors the result&quot;</span>,</span>
-<span id="cb16-420"><a href="#cb16-420" aria-hidden="true" tabindex="-1"></a>    <span class="at">x =</span> <span class="cn">NULL</span>, <span class="at">y =</span> <span class="st">&quot;Treated x Post coefficient (95% CI)&quot;</span></span>
-<span id="cb16-421"><a href="#cb16-421" aria-hidden="true" tabindex="-1"></a>  )</span>
-<span id="cb16-422"><a href="#cb16-422" aria-hidden="true" tabindex="-1"></a><span class="in">```</span></span>
-<span id="cb16-423"><a href="#cb16-423" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb16-424"><a href="#cb16-424" aria-hidden="true" tabindex="-1"></a><span class="fu">### Prescriber-fixed-effects specification</span></span>
-<span id="cb16-425"><a href="#cb16-425" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb16-426"><a href="#cb16-426" aria-hidden="true" tabindex="-1"></a><span class="in">```{r prescriber-fe}</span></span>
-<span id="cb16-427"><a href="#cb16-427" aria-hidden="true" tabindex="-1"></a>prescriber_panel <span class="ot">&lt;-</span> prescriber <span class="sc">|&gt;</span></span>
-<span id="cb16-428"><a href="#cb16-428" aria-hidden="true" tabindex="-1"></a>  <span class="fu">filter</span>(drug_class <span class="sc">!=</span> <span class="st">&quot;Other&quot;</span>) <span class="sc">|&gt;</span></span>
-<span id="cb16-429"><a href="#cb16-429" aria-hidden="true" tabindex="-1"></a>  <span class="fu">mutate</span>(</span>
-<span id="cb16-430"><a href="#cb16-430" aria-hidden="true" tabindex="-1"></a>    <span class="at">post         =</span> <span class="fu">as.integer</span>(year <span class="sc">&gt;=</span> TREAT_FIRST_YEAR),</span>
-<span id="cb16-431"><a href="#cb16-431" aria-hidden="true" tabindex="-1"></a>    <span class="at">treated_post =</span> treated <span class="sc">*</span> post,</span>
-<span id="cb16-432"><a href="#cb16-432" aria-hidden="true" tabindex="-1"></a>    <span class="at">log_fills    =</span> <span class="fu">log</span>(tot_30day_fills <span class="sc">+</span> <span class="dv">1</span>)</span>
-<span id="cb16-433"><a href="#cb16-433" aria-hidden="true" tabindex="-1"></a>  )</span>
+<span id="cb16-412"><a href="#cb16-412" aria-hidden="true" tabindex="-1"></a><span class="cf">if</span> (<span class="fu">length</span>(feasible_placebos) <span class="sc">&gt;</span> <span class="dv">0</span>) {</span>
+<span id="cb16-413"><a href="#cb16-413" aria-hidden="true" tabindex="-1"></a>  placebo_table <span class="ot">&lt;-</span> purrr<span class="sc">::</span><span class="fu">map_dfr</span>(feasible_placebos, <span class="cf">function</span>(fy) {</span>
+<span id="cb16-414"><a href="#cb16-414" aria-hidden="true" tabindex="-1"></a>    <span class="fu">tidy</span>(<span class="fu">placebo_fit</span>(fy), <span class="at">conf.int =</span> <span class="cn">TRUE</span>) <span class="sc">|&gt;</span></span>
+<span id="cb16-415"><a href="#cb16-415" aria-hidden="true" tabindex="-1"></a>      <span class="fu">filter</span>(term <span class="sc">==</span> <span class="st">&quot;treated_post&quot;</span>) <span class="sc">|&gt;</span></span>
+<span id="cb16-416"><a href="#cb16-416" aria-hidden="true" tabindex="-1"></a>      <span class="fu">mutate</span>(<span class="at">fake_cap_year =</span> fy)</span>
+<span id="cb16-417"><a href="#cb16-417" aria-hidden="true" tabindex="-1"></a>  }) <span class="sc">|&gt;</span></span>
+<span id="cb16-418"><a href="#cb16-418" aria-hidden="true" tabindex="-1"></a>    <span class="fu">transmute</span>(fake_cap_year, estimate, std.error, conf.low, conf.high, <span class="at">p_value =</span> p.value)</span>
+<span id="cb16-419"><a href="#cb16-419" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb16-420"><a href="#cb16-420" aria-hidden="true" tabindex="-1"></a>  <span class="fu">pretty_kable</span>(</span>
+<span id="cb16-421"><a href="#cb16-421" aria-hidden="true" tabindex="-1"></a>    placebo_table,</span>
+<span id="cb16-422"><a href="#cb16-422" aria-hidden="true" tabindex="-1"></a>    <span class="at">caption =</span> <span class="st">&quot;Placebo DiDs at fake cap years (sample restricted to pre-2023)&quot;</span>,</span>
+<span id="cb16-423"><a href="#cb16-423" aria-hidden="true" tabindex="-1"></a>    <span class="at">digits =</span> <span class="dv">4</span></span>
+<span id="cb16-424"><a href="#cb16-424" aria-hidden="true" tabindex="-1"></a>  )</span>
+<span id="cb16-425"><a href="#cb16-425" aria-hidden="true" tabindex="-1"></a>} <span class="cf">else</span> {</span>
+<span id="cb16-426"><a href="#cb16-426" aria-hidden="true" tabindex="-1"></a>  <span class="fu">cat</span>(<span class="fu">sprintf</span>(</span>
+<span id="cb16-427"><a href="#cb16-427" aria-hidden="true" tabindex="-1"></a>    <span class="st">&quot;**Skipped.** Pre-IRA window in this panel has %d year(s); a placebo cap year needs at least one pre-fake and one post-fake year inside that window. Re-run `prep.py` against earlier CMS releases (DY2019-DY2021) to populate this table.&quot;</span>,</span>
+<span id="cb16-428"><a href="#cb16-428" aria-hidden="true" tabindex="-1"></a>    panel <span class="sc">|&gt;</span> <span class="fu">filter</span>(year <span class="sc">&lt;</span> TREAT_FIRST_YEAR) <span class="sc">|&gt;</span> <span class="fu">distinct</span>(year) <span class="sc">|&gt;</span> <span class="fu">nrow</span>()</span>
+<span id="cb16-429"><a href="#cb16-429" aria-hidden="true" tabindex="-1"></a>  ))</span>
+<span id="cb16-430"><a href="#cb16-430" aria-hidden="true" tabindex="-1"></a>}</span>
+<span id="cb16-431"><a href="#cb16-431" aria-hidden="true" tabindex="-1"></a><span class="in">```</span></span>
+<span id="cb16-432"><a href="#cb16-432" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb16-433"><a href="#cb16-433" aria-hidden="true" tabindex="-1"></a><span class="fu">## Robustness</span></span>
 <span id="cb16-434"><a href="#cb16-434" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb16-435"><a href="#cb16-435" aria-hidden="true" tabindex="-1"></a>m_pres_fe <span class="ot">&lt;-</span> <span class="fu">feols</span>(</span>
-<span id="cb16-436"><a href="#cb16-436" aria-hidden="true" tabindex="-1"></a>  log_fills <span class="sc">~</span> treated_post <span class="sc">|</span> npi <span class="sc">+</span> gnrc_name <span class="sc">+</span> year,</span>
-<span id="cb16-437"><a href="#cb16-437" aria-hidden="true" tabindex="-1"></a>  <span class="at">data    =</span> prescriber_panel,</span>
-<span id="cb16-438"><a href="#cb16-438" aria-hidden="true" tabindex="-1"></a>  <span class="at">cluster =</span> <span class="sc">~</span>gnrc_name</span>
-<span id="cb16-439"><a href="#cb16-439" aria-hidden="true" tabindex="-1"></a>)</span>
-<span id="cb16-440"><a href="#cb16-440" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb16-441"><a href="#cb16-441" aria-hidden="true" tabindex="-1"></a><span class="fu">bind_rows</span>(</span>
-<span id="cb16-442"><a href="#cb16-442" aria-hidden="true" tabindex="-1"></a>  <span class="fu">tidy</span>(m_fills,    <span class="at">conf.int =</span> <span class="cn">TRUE</span>) <span class="sc">|&gt;</span> <span class="fu">mutate</span>(<span class="at">spec =</span> <span class="st">&quot;Drug-year panel (primary)&quot;</span>),</span>
-<span id="cb16-443"><a href="#cb16-443" aria-hidden="true" tabindex="-1"></a>  <span class="fu">tidy</span>(m_pres_fe,  <span class="at">conf.int =</span> <span class="cn">TRUE</span>) <span class="sc">|&gt;</span> <span class="fu">mutate</span>(<span class="at">spec =</span> <span class="st">&quot;Prescriber-drug-year + prescriber FE&quot;</span>)</span>
-<span id="cb16-444"><a href="#cb16-444" aria-hidden="true" tabindex="-1"></a>) <span class="sc">|&gt;</span></span>
-<span id="cb16-445"><a href="#cb16-445" aria-hidden="true" tabindex="-1"></a>  <span class="fu">filter</span>(term <span class="sc">==</span> <span class="st">&quot;treated_post&quot;</span>) <span class="sc">|&gt;</span></span>
-<span id="cb16-446"><a href="#cb16-446" aria-hidden="true" tabindex="-1"></a>  <span class="fu">transmute</span>(spec, estimate, std.error, conf.low, conf.high, <span class="at">p_value =</span> p.value) <span class="sc">|&gt;</span></span>
-<span id="cb16-447"><a href="#cb16-447" aria-hidden="true" tabindex="-1"></a>  <span class="fu">pretty_kable</span>(<span class="at">caption =</span> <span class="st">&quot;Effect is robust to absorbing prescriber-level variation&quot;</span>, <span class="at">digits =</span> <span class="dv">4</span>)</span>
-<span id="cb16-448"><a href="#cb16-448" aria-hidden="true" tabindex="-1"></a><span class="in">```</span></span>
-<span id="cb16-449"><a href="#cb16-449" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb16-450"><a href="#cb16-450" aria-hidden="true" tabindex="-1"></a><span class="fu">## Heterogeneity by prescriber specialty</span></span>
-<span id="cb16-451"><a href="#cb16-451" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb16-452"><a href="#cb16-452" aria-hidden="true" tabindex="-1"></a><span class="in">```{r specialty-het}</span></span>
-<span id="cb16-453"><a href="#cb16-453" aria-hidden="true" tabindex="-1"></a>specialty_bucket <span class="ot">&lt;-</span> <span class="cf">function</span>(t) {</span>
-<span id="cb16-454"><a href="#cb16-454" aria-hidden="true" tabindex="-1"></a>  <span class="fu">case_when</span>(</span>
-<span id="cb16-455"><a href="#cb16-455" aria-hidden="true" tabindex="-1"></a>    <span class="fu">str_detect</span>(t, <span class="st">&quot;ENDOCRINOLOGY&quot;</span>)            <span class="sc">~</span> <span class="st">&quot;Endocrinology&quot;</span>,</span>
-<span id="cb16-456"><a href="#cb16-456" aria-hidden="true" tabindex="-1"></a>    <span class="fu">str_detect</span>(t, <span class="st">&quot;FAMILY|INTERNAL|GERIATRIC|GENERAL PRACTICE|NURSE PRACT|PHYSICIAN ASSISTANT&quot;</span>)</span>
-<span id="cb16-457"><a href="#cb16-457" aria-hidden="true" tabindex="-1"></a>                                              <span class="sc">~</span> <span class="st">&quot;Primary care&quot;</span>,</span>
-<span id="cb16-458"><a href="#cb16-458" aria-hidden="true" tabindex="-1"></a>    <span class="cn">TRUE</span>                                      <span class="sc">~</span> <span class="st">&quot;Other&quot;</span></span>
-<span id="cb16-459"><a href="#cb16-459" aria-hidden="true" tabindex="-1"></a>  )</span>
-<span id="cb16-460"><a href="#cb16-460" aria-hidden="true" tabindex="-1"></a>}</span>
-<span id="cb16-461"><a href="#cb16-461" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb16-462"><a href="#cb16-462" aria-hidden="true" tabindex="-1"></a>prescriber_panel_spec <span class="ot">&lt;-</span> prescriber_panel <span class="sc">|&gt;</span></span>
-<span id="cb16-463"><a href="#cb16-463" aria-hidden="true" tabindex="-1"></a>  <span class="fu">mutate</span>(<span class="at">specialty_bucket =</span> <span class="fu">specialty_bucket</span>(prscrbr_type))</span>
+<span id="cb16-435"><a href="#cb16-435" aria-hidden="true" tabindex="-1"></a><span class="fu">### Drop GLP-1 RAs from the control group</span></span>
+<span id="cb16-436"><a href="#cb16-436" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb16-437"><a href="#cb16-437" aria-hidden="true" tabindex="-1"></a>::: {.callout-note}</span>
+<span id="cb16-438"><a href="#cb16-438" aria-hidden="true" tabindex="-1"></a><span class="fu">## Why robustness to comparator composition matters</span></span>
+<span id="cb16-439"><a href="#cb16-439" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb16-440"><a href="#cb16-440" aria-hidden="true" tabindex="-1"></a>Parallel trends is a property of *the specific control group you chose*. It can hold for some drugs and fail for others. Imagine the entire non-insulin antihyperglycemic group is fine *except* for one therapeutic class that experienced a huge concurrent demand shock unrelated to the insulin cap. That class&#39;s growth pulls the control mean upward in 2023, which drags the DiD coefficient downward — making the insulin effect look smaller (or more negative) than it really is.</span>
+<span id="cb16-441"><a href="#cb16-441" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb16-442"><a href="#cb16-442" aria-hidden="true" tabindex="-1"></a>That&#39;s exactly what&#39;s happening here with the **GLP-1 receptor agonists**. Semaglutide (Ozempic) and tirzepatide (Mounjaro / Zepbound) experienced a massive supply-constrained demand surge starting in 2022, driven largely by weight-management prescribing. That growth has nothing to do with the insulin cap. If we leave GLP-1s in the control group, their +60% YoY fill volume sets a counterfactual that insulin would never have matched even if the cap had been generous. The DiD reads negative, but the negativity is GLP-1 contamination, not an insulin response.</span>
+<span id="cb16-443"><a href="#cb16-443" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb16-444"><a href="#cb16-444" aria-hidden="true" tabindex="-1"></a>The fix is mechanical: re-estimate with GLP-1 RAs removed from the control group. The remaining controls (metformin, sulfonylureas, DPP-4i, SGLT2i, thiazolidinediones) are not under a similar concurrent shock. If the insulin coefficient flips toward positive when GLP-1s are dropped, that is the GLP-1 contamination story showing itself. The right primary specification depends on which control set you defend as parallel-trends-credible — and the smoke-test sample size here is small enough that *neither* spec produces a precise estimate, but the *direction* of the flip is informative.</span>
+<span id="cb16-445"><a href="#cb16-445" aria-hidden="true" tabindex="-1"></a>:::</span>
+<span id="cb16-446"><a href="#cb16-446" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb16-447"><a href="#cb16-447" aria-hidden="true" tabindex="-1"></a><span class="in">```{r loo-glp1}</span></span>
+<span id="cb16-448"><a href="#cb16-448" aria-hidden="true" tabindex="-1"></a>m_no_glp1 <span class="ot">&lt;-</span> <span class="fu">feols</span>(</span>
+<span id="cb16-449"><a href="#cb16-449" aria-hidden="true" tabindex="-1"></a>  log_fills <span class="sc">~</span> treated_post <span class="sc">|</span> gnrc_name <span class="sc">+</span> year,</span>
+<span id="cb16-450"><a href="#cb16-450" aria-hidden="true" tabindex="-1"></a>  <span class="at">data    =</span> panel <span class="sc">|&gt;</span> <span class="fu">filter</span>(drug_class <span class="sc">!=</span> <span class="st">&quot;GLP-1 receptor agonist&quot;</span>),</span>
+<span id="cb16-451"><a href="#cb16-451" aria-hidden="true" tabindex="-1"></a>  <span class="at">cluster =</span> <span class="sc">~</span>gnrc_name</span>
+<span id="cb16-452"><a href="#cb16-452" aria-hidden="true" tabindex="-1"></a>)</span>
+<span id="cb16-453"><a href="#cb16-453" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb16-454"><a href="#cb16-454" aria-hidden="true" tabindex="-1"></a><span class="fu">bind_rows</span>(</span>
+<span id="cb16-455"><a href="#cb16-455" aria-hidden="true" tabindex="-1"></a>  <span class="fu">tidy</span>(m_fills,   <span class="at">conf.int =</span> <span class="cn">TRUE</span>) <span class="sc">|&gt;</span> <span class="fu">mutate</span>(<span class="at">spec =</span> <span class="st">&quot;Primary (all controls)&quot;</span>),</span>
+<span id="cb16-456"><a href="#cb16-456" aria-hidden="true" tabindex="-1"></a>  <span class="fu">tidy</span>(m_no_glp1, <span class="at">conf.int =</span> <span class="cn">TRUE</span>) <span class="sc">|&gt;</span> <span class="fu">mutate</span>(<span class="at">spec =</span> <span class="st">&quot;Drop GLP-1 RAs from controls&quot;</span>)</span>
+<span id="cb16-457"><a href="#cb16-457" aria-hidden="true" tabindex="-1"></a>) <span class="sc">|&gt;</span></span>
+<span id="cb16-458"><a href="#cb16-458" aria-hidden="true" tabindex="-1"></a>  <span class="fu">filter</span>(term <span class="sc">==</span> <span class="st">&quot;treated_post&quot;</span>) <span class="sc">|&gt;</span></span>
+<span id="cb16-459"><a href="#cb16-459" aria-hidden="true" tabindex="-1"></a>  <span class="fu">transmute</span>(spec, estimate, std.error, conf.low, conf.high, <span class="at">p_value =</span> p.value) <span class="sc">|&gt;</span></span>
+<span id="cb16-460"><a href="#cb16-460" aria-hidden="true" tabindex="-1"></a>  <span class="fu">pretty_kable</span>(<span class="at">caption =</span> <span class="st">&quot;Sensitivity to comparator composition&quot;</span>, <span class="at">digits =</span> <span class="dv">4</span>)</span>
+<span id="cb16-461"><a href="#cb16-461" aria-hidden="true" tabindex="-1"></a><span class="in">```</span></span>
+<span id="cb16-462"><a href="#cb16-462" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb16-463"><a href="#cb16-463" aria-hidden="true" tabindex="-1"></a><span class="fu">### Leave-one-out by treated drug</span></span>
 <span id="cb16-464"><a href="#cb16-464" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb16-465"><a href="#cb16-465" aria-hidden="true" tabindex="-1"></a>het_fit <span class="ot">&lt;-</span> <span class="cf">function</span>(bucket) {</span>
-<span id="cb16-466"><a href="#cb16-466" aria-hidden="true" tabindex="-1"></a>  <span class="fu">feols</span>(</span>
-<span id="cb16-467"><a href="#cb16-467" aria-hidden="true" tabindex="-1"></a>    log_fills <span class="sc">~</span> treated_post <span class="sc">|</span> npi <span class="sc">+</span> gnrc_name <span class="sc">+</span> year,</span>
-<span id="cb16-468"><a href="#cb16-468" aria-hidden="true" tabindex="-1"></a>    <span class="at">data    =</span> prescriber_panel_spec <span class="sc">|&gt;</span> <span class="fu">filter</span>(specialty_bucket <span class="sc">==</span> bucket),</span>
-<span id="cb16-469"><a href="#cb16-469" aria-hidden="true" tabindex="-1"></a>    <span class="at">cluster =</span> <span class="sc">~</span>gnrc_name</span>
-<span id="cb16-470"><a href="#cb16-470" aria-hidden="true" tabindex="-1"></a>  )</span>
-<span id="cb16-471"><a href="#cb16-471" aria-hidden="true" tabindex="-1"></a>}</span>
-<span id="cb16-472"><a href="#cb16-472" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb16-473"><a href="#cb16-473" aria-hidden="true" tabindex="-1"></a>het_table <span class="ot">&lt;-</span> purrr<span class="sc">::</span><span class="fu">map_dfr</span>(</span>
-<span id="cb16-474"><a href="#cb16-474" aria-hidden="true" tabindex="-1"></a>  <span class="fu">c</span>(<span class="st">&quot;Endocrinology&quot;</span>, <span class="st">&quot;Primary care&quot;</span>, <span class="st">&quot;Other&quot;</span>),</span>
-<span id="cb16-475"><a href="#cb16-475" aria-hidden="true" tabindex="-1"></a>  <span class="cf">function</span>(b) {</span>
-<span id="cb16-476"><a href="#cb16-476" aria-hidden="true" tabindex="-1"></a>    fit <span class="ot">&lt;-</span> <span class="fu">het_fit</span>(b)</span>
-<span id="cb16-477"><a href="#cb16-477" aria-hidden="true" tabindex="-1"></a>    <span class="fu">tidy</span>(fit, <span class="at">conf.int =</span> <span class="cn">TRUE</span>) <span class="sc">|&gt;</span></span>
-<span id="cb16-478"><a href="#cb16-478" aria-hidden="true" tabindex="-1"></a>      <span class="fu">filter</span>(term <span class="sc">==</span> <span class="st">&quot;treated_post&quot;</span>) <span class="sc">|&gt;</span></span>
-<span id="cb16-479"><a href="#cb16-479" aria-hidden="true" tabindex="-1"></a>      <span class="fu">transmute</span>(<span class="at">specialty =</span> b, estimate, std.error, conf.low, conf.high, <span class="at">p_value =</span> p.value)</span>
-<span id="cb16-480"><a href="#cb16-480" aria-hidden="true" tabindex="-1"></a>  }</span>
-<span id="cb16-481"><a href="#cb16-481" aria-hidden="true" tabindex="-1"></a>)</span>
-<span id="cb16-482"><a href="#cb16-482" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb16-483"><a href="#cb16-483" aria-hidden="true" tabindex="-1"></a><span class="fu">pretty_kable</span>(het_table,</span>
-<span id="cb16-484"><a href="#cb16-484" aria-hidden="true" tabindex="-1"></a>             <span class="at">caption =</span> <span class="st">&quot;Treated x Post effect on log 30-day fills, by prescriber specialty&quot;</span>,</span>
-<span id="cb16-485"><a href="#cb16-485" aria-hidden="true" tabindex="-1"></a>             <span class="at">digits =</span> <span class="dv">4</span>)</span>
-<span id="cb16-486"><a href="#cb16-486" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb16-487"><a href="#cb16-487" aria-hidden="true" tabindex="-1"></a><span class="fu">ggplot</span>(het_table, <span class="fu">aes</span>(<span class="fu">reorder</span>(specialty, estimate), estimate)) <span class="sc">+</span></span>
-<span id="cb16-488"><a href="#cb16-488" aria-hidden="true" tabindex="-1"></a>  <span class="fu">geom_hline</span>(<span class="at">yintercept =</span> <span class="dv">0</span>, <span class="at">colour =</span> <span class="st">&quot;grey50&quot;</span>) <span class="sc">+</span></span>
-<span id="cb16-489"><a href="#cb16-489" aria-hidden="true" tabindex="-1"></a>  <span class="fu">geom_pointrange</span>(<span class="fu">aes</span>(<span class="at">ymin =</span> conf.low, <span class="at">ymax =</span> conf.high), <span class="at">size =</span> <span class="fl">0.5</span>) <span class="sc">+</span></span>
-<span id="cb16-490"><a href="#cb16-490" aria-hidden="true" tabindex="-1"></a>  <span class="fu">coord_flip</span>() <span class="sc">+</span></span>
-<span id="cb16-491"><a href="#cb16-491" aria-hidden="true" tabindex="-1"></a>  <span class="fu">labs</span>(</span>
-<span id="cb16-492"><a href="#cb16-492" aria-hidden="true" tabindex="-1"></a>    <span class="at">title =</span> <span class="st">&quot;Insulin-cap ATT by prescriber specialty&quot;</span>,</span>
-<span id="cb16-493"><a href="#cb16-493" aria-hidden="true" tabindex="-1"></a>    <span class="at">x =</span> <span class="cn">NULL</span>, <span class="at">y =</span> <span class="st">&quot;Treated x Post coefficient (95% CI)&quot;</span></span>
-<span id="cb16-494"><a href="#cb16-494" aria-hidden="true" tabindex="-1"></a>  )</span>
-<span id="cb16-495"><a href="#cb16-495" aria-hidden="true" tabindex="-1"></a><span class="in">```</span></span>
-<span id="cb16-496"><a href="#cb16-496" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb16-497"><a href="#cb16-497" aria-hidden="true" tabindex="-1"></a><span class="fu">## Limitations</span></span>
-<span id="cb16-498"><a href="#cb16-498" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb16-499"><a href="#cb16-499" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>**Annual granularity.** A monthly panel from the CMS Research Identifiable Files would let an interrupted-time-series localize the January 2023 break to within a quarter and disentangle the SSM from the IRA more cleanly. The PUF is annual, so the event-study resolves at year-aggregates.</span>
-<span id="cb16-500"><a href="#cb16-500" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>**`Tot_Drug_Cst` is total payer cost, not beneficiary OOP.** The cap operates on cost-sharing; the PUF reports total drug spend. Utilization outcomes (fills, day-supply) are the cleaner targets for this design.</span>
-<span id="cb16-501"><a href="#cb16-501" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>**2024 catastrophic redesign and 2025 OOP cap.** The IRA also eliminated the 5% catastrophic coinsurance in 2024 and capped total beneficiary OOP at $2,000 in 2025. Both can affect the *control* group&#39;s OOP costs and, indirectly, utilization. The primary 30-day-fills result is robust to this because the 2024 catastrophic change is small relative to total Part D demand at the drug-class level; OOP-based outcomes should restrict to 2019–2023.</span>
-<span id="cb16-502"><a href="#cb16-502" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>**GLP-1 demand shock.** The &quot;Drop GLP-1 RAs from controls&quot; sensitivity test addresses the most material concurrent demand shock in the panel.</span>
-<span id="cb16-503"><a href="#cb16-503" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>**Off-label and indication mix.** Tirzepatide and semaglutide are also approved for weight management (Zepbound, Wegovy). Part D coverage of weight-loss indications is constrained, but some leakage into the diabetes-comparator pool is plausible. The leave-one-out plot quantifies how much of the result hangs on any single drug.</span>
-<span id="cb16-504"><a href="#cb16-504" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>**Senior Savings Model partial treatment.** SSM applied to enrollees of participating MA-PD plans starting 2021. The event-study&#39;s 2021 and 2022 coefficients absorb that partial treatment honestly; the 2023 coefficient is the marginal effect of universalizing the cap.</span>
+<span id="cb16-465"><a href="#cb16-465" aria-hidden="true" tabindex="-1"></a>::: {.callout-note}</span>
+<span id="cb16-466"><a href="#cb16-466" aria-hidden="true" tabindex="-1"></a><span class="fu">## Why a single drug can drive an entire result</span></span>
+<span id="cb16-467"><a href="#cb16-467" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb16-468"><a href="#cb16-468" aria-hidden="true" tabindex="-1"></a>Insulin glargine alone accounts for roughly 45% of all insulin 30-day fills in the panel. Insulin lispro and insulin aspart are each another ~13%. Together, three products account for about 70% of treated-arm volume. If any of those three has an idiosyncratic 2023 story — a manufacturer rebate change, a formulary tier shift, a supply disruption, a brand-to-biosimilar switch — that single drug&#39;s trajectory could be the entire DiD point estimate.</span>
+<span id="cb16-469"><a href="#cb16-469" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb16-470"><a href="#cb16-470" aria-hidden="true" tabindex="-1"></a>**Leave-one-out (LOO)** robustness re-estimates the DiD a dozen times, dropping one treated drug at a time. The plot shows each estimate alongside the primary estimate. The width of the LOO range is the diagnostic: if the LOO estimates cluster tightly around the primary line, no single product is anchoring the result. If one specific drop pulls the estimate noticeably toward zero (or away from zero), that drug deserves a second look — and ideally a separate paragraph in the limitations section.</span>
+<span id="cb16-471"><a href="#cb16-471" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb16-472"><a href="#cb16-472" aria-hidden="true" tabindex="-1"></a>LOO is the simplest possible influence diagnostic. It doesn&#39;t replace formal tools like Cook&#39;s distance, but in a panel this small it&#39;s more interpretable: every line in the plot is &quot;what would the answer be if we&#39;d never had this product?&quot;</span>
+<span id="cb16-473"><a href="#cb16-473" aria-hidden="true" tabindex="-1"></a>:::</span>
+<span id="cb16-474"><a href="#cb16-474" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb16-475"><a href="#cb16-475" aria-hidden="true" tabindex="-1"></a><span class="in">```{r loo-treated}</span></span>
+<span id="cb16-476"><a href="#cb16-476" aria-hidden="true" tabindex="-1"></a>treated_drugs <span class="ot">&lt;-</span> panel <span class="sc">|&gt;</span> <span class="fu">filter</span>(treated <span class="sc">==</span> <span class="dv">1</span>) <span class="sc">|&gt;</span> <span class="fu">distinct</span>(gnrc_name) <span class="sc">|&gt;</span> <span class="fu">pull</span>()</span>
+<span id="cb16-477"><a href="#cb16-477" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb16-478"><a href="#cb16-478" aria-hidden="true" tabindex="-1"></a>loo <span class="ot">&lt;-</span> purrr<span class="sc">::</span><span class="fu">map_dfr</span>(treated_drugs, <span class="cf">function</span>(g) {</span>
+<span id="cb16-479"><a href="#cb16-479" aria-hidden="true" tabindex="-1"></a>  fit <span class="ot">&lt;-</span> <span class="fu">feols</span>(</span>
+<span id="cb16-480"><a href="#cb16-480" aria-hidden="true" tabindex="-1"></a>    log_fills <span class="sc">~</span> treated_post <span class="sc">|</span> gnrc_name <span class="sc">+</span> year,</span>
+<span id="cb16-481"><a href="#cb16-481" aria-hidden="true" tabindex="-1"></a>    <span class="at">data    =</span> panel <span class="sc">|&gt;</span> <span class="fu">filter</span>(gnrc_name <span class="sc">!=</span> g),</span>
+<span id="cb16-482"><a href="#cb16-482" aria-hidden="true" tabindex="-1"></a>    <span class="at">cluster =</span> <span class="sc">~</span>gnrc_name</span>
+<span id="cb16-483"><a href="#cb16-483" aria-hidden="true" tabindex="-1"></a>  )</span>
+<span id="cb16-484"><a href="#cb16-484" aria-hidden="true" tabindex="-1"></a>  <span class="fu">tidy</span>(fit, <span class="at">conf.int =</span> <span class="cn">TRUE</span>) <span class="sc">|&gt;</span></span>
+<span id="cb16-485"><a href="#cb16-485" aria-hidden="true" tabindex="-1"></a>    <span class="fu">filter</span>(term <span class="sc">==</span> <span class="st">&quot;treated_post&quot;</span>) <span class="sc">|&gt;</span></span>
+<span id="cb16-486"><a href="#cb16-486" aria-hidden="true" tabindex="-1"></a>    <span class="fu">transmute</span>(<span class="at">dropped =</span> g, estimate, conf.low, conf.high)</span>
+<span id="cb16-487"><a href="#cb16-487" aria-hidden="true" tabindex="-1"></a>})</span>
+<span id="cb16-488"><a href="#cb16-488" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb16-489"><a href="#cb16-489" aria-hidden="true" tabindex="-1"></a><span class="fu">ggplot</span>(loo, <span class="fu">aes</span>(<span class="fu">reorder</span>(dropped, estimate), estimate)) <span class="sc">+</span></span>
+<span id="cb16-490"><a href="#cb16-490" aria-hidden="true" tabindex="-1"></a>  <span class="fu">geom_hline</span>(<span class="at">yintercept =</span> <span class="fu">coef</span>(m_fills)[[<span class="st">&quot;treated_post&quot;</span>]],</span>
+<span id="cb16-491"><a href="#cb16-491" aria-hidden="true" tabindex="-1"></a>             <span class="at">colour =</span> <span class="st">&quot;#0d5c63&quot;</span>, <span class="at">linetype =</span> <span class="st">&quot;dashed&quot;</span>) <span class="sc">+</span></span>
+<span id="cb16-492"><a href="#cb16-492" aria-hidden="true" tabindex="-1"></a>  <span class="fu">geom_pointrange</span>(<span class="fu">aes</span>(<span class="at">ymin =</span> conf.low, <span class="at">ymax =</span> conf.high), <span class="at">size =</span> <span class="fl">0.3</span>) <span class="sc">+</span></span>
+<span id="cb16-493"><a href="#cb16-493" aria-hidden="true" tabindex="-1"></a>  <span class="fu">coord_flip</span>() <span class="sc">+</span></span>
+<span id="cb16-494"><a href="#cb16-494" aria-hidden="true" tabindex="-1"></a>  <span class="fu">labs</span>(</span>
+<span id="cb16-495"><a href="#cb16-495" aria-hidden="true" tabindex="-1"></a>    <span class="at">title    =</span> <span class="st">&quot;Leave-one-out: each row drops one treated drug&quot;</span>,</span>
+<span id="cb16-496"><a href="#cb16-496" aria-hidden="true" tabindex="-1"></a>    <span class="at">subtitle =</span> <span class="st">&quot;Dashed line = primary ATT; range shows how a single product anchors the result&quot;</span>,</span>
+<span id="cb16-497"><a href="#cb16-497" aria-hidden="true" tabindex="-1"></a>    <span class="at">x =</span> <span class="cn">NULL</span>, <span class="at">y =</span> <span class="st">&quot;Treated x Post coefficient (95% CI)&quot;</span></span>
+<span id="cb16-498"><a href="#cb16-498" aria-hidden="true" tabindex="-1"></a>  )</span>
+<span id="cb16-499"><a href="#cb16-499" aria-hidden="true" tabindex="-1"></a><span class="in">```</span></span>
+<span id="cb16-500"><a href="#cb16-500" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb16-501"><a href="#cb16-501" aria-hidden="true" tabindex="-1"></a><span class="fu">### Prescriber-fixed-effects specification</span></span>
+<span id="cb16-502"><a href="#cb16-502" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb16-503"><a href="#cb16-503" aria-hidden="true" tabindex="-1"></a>::: {.callout-note}</span>
+<span id="cb16-504"><a href="#cb16-504" aria-hidden="true" tabindex="-1"></a><span class="fu">## Why a prescriber fixed effect changes the question being asked</span></span>
 <span id="cb16-505"><a href="#cb16-505" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb16-506"><a href="#cb16-506" aria-hidden="true" tabindex="-1"></a><span class="fu">## References</span></span>
+<span id="cb16-506"><a href="#cb16-506" aria-hidden="true" tabindex="-1"></a>At the drug-year level, you cannot tell whether insulin volume rose because (a) **existing insulin prescribers wrote more scripts each**, (b) **new prescribers entered the insulin market**, or (c) **the mix of who prescribes insulin shifted** (e.g., endocrinologists left Part D billing and primary-care doctors picked it up). All three would look identical in the aggregate panel.</span>
 <span id="cb16-507"><a href="#cb16-507" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb16-508"><a href="#cb16-508" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>Inflation Reduction Act of 2022, Pub. L. 117-169, Section 11406. <span class="ot">&lt;https://www.congress.gov/bill/117th-congress/house-bill/5376&gt;</span></span>
-<span id="cb16-509"><a href="#cb16-509" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>Centers for Medicare &amp; Medicaid Services. *Medicare Part D Prescribers — by Provider and Drug.* <span class="ot">&lt;https://data.cms.gov/provider-summary-by-type-of-service/medicare-part-d-prescribers&gt;</span></span>
-<span id="cb16-510"><a href="#cb16-510" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>Centers for Medicare &amp; Medicaid Services. *Part D Senior Savings Model.* <span class="ot">&lt;https://www.cms.gov/priorities/innovation/innovation-models/part-d-senior-savings-model&gt;</span></span>
-<span id="cb16-511"><a href="#cb16-511" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>Borusyak, K., Jaravel, X., &amp; Spiess, J. (2024). Revisiting event-study designs: robust and efficient estimation. *Review of Economic Studies*, 91(6).</span>
-<span id="cb16-512"><a href="#cb16-512" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>Callaway, B., &amp; Sant&#39;Anna, P. H. C. (2021). Difference-in-differences with multiple time periods. *Journal of Econometrics*, 225(2).</span>
-<span id="cb16-513"><a href="#cb16-513" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>Bergé, L. (2018). *Efficient estimation of maximum likelihood models with multiple fixed-effects: the R package* <span class="in">`fixest`</span>. CREA Discussion Papers.</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button" data-in-quarto-modal><i class="bi"></i></button></div>
+<span id="cb16-508"><a href="#cb16-508" aria-hidden="true" tabindex="-1"></a>Adding an **NPI fixed effect** absorbs every time-invariant difference between prescribers — their specialty, their geography, their typical panel size, their baseline propensity to use insulin at all. After the prescriber FE, the regression is identifying the treatment effect *within prescriber*: did the same prescriber who wrote 50 insulin scripts in 2022 write more in 2023, beyond what the year-FE-adjusted control trajectory predicts?</span>
+<span id="cb16-509"><a href="#cb16-509" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb16-510"><a href="#cb16-510" aria-hidden="true" tabindex="-1"></a>That&#39;s a stronger and more interpretable question. It rules out compositional explanations entirely. If the prescriber-FE estimate matches the drug-level estimate, the drug-level result is not a compositional artifact. If they diverge, the divergence is itself the finding — it tells you whether the policy moved the *intensive margin* (existing prescribers writing more) or the *extensive margin* (different prescribers entering the market). Both are real policy effects; they just have different downstream implications. (Wooldridge 2010, Ch. 10)</span>
+<span id="cb16-511"><a href="#cb16-511" aria-hidden="true" tabindex="-1"></a>:::</span>
+<span id="cb16-512"><a href="#cb16-512" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb16-513"><a href="#cb16-513" aria-hidden="true" tabindex="-1"></a><span class="in">```{r prescriber-fe}</span></span>
+<span id="cb16-514"><a href="#cb16-514" aria-hidden="true" tabindex="-1"></a>prescriber_panel <span class="ot">&lt;-</span> prescriber <span class="sc">|&gt;</span></span>
+<span id="cb16-515"><a href="#cb16-515" aria-hidden="true" tabindex="-1"></a>  <span class="fu">filter</span>(drug_class <span class="sc">!=</span> <span class="st">&quot;Other&quot;</span>) <span class="sc">|&gt;</span></span>
+<span id="cb16-516"><a href="#cb16-516" aria-hidden="true" tabindex="-1"></a>  <span class="fu">mutate</span>(</span>
+<span id="cb16-517"><a href="#cb16-517" aria-hidden="true" tabindex="-1"></a>    <span class="at">post         =</span> <span class="fu">as.integer</span>(year <span class="sc">&gt;=</span> TREAT_FIRST_YEAR),</span>
+<span id="cb16-518"><a href="#cb16-518" aria-hidden="true" tabindex="-1"></a>    <span class="at">treated_post =</span> treated <span class="sc">*</span> post,</span>
+<span id="cb16-519"><a href="#cb16-519" aria-hidden="true" tabindex="-1"></a>    <span class="at">log_fills    =</span> <span class="fu">log</span>(tot_30day_fills <span class="sc">+</span> <span class="dv">1</span>)</span>
+<span id="cb16-520"><a href="#cb16-520" aria-hidden="true" tabindex="-1"></a>  )</span>
+<span id="cb16-521"><a href="#cb16-521" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb16-522"><a href="#cb16-522" aria-hidden="true" tabindex="-1"></a>m_pres_fe <span class="ot">&lt;-</span> <span class="fu">feols</span>(</span>
+<span id="cb16-523"><a href="#cb16-523" aria-hidden="true" tabindex="-1"></a>  log_fills <span class="sc">~</span> treated_post <span class="sc">|</span> npi <span class="sc">+</span> gnrc_name <span class="sc">+</span> year,</span>
+<span id="cb16-524"><a href="#cb16-524" aria-hidden="true" tabindex="-1"></a>  <span class="at">data    =</span> prescriber_panel,</span>
+<span id="cb16-525"><a href="#cb16-525" aria-hidden="true" tabindex="-1"></a>  <span class="at">cluster =</span> <span class="sc">~</span>gnrc_name</span>
+<span id="cb16-526"><a href="#cb16-526" aria-hidden="true" tabindex="-1"></a>)</span>
+<span id="cb16-527"><a href="#cb16-527" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb16-528"><a href="#cb16-528" aria-hidden="true" tabindex="-1"></a><span class="fu">bind_rows</span>(</span>
+<span id="cb16-529"><a href="#cb16-529" aria-hidden="true" tabindex="-1"></a>  <span class="fu">tidy</span>(m_fills,    <span class="at">conf.int =</span> <span class="cn">TRUE</span>) <span class="sc">|&gt;</span> <span class="fu">mutate</span>(<span class="at">spec =</span> <span class="st">&quot;Drug-year panel (primary)&quot;</span>),</span>
+<span id="cb16-530"><a href="#cb16-530" aria-hidden="true" tabindex="-1"></a>  <span class="fu">tidy</span>(m_pres_fe,  <span class="at">conf.int =</span> <span class="cn">TRUE</span>) <span class="sc">|&gt;</span> <span class="fu">mutate</span>(<span class="at">spec =</span> <span class="st">&quot;Prescriber-drug-year + prescriber FE&quot;</span>)</span>
+<span id="cb16-531"><a href="#cb16-531" aria-hidden="true" tabindex="-1"></a>) <span class="sc">|&gt;</span></span>
+<span id="cb16-532"><a href="#cb16-532" aria-hidden="true" tabindex="-1"></a>  <span class="fu">filter</span>(term <span class="sc">==</span> <span class="st">&quot;treated_post&quot;</span>) <span class="sc">|&gt;</span></span>
+<span id="cb16-533"><a href="#cb16-533" aria-hidden="true" tabindex="-1"></a>  <span class="fu">transmute</span>(spec, estimate, std.error, conf.low, conf.high, <span class="at">p_value =</span> p.value) <span class="sc">|&gt;</span></span>
+<span id="cb16-534"><a href="#cb16-534" aria-hidden="true" tabindex="-1"></a>  <span class="fu">pretty_kable</span>(<span class="at">caption =</span> <span class="st">&quot;Effect is robust to absorbing prescriber-level variation&quot;</span>, <span class="at">digits =</span> <span class="dv">4</span>)</span>
+<span id="cb16-535"><a href="#cb16-535" aria-hidden="true" tabindex="-1"></a><span class="in">```</span></span>
+<span id="cb16-536"><a href="#cb16-536" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb16-537"><a href="#cb16-537" aria-hidden="true" tabindex="-1"></a><span class="fu">## Heterogeneity by prescriber specialty</span></span>
+<span id="cb16-538"><a href="#cb16-538" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb16-539"><a href="#cb16-539" aria-hidden="true" tabindex="-1"></a>::: {.callout-note}</span>
+<span id="cb16-540"><a href="#cb16-540" aria-hidden="true" tabindex="-1"></a><span class="fu">## Why average effects can hide important variation</span></span>
+<span id="cb16-541"><a href="#cb16-541" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb16-542"><a href="#cb16-542" aria-hidden="true" tabindex="-1"></a>The headline ATT averages over every prescriber in the panel — endocrinologists, primary-care physicians, PAs, NPs, and assorted other specialties. But the policy may not have hit each specialty&#39;s patient panel equally. **Endocrinology patients** were more likely to already have access to manufacturer patient-assistance programs and structured care management before the cap, so the marginal cost-sharing relief from the cap is smaller for them. **Primary-care patients** were more likely to face the un-mitigated $300+ list-price OOP that the cap actually displaced; the cap&#39;s marginal effect on their behavior should be larger.</span>
+<span id="cb16-543"><a href="#cb16-543" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb16-544"><a href="#cb16-544" aria-hidden="true" tabindex="-1"></a>If the cap had a uniform effect, all three specialty buckets should produce similar coefficients. If the cap mattered most where pre-cap OOP was highest, primary-care should show a larger effect than endocrinology. **Stratifying by specialty is the cleanest way to see this** — the alternative would be a triple interaction in a single model, which is harder to read and produces less interpretable standard errors at small sample sizes.</span>
+<span id="cb16-545"><a href="#cb16-545" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb16-546"><a href="#cb16-546" aria-hidden="true" tabindex="-1"></a>The split below uses three buckets: explicit endocrinology, explicit primary care (family medicine, internal medicine, geriatrics, general practice, NPs, PAs), and everything else. The &quot;Other&quot; bucket is mostly cardiology, nephrology, and hospitalists — specialties that prescribe insulin but in lower volumes than the first two groups.</span>
+<span id="cb16-547"><a href="#cb16-547" aria-hidden="true" tabindex="-1"></a>:::</span>
+<span id="cb16-548"><a href="#cb16-548" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb16-549"><a href="#cb16-549" aria-hidden="true" tabindex="-1"></a><span class="in">```{r specialty-het}</span></span>
+<span id="cb16-550"><a href="#cb16-550" aria-hidden="true" tabindex="-1"></a>specialty_bucket <span class="ot">&lt;-</span> <span class="cf">function</span>(t) {</span>
+<span id="cb16-551"><a href="#cb16-551" aria-hidden="true" tabindex="-1"></a>  <span class="fu">case_when</span>(</span>
+<span id="cb16-552"><a href="#cb16-552" aria-hidden="true" tabindex="-1"></a>    <span class="fu">str_detect</span>(t, <span class="st">&quot;ENDOCRINOLOGY&quot;</span>)            <span class="sc">~</span> <span class="st">&quot;Endocrinology&quot;</span>,</span>
+<span id="cb16-553"><a href="#cb16-553" aria-hidden="true" tabindex="-1"></a>    <span class="fu">str_detect</span>(t, <span class="st">&quot;FAMILY|INTERNAL|GERIATRIC|GENERAL PRACTICE|NURSE PRACT|PHYSICIAN ASSISTANT&quot;</span>)</span>
+<span id="cb16-554"><a href="#cb16-554" aria-hidden="true" tabindex="-1"></a>                                              <span class="sc">~</span> <span class="st">&quot;Primary care&quot;</span>,</span>
+<span id="cb16-555"><a href="#cb16-555" aria-hidden="true" tabindex="-1"></a>    <span class="cn">TRUE</span>                                      <span class="sc">~</span> <span class="st">&quot;Other&quot;</span></span>
+<span id="cb16-556"><a href="#cb16-556" aria-hidden="true" tabindex="-1"></a>  )</span>
+<span id="cb16-557"><a href="#cb16-557" aria-hidden="true" tabindex="-1"></a>}</span>
+<span id="cb16-558"><a href="#cb16-558" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb16-559"><a href="#cb16-559" aria-hidden="true" tabindex="-1"></a>prescriber_panel_spec <span class="ot">&lt;-</span> prescriber_panel <span class="sc">|&gt;</span></span>
+<span id="cb16-560"><a href="#cb16-560" aria-hidden="true" tabindex="-1"></a>  <span class="fu">mutate</span>(<span class="at">specialty_bucket =</span> <span class="fu">specialty_bucket</span>(prscrbr_type))</span>
+<span id="cb16-561"><a href="#cb16-561" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb16-562"><a href="#cb16-562" aria-hidden="true" tabindex="-1"></a>het_fit <span class="ot">&lt;-</span> <span class="cf">function</span>(bucket) {</span>
+<span id="cb16-563"><a href="#cb16-563" aria-hidden="true" tabindex="-1"></a>  <span class="fu">feols</span>(</span>
+<span id="cb16-564"><a href="#cb16-564" aria-hidden="true" tabindex="-1"></a>    log_fills <span class="sc">~</span> treated_post <span class="sc">|</span> npi <span class="sc">+</span> gnrc_name <span class="sc">+</span> year,</span>
+<span id="cb16-565"><a href="#cb16-565" aria-hidden="true" tabindex="-1"></a>    <span class="at">data    =</span> prescriber_panel_spec <span class="sc">|&gt;</span> <span class="fu">filter</span>(specialty_bucket <span class="sc">==</span> bucket),</span>
+<span id="cb16-566"><a href="#cb16-566" aria-hidden="true" tabindex="-1"></a>    <span class="at">cluster =</span> <span class="sc">~</span>gnrc_name</span>
+<span id="cb16-567"><a href="#cb16-567" aria-hidden="true" tabindex="-1"></a>  )</span>
+<span id="cb16-568"><a href="#cb16-568" aria-hidden="true" tabindex="-1"></a>}</span>
+<span id="cb16-569"><a href="#cb16-569" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb16-570"><a href="#cb16-570" aria-hidden="true" tabindex="-1"></a>het_table <span class="ot">&lt;-</span> purrr<span class="sc">::</span><span class="fu">map_dfr</span>(</span>
+<span id="cb16-571"><a href="#cb16-571" aria-hidden="true" tabindex="-1"></a>  <span class="fu">c</span>(<span class="st">&quot;Endocrinology&quot;</span>, <span class="st">&quot;Primary care&quot;</span>, <span class="st">&quot;Other&quot;</span>),</span>
+<span id="cb16-572"><a href="#cb16-572" aria-hidden="true" tabindex="-1"></a>  <span class="cf">function</span>(b) {</span>
+<span id="cb16-573"><a href="#cb16-573" aria-hidden="true" tabindex="-1"></a>    fit <span class="ot">&lt;-</span> <span class="fu">het_fit</span>(b)</span>
+<span id="cb16-574"><a href="#cb16-574" aria-hidden="true" tabindex="-1"></a>    <span class="fu">tidy</span>(fit, <span class="at">conf.int =</span> <span class="cn">TRUE</span>) <span class="sc">|&gt;</span></span>
+<span id="cb16-575"><a href="#cb16-575" aria-hidden="true" tabindex="-1"></a>      <span class="fu">filter</span>(term <span class="sc">==</span> <span class="st">&quot;treated_post&quot;</span>) <span class="sc">|&gt;</span></span>
+<span id="cb16-576"><a href="#cb16-576" aria-hidden="true" tabindex="-1"></a>      <span class="fu">transmute</span>(<span class="at">specialty =</span> b, estimate, std.error, conf.low, conf.high, <span class="at">p_value =</span> p.value)</span>
+<span id="cb16-577"><a href="#cb16-577" aria-hidden="true" tabindex="-1"></a>  }</span>
+<span id="cb16-578"><a href="#cb16-578" aria-hidden="true" tabindex="-1"></a>)</span>
+<span id="cb16-579"><a href="#cb16-579" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb16-580"><a href="#cb16-580" aria-hidden="true" tabindex="-1"></a><span class="fu">pretty_kable</span>(het_table,</span>
+<span id="cb16-581"><a href="#cb16-581" aria-hidden="true" tabindex="-1"></a>             <span class="at">caption =</span> <span class="st">&quot;Treated x Post effect on log 30-day fills, by prescriber specialty&quot;</span>,</span>
+<span id="cb16-582"><a href="#cb16-582" aria-hidden="true" tabindex="-1"></a>             <span class="at">digits =</span> <span class="dv">4</span>)</span>
+<span id="cb16-583"><a href="#cb16-583" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb16-584"><a href="#cb16-584" aria-hidden="true" tabindex="-1"></a><span class="fu">ggplot</span>(het_table, <span class="fu">aes</span>(<span class="fu">reorder</span>(specialty, estimate), estimate)) <span class="sc">+</span></span>
+<span id="cb16-585"><a href="#cb16-585" aria-hidden="true" tabindex="-1"></a>  <span class="fu">geom_hline</span>(<span class="at">yintercept =</span> <span class="dv">0</span>, <span class="at">colour =</span> <span class="st">&quot;grey50&quot;</span>) <span class="sc">+</span></span>
+<span id="cb16-586"><a href="#cb16-586" aria-hidden="true" tabindex="-1"></a>  <span class="fu">geom_pointrange</span>(<span class="fu">aes</span>(<span class="at">ymin =</span> conf.low, <span class="at">ymax =</span> conf.high), <span class="at">size =</span> <span class="fl">0.5</span>) <span class="sc">+</span></span>
+<span id="cb16-587"><a href="#cb16-587" aria-hidden="true" tabindex="-1"></a>  <span class="fu">coord_flip</span>() <span class="sc">+</span></span>
+<span id="cb16-588"><a href="#cb16-588" aria-hidden="true" tabindex="-1"></a>  <span class="fu">labs</span>(</span>
+<span id="cb16-589"><a href="#cb16-589" aria-hidden="true" tabindex="-1"></a>    <span class="at">title =</span> <span class="st">&quot;Insulin-cap ATT by prescriber specialty&quot;</span>,</span>
+<span id="cb16-590"><a href="#cb16-590" aria-hidden="true" tabindex="-1"></a>    <span class="at">x =</span> <span class="cn">NULL</span>, <span class="at">y =</span> <span class="st">&quot;Treated x Post coefficient (95% CI)&quot;</span></span>
+<span id="cb16-591"><a href="#cb16-591" aria-hidden="true" tabindex="-1"></a>  )</span>
+<span id="cb16-592"><a href="#cb16-592" aria-hidden="true" tabindex="-1"></a><span class="in">```</span></span>
+<span id="cb16-593"><a href="#cb16-593" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb16-594"><a href="#cb16-594" aria-hidden="true" tabindex="-1"></a><span class="fu">## Limitations</span></span>
+<span id="cb16-595"><a href="#cb16-595" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb16-596"><a href="#cb16-596" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>**Annual granularity.** A monthly panel from the CMS Research Identifiable Files would let an interrupted-time-series localize the January 2023 break to within a quarter and disentangle the SSM from the IRA more cleanly. The PUF is annual, so the event-study resolves at year-aggregates.</span>
+<span id="cb16-597"><a href="#cb16-597" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>**`Tot_Drug_Cst` is total payer cost, not beneficiary OOP.** The cap operates on cost-sharing; the PUF reports total drug spend. Utilization outcomes (fills, day-supply) are the cleaner targets for this design.</span>
+<span id="cb16-598"><a href="#cb16-598" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>**2024 catastrophic redesign and 2025 OOP cap.** The IRA also eliminated the 5% catastrophic coinsurance in 2024 and capped total beneficiary OOP at $2,000 in 2025. Both can affect the *control* group&#39;s OOP costs and, indirectly, utilization. The primary 30-day-fills result is robust to this because the 2024 catastrophic change is small relative to total Part D demand at the drug-class level; OOP-based outcomes should restrict to 2019–2023.</span>
+<span id="cb16-599"><a href="#cb16-599" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>**GLP-1 demand shock.** The &quot;Drop GLP-1 RAs from controls&quot; sensitivity test addresses the most material concurrent demand shock in the panel.</span>
+<span id="cb16-600"><a href="#cb16-600" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>**Off-label and indication mix.** Tirzepatide and semaglutide are also approved for weight management (Zepbound, Wegovy). Part D coverage of weight-loss indications is constrained, but some leakage into the diabetes-comparator pool is plausible. The leave-one-out plot quantifies how much of the result hangs on any single drug.</span>
+<span id="cb16-601"><a href="#cb16-601" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>**Senior Savings Model partial treatment.** SSM applied to enrollees of participating MA-PD plans starting 2021. The event-study&#39;s 2021 and 2022 coefficients absorb that partial treatment honestly; the 2023 coefficient is the marginal effect of universalizing the cap.</span>
+<span id="cb16-602"><a href="#cb16-602" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb16-603"><a href="#cb16-603" aria-hidden="true" tabindex="-1"></a><span class="fu">## Methods primer</span></span>
+<span id="cb16-604"><a href="#cb16-604" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb16-605"><a href="#cb16-605" aria-hidden="true" tabindex="-1"></a>A one-stop reference for the design vocabulary used above. Skip this if you&#39;ve taken an applied-econometrics course; otherwise, every concept the analysis depends on is here in plain language.</span>
+<span id="cb16-606"><a href="#cb16-606" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb16-607"><a href="#cb16-607" aria-hidden="true" tabindex="-1"></a><span class="fu">### Difference-in-differences (DiD)</span></span>
+<span id="cb16-608"><a href="#cb16-608" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb16-609"><a href="#cb16-609" aria-hidden="true" tabindex="-1"></a>The simplest possible policy-evaluation tool when you can&#39;t randomize. Take two groups (treated and control), measure each one before and after the policy, and compare the *change* in the treated group&#39;s outcome to the *change* in the control&#39;s. The treatment effect is the gap between those two changes — the &quot;difference of the differences.&quot; It works because subtracting the control&#39;s change removes any nationwide trend that affected both groups equally, leaving only the treated-group-specific deviation.</span>
+<span id="cb16-610"><a href="#cb16-610" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb16-611"><a href="#cb16-611" aria-hidden="true" tabindex="-1"></a>The validity of DiD rests entirely on **parallel trends**: the assumption that, in the absence of the policy, the gap between the two groups would have evolved the same way it had been evolving before. We can never observe the counterfactual, so we use pre-period parallelism as the strongest available signal that this assumption is plausible.</span>
+<span id="cb16-612"><a href="#cb16-612" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb16-613"><a href="#cb16-613" aria-hidden="true" tabindex="-1"></a><span class="fu">### Fixed effects (FE)</span></span>
+<span id="cb16-614"><a href="#cb16-614" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb16-615"><a href="#cb16-615" aria-hidden="true" tabindex="-1"></a>A statistical trick for &quot;absorbing&quot; persistent differences between units so they don&#39;t contaminate the coefficient of interest. A **drug fixed effect** absorbs every time-invariant difference between drugs — baseline volume, formulary placement, prescriber familiarity. A **year fixed effect** absorbs every nationwide shock that hit all drugs equally — pandemic effects, broad reimbursement changes. After both, what remains is each drug-year&#39;s deviation from its drug&#39;s average AND from its year&#39;s average. That residual variation is what identifies the treatment effect.</span>
+<span id="cb16-616"><a href="#cb16-616" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb16-617"><a href="#cb16-617" aria-hidden="true" tabindex="-1"></a>The &quot;two-way&quot; in **two-way fixed effects (TWFE)** just means you&#39;re using both kinds of FE simultaneously. In the right setting (simultaneous treatment, parallel trends) this estimator is equivalent to the canonical 2×2 DiD, just expressed as a regression so you can run robustness checks more easily.</span>
+<span id="cb16-618"><a href="#cb16-618" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb16-619"><a href="#cb16-619" aria-hidden="true" tabindex="-1"></a><span class="fu">### The treated × post interaction term</span></span>
+<span id="cb16-620"><a href="#cb16-620" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb16-621"><a href="#cb16-621" aria-hidden="true" tabindex="-1"></a>In a DiD regression, the coefficient on **`treated × post`** is the treatment effect. It&#39;s a 0/1 indicator for &quot;this observation is in the treated group AND in the post-treatment period.&quot; All four DiD cells (treated-pre, treated-post, control-pre, control-post) get an indicator value, and only the treated-post cell gets a 1. The coefficient on that indicator therefore captures the &quot;extra&quot; effect of being simultaneously treated and post — exactly what we want.</span>
+<span id="cb16-622"><a href="#cb16-622" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb16-623"><a href="#cb16-623" aria-hidden="true" tabindex="-1"></a><span class="fu">### Event-study</span></span>
+<span id="cb16-624"><a href="#cb16-624" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb16-625"><a href="#cb16-625" aria-hidden="true" tabindex="-1"></a>A finer-grained DiD where instead of one <span class="in">`treated × post`</span> interaction, you create one interaction per year — <span class="in">`treated × 2019`</span>, <span class="in">`treated × 2020`</span>, ..., <span class="in">`treated × 2024`</span> — and omit one reference year (here, 2022, the last full pre-policy year). Each coefficient reads as: *the gap between treated and control in this year, relative to the gap in the reference year.* Pre-period coefficients should be near zero if parallel trends hold; post-period coefficients trace the shape of the response.</span>
+<span id="cb16-626"><a href="#cb16-626" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb16-627"><a href="#cb16-627" aria-hidden="true" tabindex="-1"></a><span class="fu">### Standard errors and clustering</span></span>
+<span id="cb16-628"><a href="#cb16-628" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb16-629"><a href="#cb16-629" aria-hidden="true" tabindex="-1"></a>A **standard error (SE)** is the precision of an estimate. A **clustered SE** corrects for the fact that observations within a &quot;cluster&quot; (same drug across years, same patient across visits, same firm across quarters) are statistically dependent — they share unobserved factors that move them together. Treating dependent observations as independent makes SEs too small, which inflates t-statistics and produces false-positive findings. The standard rule is to cluster at the level at which treatment is assigned. Since the IRA cap is assigned at the drug level, we cluster at the drug level.</span>
+<span id="cb16-630"><a href="#cb16-630" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb16-631"><a href="#cb16-631" aria-hidden="true" tabindex="-1"></a><span class="fu">### Placebo tests</span></span>
+<span id="cb16-632"><a href="#cb16-632" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb16-633"><a href="#cb16-633" aria-hidden="true" tabindex="-1"></a>A test that runs the entire estimation procedure with a *fake* treatment — a fake date, a fake group, a fake outcome — under conditions where any &quot;effect&quot; must be artifactual. A null placebo is reassurance: the design isn&#39;t picking up phantom signals. A non-null placebo is a warning: something in the design is generating the appearance of effects where none should exist.</span>
+<span id="cb16-634"><a href="#cb16-634" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb16-635"><a href="#cb16-635" aria-hidden="true" tabindex="-1"></a><span class="fu">### Wald F-test on event-study leads</span></span>
+<span id="cb16-636"><a href="#cb16-636" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb16-637"><a href="#cb16-637" aria-hidden="true" tabindex="-1"></a>A formal test of the parallel-trends assumption. The **Wald F-test** asks whether a set of coefficients is jointly equal to zero. Applied to the pre-period event-study coefficients (&quot;leads&quot;), it asks: *are the pre-period treated-control gaps jointly indistinguishable from zero, year by year?* A non-rejection ($p &gt; 0.05$) is consistent with parallel trends; a rejection ($p &lt; 0.05$) means there&#39;s a real pre-existing trend differential, and the post-period DiD coefficient is contaminated.</span>
+<span id="cb16-638"><a href="#cb16-638" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb16-639"><a href="#cb16-639" aria-hidden="true" tabindex="-1"></a><span class="fu">### ATT vs ITT</span></span>
+<span id="cb16-640"><a href="#cb16-640" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb16-641"><a href="#cb16-641" aria-hidden="true" tabindex="-1"></a>**ATT** = average treatment effect on the *treated* — the effect of the policy on the population that actually got it. **ITT** = intention-to-treat — the effect on the population that was *eligible* for the policy, regardless of whether they got it. With the IRA cap, treatment compliance is mechanical (the cap applies uniformly to every Part D claim for a covered insulin), so the ATT is the relevant estimand and ITT/ATT distinctions don&#39;t bite.</span>
+<span id="cb16-642"><a href="#cb16-642" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb16-643"><a href="#cb16-643" aria-hidden="true" tabindex="-1"></a><span class="fu">### Why TWFE is unbiased here (and isn&#39;t always)</span></span>
+<span id="cb16-644"><a href="#cb16-644" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb16-645"><a href="#cb16-645" aria-hidden="true" tabindex="-1"></a>A 2021 wave of econometrics papers (Goodman-Bacon, Callaway–Sant&#39;Anna, Sun–Abraham, de Chaisemartin–D&#39;Haultfœuille) showed that TWFE estimators can be badly biased when treatment is *staggered* — when different units enter treatment at different times. The bias arises from &quot;forbidden comparisons&quot; between earlier-treated and later-treated units. **None of that applies here**: every insulin product is treated on the same date (2023-01-01), and no control drug is ever treated. Treatment timing is binary and simultaneous. Plain TWFE is fine. The Borusyak–Jaravel–Spiess and Callaway–Sant&#39;Anna estimators would produce numerically identical results in this setting; they&#39;re listed in the references for completeness.</span>
+<span id="cb16-646"><a href="#cb16-646" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb16-647"><a href="#cb16-647" aria-hidden="true" tabindex="-1"></a>---</span>
+<span id="cb16-648"><a href="#cb16-648" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb16-649"><a href="#cb16-649" aria-hidden="true" tabindex="-1"></a><span class="fu">## References</span></span>
+<span id="cb16-650"><a href="#cb16-650" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb16-651"><a href="#cb16-651" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>Inflation Reduction Act of 2022, Pub. L. 117-169, Section 11406. <span class="ot">&lt;https://www.congress.gov/bill/117th-congress/house-bill/5376&gt;</span></span>
+<span id="cb16-652"><a href="#cb16-652" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>Centers for Medicare &amp; Medicaid Services. *Medicare Part D Prescribers — by Provider and Drug.* <span class="ot">&lt;https://data.cms.gov/provider-summary-by-type-of-service/medicare-part-d-prescribers&gt;</span></span>
+<span id="cb16-653"><a href="#cb16-653" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>Centers for Medicare &amp; Medicaid Services. *Part D Senior Savings Model.* <span class="ot">&lt;https://www.cms.gov/priorities/innovation/innovation-models/part-d-senior-savings-model&gt;</span></span>
+<span id="cb16-654"><a href="#cb16-654" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>Abadie, A., Athey, S., Imbens, G. W., &amp; Wooldridge, J. M. (2023). When should you adjust standard errors for clustering? *Quarterly Journal of Economics*, 138(1).</span>
+<span id="cb16-655"><a href="#cb16-655" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>Angrist, J. D., &amp; Pischke, J.-S. (2009). *Mostly Harmless Econometrics: An Empiricist&#39;s Companion.* Princeton University Press.</span>
+<span id="cb16-656"><a href="#cb16-656" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>Athey, S., &amp; Imbens, G. W. (2017). The state of applied econometrics: causality and policy evaluation. *Journal of Economic Perspectives*, 31(2).</span>
+<span id="cb16-657"><a href="#cb16-657" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>Bergé, L. (2018). *Efficient estimation of maximum likelihood models with multiple fixed-effects: the R package* <span class="in">`fixest`</span>. CREA Discussion Papers.</span>
+<span id="cb16-658"><a href="#cb16-658" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>Borusyak, K., Jaravel, X., &amp; Spiess, J. (2024). Revisiting event-study designs: robust and efficient estimation. *Review of Economic Studies*, 91(6).</span>
+<span id="cb16-659"><a href="#cb16-659" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>Callaway, B., &amp; Sant&#39;Anna, P. H. C. (2021). Difference-in-differences with multiple time periods. *Journal of Econometrics*, 225(2).</span>
+<span id="cb16-660"><a href="#cb16-660" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>Cameron, A. C., &amp; Miller, D. L. (2015). A practitioner&#39;s guide to cluster-robust inference. *Journal of Human Resources*, 50(2).</span>
+<span id="cb16-661"><a href="#cb16-661" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>Card, D., &amp; Krueger, A. B. (1994). Minimum wages and employment: a case study of the fast-food industry in New Jersey and Pennsylvania. *American Economic Review*, 84(4).</span>
+<span id="cb16-662"><a href="#cb16-662" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>Sun, L., &amp; Abraham, S. (2021). Estimating dynamic treatment effects in event studies with heterogeneous treatment effects. *Journal of Econometrics*, 225(2).</span>
+<span id="cb16-663"><a href="#cb16-663" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>Wooldridge, J. M. (2010). *Econometric Analysis of Cross Section and Panel Data* (2nd ed.). MIT Press.</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button" data-in-quarto-modal><i class="bi"></i></button></div>
 </div></div></div></div></div>
 </div> <!-- /content -->
 

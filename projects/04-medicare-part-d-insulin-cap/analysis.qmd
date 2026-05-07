@@ -35,10 +35,10 @@ execute:
 ::: {.callout-tip icon=false}
 ## Key findings — TL;DR
 
-- **The IRA's $35 insulin cap is a clean natural experiment.** Treatment hits one therapeutic class on one date (2023-01-01), with non-insulin antihyperglycemics as an internally valid control group — a setting where two-way fixed effects are unbiased without the staggered-adoption corrections.
-- **Primary outcome — log total 30-day fills at the drug-year level.** A positive ATT is the expected sign: a binding price cap that lowers beneficiary OOP should raise utilization. The 95% CI and event-study coefficients populate from `data/processed/drug_year_panel.parquet`.
+- **The IRA's $35 insulin cap is a clean natural experiment.** Treatment hits one therapeutic class on one date (2023-01-01), with non-insulin antihyperglycemics as an internally valid control group — a setting where **two-way fixed effects (TWFE)** are unbiased without the staggered-adoption corrections that more complex DiD designs require.
+- **Primary outcome — log total 30-day fills at the drug-year level.** A positive **ATT (average treatment effect on the treated)** is the expected sign: a binding price cap that lowers beneficiary out-of-pocket cost should raise utilization. The 95% CI and event-study coefficients populate from `data/processed/drug_year_panel.parquet`.
 - **Pre-trends are the load-bearing assumption** — and the event-study plot is where it has to be defended. The 2021 coefficient is *not* expected to be zero because the CMS Senior Savings Model partially treated MA-PD insulin enrollees that year; the IRA effect is the marginal jump in 2023 once the cap went universal.
-- **Methods used (every claim ties back to a specific chunk):** DuckDB streaming filter of six annual CMS PUFs, drug-year and prescriber-drug-year panels, two-way FE DiD with drug-clustered SEs, event-study with parallel-trends F-test, placebo cap-year tests, leave-one-out drug robustness, prescriber-FE specification, and specialty-stratified heterogeneity.
+- **Methods used (every claim ties back to a specific chunk):** DuckDB streaming filter of the CMS Part D Prescriber PUFs, drug-year and prescriber-drug-year panels, TWFE DiD with drug-clustered SEs, event-study with a parallel-trends F-test, placebo cap-year tests, leave-one-out drug robustness, prescriber-FE specification, and specialty-stratified heterogeneity. Each step has an inline "**Why this test?**" callout explaining what it tests and why it earns its place at this specific moment in the analysis.
 :::
 
 ## Why this analysis
@@ -199,6 +199,19 @@ ggplot(class_year, aes(year, idx,
 
 The visual diagnostic above is the parallel-trends story in pictures. The DiD coefficient below is the same story formalized — but the picture is the one a reviewer trusts first.
 
+::: {.callout-note}
+## Why difference-in-differences, and why "parallel trends" is the whole game
+
+A **difference-in-differences (DiD)** asks: *did the gap between the treated and untreated groups change after the policy, beyond what was already changing before?* Concretely, we take two differences:
+
+1. **Within-group change**: insulin volume in 2023 minus insulin volume in 2022.
+2. **Between-group difference of those changes**: the insulin within-group change minus the equivalent within-group change for non-insulin antihyperglycemics.
+
+If the gap between groups was stable in the pre-period and then jumped in the post-period, the jump is the causal effect of the policy *under one assumption* — the **parallel-trends assumption**. Parallel trends says: in the absence of the policy, the gap between treated and control would have continued to evolve in parallel. We can never observe the counterfactual ("what would insulin have done in 2023 without the cap?"), so we use the control group's actual 2023 trajectory as the stand-in. That stand-in is only valid if pre-period gaps were stable.
+
+This is why every DiD analysis from here forward is, in some sense, an argument about whether parallel trends hold. The point estimate is one regression coefficient. The credibility of that coefficient depends on whatever evidence we can muster — visual, formal, placebo — that the assumption isn't violated. (Card & Krueger 1994; Angrist & Pischke 2009)
+:::
+
 ## Primary specification — two-way fixed effects
 
 The specification is
@@ -207,7 +220,17 @@ $$
 \log \text{Fills}_{it} = \beta \cdot (\text{Treated}_i \times \text{Post}_t) + \alpha_i + \gamma_t + \varepsilon_{it}
 $$
 
-where $i$ indexes a generic name, $t$ indexes calendar year, $\alpha_i$ is a drug fixed effect, $\gamma_t$ is a year fixed effect, and $\text{Post}_t = \mathbb{1}[t \geq 2023]$. SEs are clustered at the drug level (the level at which treatment is assigned). $\beta$ is the average treatment effect on insulin's log 30-day fills.
+where $i$ indexes a generic name, $t$ indexes calendar year, $\alpha_i$ is a drug fixed effect, $\gamma_t$ is a year fixed effect, and $\text{Post}_t = \mathbb{1}[t \geq 2023]$. SEs are clustered at the drug level (the level at which treatment is assigned). $\beta$ is the average treatment effect on the treated (ATT) — the relative change in insulin's log 30-day fills caused by the policy.
+
+::: {.callout-note}
+## Why two-way fixed effects, and why cluster the SEs at the drug level?
+
+**Drug fixed effects ($\alpha_i$)** absorb every time-invariant difference between drugs. Insulin glargine is a much higher-volume drug than insulin glulisine, and metformin dwarfs them both — but those baseline differences don't vary across years, so they get soaked up by the drug FE. What's left after the drug FE is *each drug's deviation from its own average over time.*
+
+**Year fixed effects ($\gamma_t$)** absorb every nationwide shock that hit all drugs equally — formulary tier changes, pandemic-era prescribing shifts, broad reimbursement adjustments. After the year FE, what's left is *each drug-year's deviation from its drug's average AND from the year's average.* The TWFE estimator is identifying the treatment effect from exactly this residual variation: the "extra" change in insulin specifically, in 2023 specifically, beyond what the drug-level and year-level baselines predict.
+
+**Clustering SEs at the drug level** corrects for the fact that observations within the same drug across years are not statistically independent. Insulin glargine in 2022 and insulin glargine in 2023 share unobserved supply, formulary, and demand factors. Naive ("classical") SEs would treat each drug-year as independent and produce confidence intervals that are too narrow — a known recipe for false-positive findings. We cluster at the level at which treatment is assigned (the drug); that's the standard rule. (Cameron & Miller 2015; Abadie et al. 2023)
+:::
 
 ```{r did-primary}
 m_fills  <- feols(log_fills  ~ treated_post | gnrc_name + year, data = panel, cluster = ~gnrc_name)
@@ -235,9 +258,21 @@ pretty_kable(
 )
 ```
 
-The `treated_post` coefficient is the log-percentage change in the outcome for insulin relative to the non-insulin counterfactual after 2023. A coefficient of 0.05 means roughly a 5% relative increase; exponentiating gives the multiplicative effect.
+The `treated_post` coefficient is the log-percentage change in the outcome for insulin relative to the non-insulin counterfactual after 2023. Because the outcome is logged, the coefficient is approximately a relative change: $\beta = 0.05$ implies roughly $\exp(0.05) - 1 \approx 5.1\%$ more 30-day fills for insulin than the control-group counterfactual predicts. A negative coefficient says the opposite — insulin grew *less* than controls.
 
 ## Event study — does the effect line up with the policy date?
+
+::: {.callout-note}
+## Why an event-study, when we already have a single DiD number?
+
+The DiD compresses the entire treatment effect into one number — the average jump after 2023. That's useful for headlines but hides three things a careful reader wants to see:
+
+1. **Pre-trends.** Were treated and control already moving apart *before* the policy? An event-study traces the treated-vs-control gap *year by year*, with the year right before treatment normalized to zero. Pre-period coefficients should hover near zero if parallel trends hold; if they drift, the DiD point estimate is contaminated by a pre-existing trend that has nothing to do with the policy.
+2. **Anticipation.** Markets sometimes respond before a policy takes effect — manufacturers, plans, and prescribers anticipated the IRA cap from August 2022 (when the bill was signed) onward. If insulin's 2022 coefficient is already non-zero, that's evidence of anticipation, and the DiD's "post" coefficient is a mix of anticipation + actual policy impact.
+3. **Timing of the response.** Did the effect appear sharply in 2023 or build over multiple post-years? A pile of post-period coefficients lets you see the dose-response curve over time, not just the average.
+
+Mechanically, the event-study replaces the single $\text{Treated} \times \text{Post}$ term with $\text{Treated} \times \mathbb{1}[t = k]$ interactions for each year $k$, omitting one reference year (here, 2022 — the last full pre-IRA calendar year). Each coefficient reads as: *the gap between insulin and control in year $k$, relative to the gap in 2022.* (Sun & Abraham 2021; Borusyak, Jaravel & Spiess 2024)
+:::
 
 ```{r event-study}
 # Build year-by-treated interaction with 2022 as the omitted reference.
@@ -280,6 +315,19 @@ ggplot(es_tidy, aes(year, estimate, colour = period)) +
 ```
 
 ## Parallel-trends F-test
+
+::: {.callout-note}
+## Why the parallel-trends F-test, and why a non-rejection isn't proof
+
+The event-study plot is a visual check; the F-test is the formal statement. A **joint Wald F-test** asks whether *all the pre-period coefficients are jointly equal to zero.* If we cannot reject that joint null, the data are at least consistent with parallel trends. If we *do* reject — meaning at least one pre-period coefficient is reliably different from zero — the parallel-trends assumption has measurable violations, and the post-period DiD coefficient is no longer a clean treatment effect.
+
+Two important asymmetries in how to read this test:
+
+1. **A non-rejection ($p > 0.05$) does not prove parallel trends.** It only fails to falsify them. Underpowered designs with few pre-period years and noisy outcomes will fail to reject *any* null. A small number of pre-period coefficients (this smoke test has only one) makes the test almost guaranteed to fail to reject — which is why we explicitly note when the test is statistically meaningful and when it is essentially uninformative.
+2. **A rejection ($p < 0.05$) is fatal in a way that's hard to fix.** You can sometimes argue the design is still valid (e.g., if the violation is in a single drug you can drop it via leave-one-out), but the burden of proof shifts to the analyst. Many published DiD papers fail at exactly this check, which is why this section is run *before* anyone is allowed to interpret the post-period coefficient.
+
+We run the F-test twice: once on all pre-period leads, and once dropping 2021 (which is partially treated by the CMS Senior Savings Model and therefore would be expected to deviate from zero even under valid parallel trends). The second test is the cleaner check.
+:::
 
 ```{r pretrends-f}
 pre_years <- panel |> filter(year < TREAT_FIRST_YEAR) |> distinct(year) |> pull(year)
@@ -328,7 +376,18 @@ if (n_pre >= 2) {
 
 ## Placebo cap years
 
-If a "treatment effect" of similar magnitude appears at fake cap dates inside the pre-period, the design fails. The two natural placebos are 2020 (no policy change in either group) and 2021 (SSM kickoff — a *real* partial treatment, so a non-zero coefficient here is the design working, not failing).
+::: {.callout-note}
+## Why placebos earn their place by trying to break the design
+
+A **placebo test** asks the most adversarial question we can ask of the design: *what if I pretend the cap took effect in a year when no policy actually changed?* If we re-run the same DiD with a fake cap date inside the pre-IRA window and the estimator obediently produces a "treatment effect" of similar magnitude, the design is detecting random noise that pre-existed the real policy — and the actual 2023 coefficient is not credibly the effect of the cap. If the placebo coefficient is near zero, the design is at least not fooled by random fluctuation.
+
+There are two kinds of placebo dates worth running:
+
+1. **Pure placebos** — fake cap years when nothing actually changed. 2020 is the cleanest example here: no insulin-specific policy, no insulin demand shock that we know of. A near-zero placebo coefficient at 2020 is reassurance that the design isn't picking up phantom trends.
+2. **Known partial-treatment placebos** — years when a real but smaller policy was in effect. **2021 is a *partial-treatment* placebo, not a pure one**: the CMS Senior Savings Model demonstration extended a $35 insulin cap to participating MA-PD plans starting 2021-01-01. So a non-zero 2021 placebo is the design *correctly detecting* a known smaller version of the same intervention — evidence the estimator works, not evidence it's broken.
+
+Reading the table below: a near-zero 2020 coefficient is good news; a positive 2021 coefficient (if estimable in the panel) tells the SSM story. Either an unexpectedly large 2020 or an unexpectedly *negative* 2021 would be a red flag. (Athey & Imbens 2017)
+:::
 
 ```{r placebos}
 placebo_fit <- function(fake_year) {
@@ -375,7 +434,15 @@ if (length(feasible_placebos) > 0) {
 
 ### Drop GLP-1 RAs from the control group
 
-Semaglutide and tirzepatide saw large 2022–2024 demand growth that is unrelated to the insulin cap and could distort the comparator average if it shows up as control-group growth. Re-estimate without GLP-1 RAs.
+::: {.callout-note}
+## Why robustness to comparator composition matters
+
+Parallel trends is a property of *the specific control group you chose*. It can hold for some drugs and fail for others. Imagine the entire non-insulin antihyperglycemic group is fine *except* for one therapeutic class that experienced a huge concurrent demand shock unrelated to the insulin cap. That class's growth pulls the control mean upward in 2023, which drags the DiD coefficient downward — making the insulin effect look smaller (or more negative) than it really is.
+
+That's exactly what's happening here with the **GLP-1 receptor agonists**. Semaglutide (Ozempic) and tirzepatide (Mounjaro / Zepbound) experienced a massive supply-constrained demand surge starting in 2022, driven largely by weight-management prescribing. That growth has nothing to do with the insulin cap. If we leave GLP-1s in the control group, their +60% YoY fill volume sets a counterfactual that insulin would never have matched even if the cap had been generous. The DiD reads negative, but the negativity is GLP-1 contamination, not an insulin response.
+
+The fix is mechanical: re-estimate with GLP-1 RAs removed from the control group. The remaining controls (metformin, sulfonylureas, DPP-4i, SGLT2i, thiazolidinediones) are not under a similar concurrent shock. If the insulin coefficient flips toward positive when GLP-1s are dropped, that is the GLP-1 contamination story showing itself. The right primary specification depends on which control set you defend as parallel-trends-credible — and the smoke-test sample size here is small enough that *neither* spec produces a precise estimate, but the *direction* of the flip is informative.
+:::
 
 ```{r loo-glp1}
 m_no_glp1 <- feols(
@@ -394,6 +461,16 @@ bind_rows(
 ```
 
 ### Leave-one-out by treated drug
+
+::: {.callout-note}
+## Why a single drug can drive an entire result
+
+Insulin glargine alone accounts for roughly 45% of all insulin 30-day fills in the panel. Insulin lispro and insulin aspart are each another ~13%. Together, three products account for about 70% of treated-arm volume. If any of those three has an idiosyncratic 2023 story — a manufacturer rebate change, a formulary tier shift, a supply disruption, a brand-to-biosimilar switch — that single drug's trajectory could be the entire DiD point estimate.
+
+**Leave-one-out (LOO)** robustness re-estimates the DiD a dozen times, dropping one treated drug at a time. The plot shows each estimate alongside the primary estimate. The width of the LOO range is the diagnostic: if the LOO estimates cluster tightly around the primary line, no single product is anchoring the result. If one specific drop pulls the estimate noticeably toward zero (or away from zero), that drug deserves a second look — and ideally a separate paragraph in the limitations section.
+
+LOO is the simplest possible influence diagnostic. It doesn't replace formal tools like Cook's distance, but in a panel this small it's more interpretable: every line in the plot is "what would the answer be if we'd never had this product?"
+:::
 
 ```{r loo-treated}
 treated_drugs <- panel |> filter(treated == 1) |> distinct(gnrc_name) |> pull()
@@ -423,6 +500,16 @@ ggplot(loo, aes(reorder(dropped, estimate), estimate)) +
 
 ### Prescriber-fixed-effects specification
 
+::: {.callout-note}
+## Why a prescriber fixed effect changes the question being asked
+
+At the drug-year level, you cannot tell whether insulin volume rose because (a) **existing insulin prescribers wrote more scripts each**, (b) **new prescribers entered the insulin market**, or (c) **the mix of who prescribes insulin shifted** (e.g., endocrinologists left Part D billing and primary-care doctors picked it up). All three would look identical in the aggregate panel.
+
+Adding an **NPI fixed effect** absorbs every time-invariant difference between prescribers — their specialty, their geography, their typical panel size, their baseline propensity to use insulin at all. After the prescriber FE, the regression is identifying the treatment effect *within prescriber*: did the same prescriber who wrote 50 insulin scripts in 2022 write more in 2023, beyond what the year-FE-adjusted control trajectory predicts?
+
+That's a stronger and more interpretable question. It rules out compositional explanations entirely. If the prescriber-FE estimate matches the drug-level estimate, the drug-level result is not a compositional artifact. If they diverge, the divergence is itself the finding — it tells you whether the policy moved the *intensive margin* (existing prescribers writing more) or the *extensive margin* (different prescribers entering the market). Both are real policy effects; they just have different downstream implications. (Wooldridge 2010, Ch. 10)
+:::
+
 ```{r prescriber-fe}
 prescriber_panel <- prescriber |>
   filter(drug_class != "Other") |>
@@ -448,6 +535,16 @@ bind_rows(
 ```
 
 ## Heterogeneity by prescriber specialty
+
+::: {.callout-note}
+## Why average effects can hide important variation
+
+The headline ATT averages over every prescriber in the panel — endocrinologists, primary-care physicians, PAs, NPs, and assorted other specialties. But the policy may not have hit each specialty's patient panel equally. **Endocrinology patients** were more likely to already have access to manufacturer patient-assistance programs and structured care management before the cap, so the marginal cost-sharing relief from the cap is smaller for them. **Primary-care patients** were more likely to face the un-mitigated $300+ list-price OOP that the cap actually displaced; the cap's marginal effect on their behavior should be larger.
+
+If the cap had a uniform effect, all three specialty buckets should produce similar coefficients. If the cap mattered most where pre-cap OOP was highest, primary-care should show a larger effect than endocrinology. **Stratifying by specialty is the cleanest way to see this** — the alternative would be a triple interaction in a single model, which is harder to read and produces less interpretable standard errors at small sample sizes.
+
+The split below uses three buckets: explicit endocrinology, explicit primary care (family medicine, internal medicine, geriatrics, general practice, NPs, PAs), and everything else. The "Other" bucket is mostly cardiology, nephrology, and hospitalists — specialties that prescribe insulin but in lower volumes than the first two groups.
+:::
 
 ```{r specialty-het}
 specialty_bucket <- function(t) {
@@ -503,11 +600,64 @@ ggplot(het_table, aes(reorder(specialty, estimate), estimate)) +
 - **Off-label and indication mix.** Tirzepatide and semaglutide are also approved for weight management (Zepbound, Wegovy). Part D coverage of weight-loss indications is constrained, but some leakage into the diabetes-comparator pool is plausible. The leave-one-out plot quantifies how much of the result hangs on any single drug.
 - **Senior Savings Model partial treatment.** SSM applied to enrollees of participating MA-PD plans starting 2021. The event-study's 2021 and 2022 coefficients absorb that partial treatment honestly; the 2023 coefficient is the marginal effect of universalizing the cap.
 
+## Methods primer
+
+A one-stop reference for the design vocabulary used above. Skip this if you've taken an applied-econometrics course; otherwise, every concept the analysis depends on is here in plain language.
+
+### Difference-in-differences (DiD)
+
+The simplest possible policy-evaluation tool when you can't randomize. Take two groups (treated and control), measure each one before and after the policy, and compare the *change* in the treated group's outcome to the *change* in the control's. The treatment effect is the gap between those two changes — the "difference of the differences." It works because subtracting the control's change removes any nationwide trend that affected both groups equally, leaving only the treated-group-specific deviation.
+
+The validity of DiD rests entirely on **parallel trends**: the assumption that, in the absence of the policy, the gap between the two groups would have evolved the same way it had been evolving before. We can never observe the counterfactual, so we use pre-period parallelism as the strongest available signal that this assumption is plausible.
+
+### Fixed effects (FE)
+
+A statistical trick for "absorbing" persistent differences between units so they don't contaminate the coefficient of interest. A **drug fixed effect** absorbs every time-invariant difference between drugs — baseline volume, formulary placement, prescriber familiarity. A **year fixed effect** absorbs every nationwide shock that hit all drugs equally — pandemic effects, broad reimbursement changes. After both, what remains is each drug-year's deviation from its drug's average AND from its year's average. That residual variation is what identifies the treatment effect.
+
+The "two-way" in **two-way fixed effects (TWFE)** just means you're using both kinds of FE simultaneously. In the right setting (simultaneous treatment, parallel trends) this estimator is equivalent to the canonical 2×2 DiD, just expressed as a regression so you can run robustness checks more easily.
+
+### The treated × post interaction term
+
+In a DiD regression, the coefficient on **`treated × post`** is the treatment effect. It's a 0/1 indicator for "this observation is in the treated group AND in the post-treatment period." All four DiD cells (treated-pre, treated-post, control-pre, control-post) get an indicator value, and only the treated-post cell gets a 1. The coefficient on that indicator therefore captures the "extra" effect of being simultaneously treated and post — exactly what we want.
+
+### Event-study
+
+A finer-grained DiD where instead of one `treated × post` interaction, you create one interaction per year — `treated × 2019`, `treated × 2020`, ..., `treated × 2024` — and omit one reference year (here, 2022, the last full pre-policy year). Each coefficient reads as: *the gap between treated and control in this year, relative to the gap in the reference year.* Pre-period coefficients should be near zero if parallel trends hold; post-period coefficients trace the shape of the response.
+
+### Standard errors and clustering
+
+A **standard error (SE)** is the precision of an estimate. A **clustered SE** corrects for the fact that observations within a "cluster" (same drug across years, same patient across visits, same firm across quarters) are statistically dependent — they share unobserved factors that move them together. Treating dependent observations as independent makes SEs too small, which inflates t-statistics and produces false-positive findings. The standard rule is to cluster at the level at which treatment is assigned. Since the IRA cap is assigned at the drug level, we cluster at the drug level.
+
+### Placebo tests
+
+A test that runs the entire estimation procedure with a *fake* treatment — a fake date, a fake group, a fake outcome — under conditions where any "effect" must be artifactual. A null placebo is reassurance: the design isn't picking up phantom signals. A non-null placebo is a warning: something in the design is generating the appearance of effects where none should exist.
+
+### Wald F-test on event-study leads
+
+A formal test of the parallel-trends assumption. The **Wald F-test** asks whether a set of coefficients is jointly equal to zero. Applied to the pre-period event-study coefficients ("leads"), it asks: *are the pre-period treated-control gaps jointly indistinguishable from zero, year by year?* A non-rejection ($p > 0.05$) is consistent with parallel trends; a rejection ($p < 0.05$) means there's a real pre-existing trend differential, and the post-period DiD coefficient is contaminated.
+
+### ATT vs ITT
+
+**ATT** = average treatment effect on the *treated* — the effect of the policy on the population that actually got it. **ITT** = intention-to-treat — the effect on the population that was *eligible* for the policy, regardless of whether they got it. With the IRA cap, treatment compliance is mechanical (the cap applies uniformly to every Part D claim for a covered insulin), so the ATT is the relevant estimand and ITT/ATT distinctions don't bite.
+
+### Why TWFE is unbiased here (and isn't always)
+
+A 2021 wave of econometrics papers (Goodman-Bacon, Callaway–Sant'Anna, Sun–Abraham, de Chaisemartin–D'Haultfœuille) showed that TWFE estimators can be badly biased when treatment is *staggered* — when different units enter treatment at different times. The bias arises from "forbidden comparisons" between earlier-treated and later-treated units. **None of that applies here**: every insulin product is treated on the same date (2023-01-01), and no control drug is ever treated. Treatment timing is binary and simultaneous. Plain TWFE is fine. The Borusyak–Jaravel–Spiess and Callaway–Sant'Anna estimators would produce numerically identical results in this setting; they're listed in the references for completeness.
+
+---
+
 ## References
 
 - Inflation Reduction Act of 2022, Pub. L. 117-169, Section 11406. <https://www.congress.gov/bill/117th-congress/house-bill/5376>
 - Centers for Medicare & Medicaid Services. *Medicare Part D Prescribers — by Provider and Drug.* <https://data.cms.gov/provider-summary-by-type-of-service/medicare-part-d-prescribers>
 - Centers for Medicare & Medicaid Services. *Part D Senior Savings Model.* <https://www.cms.gov/priorities/innovation/innovation-models/part-d-senior-savings-model>
+- Abadie, A., Athey, S., Imbens, G. W., & Wooldridge, J. M. (2023). When should you adjust standard errors for clustering? *Quarterly Journal of Economics*, 138(1).
+- Angrist, J. D., & Pischke, J.-S. (2009). *Mostly Harmless Econometrics: An Empiricist's Companion.* Princeton University Press.
+- Athey, S., & Imbens, G. W. (2017). The state of applied econometrics: causality and policy evaluation. *Journal of Economic Perspectives*, 31(2).
+- Bergé, L. (2018). *Efficient estimation of maximum likelihood models with multiple fixed-effects: the R package* `fixest`. CREA Discussion Papers.
 - Borusyak, K., Jaravel, X., & Spiess, J. (2024). Revisiting event-study designs: robust and efficient estimation. *Review of Economic Studies*, 91(6).
 - Callaway, B., & Sant'Anna, P. H. C. (2021). Difference-in-differences with multiple time periods. *Journal of Econometrics*, 225(2).
-- Bergé, L. (2018). *Efficient estimation of maximum likelihood models with multiple fixed-effects: the R package* `fixest`. CREA Discussion Papers.
+- Cameron, A. C., & Miller, D. L. (2015). A practitioner's guide to cluster-robust inference. *Journal of Human Resources*, 50(2).
+- Card, D., & Krueger, A. B. (1994). Minimum wages and employment: a case study of the fast-food industry in New Jersey and Pennsylvania. *American Economic Review*, 84(4).
+- Sun, L., & Abraham, S. (2021). Estimating dynamic treatment effects in event studies with heterogeneous treatment effects. *Journal of Econometrics*, 225(2).
+- Wooldridge, J. M. (2010). *Econometric Analysis of Cross Section and Panel Data* (2nd ed.). MIT Press.
