@@ -5,7 +5,7 @@ author: "Paulina Del Mundo Del Fierro, MD, MPH"
 date: last-modified
 format:
   html:
-    theme: cosmo
+    theme: [cosmo, _theme.scss]
     toc: true
     toc-depth: 3
     toc-location: right
