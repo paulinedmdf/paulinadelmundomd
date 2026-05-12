@@ -236,6 +236,8 @@ where $i$ indexes a generic name, $t$ indexes calendar year, $\alpha_i$ is a dru
 ::: {.callout-note collapse="true"}
 ## Going deeper — the Liang–Zeger cluster-robust ("sandwich") variance
 
+**Plain English.** Ordinary regression assumes every observation is *independent* — like rolling a fresh die each time. But real-world panel data isn't independent: observations within the same drug (or the same patient, or the same firm) are correlated because they share unobserved factors. If you ignore that and use ordinary standard errors, your confidence intervals come out *too narrow* and you'll claim significance for results that aren't really there. The "sandwich" estimator (named because the formula visually looks like bread–meat–bread) fixes this by *estimating* the within-group correlations directly from your residuals instead of assuming independence. You don't have to specify the correlation structure — the sandwich figures it out empirically. The standard rule is "cluster the SEs at the level where treatment was assigned," which here is the drug.
+
 **Intuition.** OLS gives one variance formula assuming all errors are i.i.d.: $\widehat{\text{Var}}(\hat\beta) = \hat\sigma^2 (\mathbf{X}^\top \mathbf{X})^{-1}$. If errors are correlated within clusters (drugs), that formula understates variance because it pretends each within-cluster observation is independent new evidence — when in reality they carry overlapping information. The cluster-robust ("sandwich") estimator replaces the i.i.d. assumption with an empirical estimate of the within-cluster correlation structure, *whatever* it happens to be.
 
 **The sandwich formula.** With $G$ clusters indexed by $g$, residuals $\hat e_g$, and design block $\mathbf{X}_g$ for cluster $g$:
@@ -281,6 +283,8 @@ The `treated_post` coefficient is the log-percentage change in the outcome for i
 
 ::: {.callout-note collapse="true"}
 ## Going deeper — interpreting a log-outcome coefficient as a percent change
+
+**Plain English.** When your outcome variable in a regression is the *logarithm* of something (log of fills, log of sales), a coefficient of $0.05$ doesn't mean "the outcome increases by 0.05" — it means "the *log* of the outcome increases by 0.05." To translate that to percent change in the actual outcome, you compute $e^{0.05} - 1 \approx 0.0513$, or about 5.1%. For *small* coefficients (under ~0.10) the coefficient itself is close enough to the percent change. For bigger coefficients the gap grows and you should report the exponentiated version explicitly. The reason regressions use log-outcomes in the first place is that *percent* changes — not absolute changes — are usually the meaningful quantity for things like prescription volumes or sales (doubling fills is the same magnitude of event whether you start at 100 or 10,000).
 
 **Setup.** When the outcome is $\log Y$, a one-unit increase in a regressor $X$ changes $\log Y$ by $\beta$ — i.e., $Y$ scales by $e^\beta$. So the percent change in $Y$ is exactly
 $$\frac{\Delta Y}{Y} = e^{\beta} - 1.$$
@@ -380,6 +384,8 @@ We run the F-test twice: once on all pre-period leads, and once dropping 2021 (w
 
 ::: {.callout-note collapse="true"}
 ## Going deeper — the Wald F-statistic formula and what it tests
+
+**Plain English.** Sometimes you want to test, not "is *this one* coefficient zero?", but "are these *three* coefficients all jointly zero, considered together?" The Wald F-test is the tool for that joint question. It's essentially a multidimensional t-test: take your three coefficient estimates, divide them by their joint uncertainty (which accounts for how correlated they are with each other), square and sum. Under the null hypothesis "all three really are zero," the resulting statistic follows a known F distribution, so you can read off a p-value. A small F-statistic = "the data is consistent with all three coefficients being zero" — good news for parallel trends. A big F-statistic = "something is going on in those pre-period years that *isn't* zero," and the parallel-trends assumption is shaky.
 
 **Setup.** We have $\hat\beta$ (a $p$-vector of coefficient estimates) and $\widehat{\text{Var}}(\hat\beta)$ (its $p \times p$ variance matrix). We want to test a *set* of $q$ linear restrictions on $\beta$ simultaneously — e.g., "the pre-period event-study leads $\hat\beta_{2019}, \hat\beta_{2020}, \hat\beta_{2021}$ are all jointly equal to zero." Encode that as $\mathbf{R}\beta = \mathbf{r}$, where $\mathbf{R}$ is a $q \times p$ "selector" matrix and $\mathbf{r}$ a $q$-vector.
 
@@ -716,6 +722,8 @@ A 2021 wave of econometrics papers (Goodman-Bacon, Callaway–Sant'Anna, Sun–A
 ::: {.callout-note collapse="true"}
 ## Going deeper — the Goodman-Bacon decomposition and "forbidden comparisons"
 
+**Plain English.** For decades economists used "two-way fixed effects" (TWFE) as the all-purpose DiD tool. Then a wave of 2021 papers showed that TWFE can produce *garbage* in "staggered adoption" settings — when different units get treated at different times. The problem: TWFE implicitly compares already-treated units against later-treated units, and treats the already-treated unit as the *control* for the later one. But that unit *isn't a control anymore* — it's been treated, so the comparison is contaminated by whatever post-treatment dynamics are unfolding. Goodman-Bacon proved that TWFE is a weighted sum of every possible 2×2 comparison, and showed which weights are "clean" and which are contaminated. **None of this applies to the insulin cap**, because every insulin product was treated on the exact same date — no staggering, no contaminated comparisons.
+
 **The result.** In a staggered-adoption panel (units adopt treatment at different times), the TWFE estimator on $\text{Treated}_{it} \times \text{Post}_{it}$ is a *weighted average* of every possible 2×2 DiD between treated and untreated subsets — but the weights include some that are **negative**, and some 2×2s use already-treated units as the "control" for later-treated units.
 
 **The decomposition.** With $K$ treatment-timing groups (units that adopt treatment in year $k$) and a never-treated group, the TWFE coefficient $\hat\beta_{\text{TWFE}}$ decomposes as
@@ -737,6 +745,8 @@ The IRA cap took effect 2023-01-01 *for every covered insulin product simultaneo
 
 ::: {.callout-note collapse="true"}
 ## Going deeper — the few-cluster problem and wild cluster bootstrap
+
+**Plain English.** Cluster-robust standard errors only work well when you have *many* clusters (40+). With only 20–30 clusters — which is what we have here, since there are only a few dozen distinct drugs — the math overstates how precise your estimate really is. You get p-values smaller than they should be, and false-significance becomes a real risk. The fix is a **bootstrap**: instead of trusting the asymptotic math, you re-sample your data thousands of times (with a twist that preserves the clustering), refit the model on each resample, and build up an empirical distribution of test statistics. The "wild" version flips residual signs at the cluster level — preserving within-cluster correlation while creating valid null draws. The bootstrap p-value is the more honest number when clusters are few.
 
 **The asymptotic regime.** Cluster-robust SEs are consistent as $G \to \infty$. The typical asymptotic distribution claims rely on $G$ being "large" — but how large? Cameron, Gelbach, Miller (2008) and follow-ups suggest **$G \geq 40$** is the conventional comfort zone for asymptotic clustered inference. Below that, the asymptotic normal approximation systematically *over-rejects* — t-statistics that should follow a $t_{G-1}$ distribution are compared to a standard normal, giving p-values that are too small.
 

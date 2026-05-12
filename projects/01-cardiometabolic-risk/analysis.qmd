@@ -400,6 +400,8 @@ if (length(fit_results) > 0) {
 ::: {.callout-note collapse="true"}
 ## Going deeper — what skewness and excess kurtosis actually measure
 
+**Plain English.** If you plotted everyone's value as a histogram, would it lean to one side? *Skewness* answers that — zero means symmetric (like a bell curve), positive means there's a long tail of high values stretching to the right. *Kurtosis* measures how "fat" the tails are — whether the rare extreme values show up more often or less often than they would in a normal bell curve. We say "excess" kurtosis because we subtract 3 first, so a perfect bell curve scores 0; anything bigger means "more extremes than I'd expect." Both numbers warn you when your data is too lopsided or too tail-heavy to be treated like a bell curve in downstream analyses.
+
 **Intuition.** Skewness measures *asymmetry*: positive skew means the right tail is longer than the left (mean lies to the right of the median). Kurtosis measures *tail-heaviness* — how much probability sits in the extremes versus the shoulders. "Excess" kurtosis subtracts 3 so that a normal distribution has 0; positive values mean tails heavier than normal (leptokurtic), negative means lighter (platykurtic).
 
 **Formulas.** For a sample $x_1, \ldots, x_n$ with mean $\bar{x}$ and SD $s$:
@@ -411,6 +413,8 @@ The standardisation makes both unitless. The cube and fourth power amplify extre
 
 ::: {.callout-note collapse="true"}
 ## Going deeper — what AIC is actually doing
+
+**Plain English.** Suppose you have a few candidate "shapes" your data might follow — a normal bell curve, a lopsided log-normal, a gamma. AIC scores each candidate; lower = better. It rewards models that fit the data tightly but punishes models that use too many free dials to do it (otherwise you'd always pick the most complicated model and overfit). The score isn't meaningful on its own — only *differences* between candidates matter. A gap of 2 = weak preference; a gap of 10 or more = decisive. You compare AICs to pick the best candidate, not to make claims about whether any single model is "good."
 
 **Intuition.** The Akaike Information Criterion balances *fit* against *complexity*. The fit term ($-2\log L$) rewards models that assign high likelihood to the observed data; the penalty term ($2k$) charges every extra free parameter. The deep result behind the formula is that, under regularity conditions, AIC is an asymptotically unbiased estimator of (twice) the Kullback–Leibler divergence between the candidate model and the true data-generating distribution. Minimising AIC ≈ minimising expected information loss.
 
@@ -504,6 +508,8 @@ knitr::kable(
 ::: {.callout-note collapse="true"}
 ## Going deeper — why the latent residual variance is exactly $\pi^2/3$
 
+**Plain English.** Behind every logistic regression there's a hidden continuous "propensity" score we never observe — we only see whether each person crossed a threshold (yes/no on metabolic syndrome). The randomness around that hidden score has a fixed amount of variance built into the math, exactly $\pi^2/3 \approx 3.29$, set by the logistic curve we use. So when we ask "how much of the variation comes from sampling stratum or PSU clustering?", we measure it as a fraction of that fixed total. The number isn't arbitrary; it's baked into the choice of logistic regression itself, the same way using Fahrenheit vs Celsius bakes in different reference temperatures.
+
 **Intuition.** A binary logistic regression can be rewritten as a *latent variable model*: imagine a continuous, unobserved "propensity" $Y^*_i = X_i\beta + \varepsilon_i$, and we observe $Y_i = 1$ iff $Y^*_i > 0$. The link function is the CDF of $\varepsilon_i$ — for logit, $\varepsilon_i$ follows the **standard logistic distribution**. So the per-observation residual variance, *on the latent scale we never measure*, is fixed by the choice of link, not estimated. There is nothing to estimate because the link's scale is what defines the unit.
 
 **Formula.** The standard logistic density is $f(\varepsilon) = e^{-\varepsilon}/(1+e^{-\varepsilon})^2$, symmetric about zero with
@@ -531,6 +537,8 @@ The fix is the **MEC sample weight (`WTMEC2YR`)** — a number per row that says
 
 ::: {.callout-note collapse="true"}
 ## Going deeper — Taylor linearization, `nest = TRUE`, and what the SE is actually computing
+
+**Plain English.** When you compute an average on survey data, the formula is "sum of (weight × value) divided by sum of weights." That's a *ratio* of two things that both have random sampling noise — and ratios don't have a clean closed-form formula for how uncertain they are. Taylor linearization is a calculus trick: pretend the ratio is a straight line at the point you care about, compute how uncertain *that* straight line is, and call it a good approximation. As for `nest = TRUE`: NHANES uses small numeric IDs for its sub-clusters (PSUs) that get reused inside different bigger clusters (strata). `nest = TRUE` tells R "treat the small IDs as living inside the big IDs, not as the same thing across the whole country." Forget it and your standard errors will be badly wrong.
 
 **Intuition.** A survey-weighted mean $\hat{Y} = \sum w_i y_i / \sum w_i$ is a *ratio of two random sums*. Its variance does not have a closed form — both numerator and denominator are sums of dependent random variables. Taylor linearization replaces the ratio with its first-order Taylor expansion (a linear function of the data) and computes the variance of *that*, which does have a closed form. The exchange of "exact variance of a nonlinear thing" for "approximate variance of its linear approximation" is the price of admission for survey inference.
 
@@ -764,6 +772,8 @@ The outcome (metabolic syndrome) is **binary** — either the person meets ≥3 
 ::: {.callout-note collapse="true"}
 ## Going deeper — why `family = quasibinomial()` in `svyglm`
 
+**Plain English.** Binomial logistic regression assumes the data behave like a perfect coin-flip experiment — the *spread* of yes/no outcomes is uniquely determined by their *average*. Real data is messier; the spread can be wider (or narrower) than the binomial formula predicts. Quasibinomial fixes this by saying "use the binomial model for the *average* outcome, but estimate the actual *spread* empirically from the data, not from the formula." It changes nothing about the coefficient point estimates, only your confidence-interval widths. In survey analysis it's a near-mandatory choice because clustering and weighting introduce extra spread the plain binomial doesn't expect.
+
 **Intuition.** Binomial logistic regression assumes that, conditional on $X$, the outcome $Y$ has variance $p(1-p)$ — fully determined by the mean. Real survey data rarely respect that. Clustering, design weights, and unmodelled heterogeneity all let the variance run higher (overdispersion) or lower (underdispersion) than the binomial says it should. **Quasi-likelihood** keeps the binomial *mean* model but lets the variance scale by a free dispersion parameter $\phi$, estimated from the residuals.
 
 **Formula.** Quasi-binomial assumes
@@ -822,6 +832,8 @@ Use MI whenever you have non-trivial missingness on key variables (>5%) and the 
 
 ::: {.callout-note collapse="true"}
 ## Going deeper — Predictive Mean Matching, step by step
+
+**Plain English.** When you have missing data, the laziest fix is to plug in each missing value with a regression's predicted number. But that gives every missing person the same boring average prediction — unrealistic. Predictive Mean Matching is a smarter trick: for each person with a missing value, compute the regression's prediction, then find a handful of *real* people whose predictions are similar, and copy one of *their actual observed values* into the missing spot. So the imputed value is always something that genuinely occurred in your data — heavy tails, weird readings, lab outliers all preserved. You repeat the whole process 5 (or more) times to get 5 plausible "filled-in" datasets that each look like the real one.
 
 **Intuition.** Naive regression imputation replaces a missing $y$ with the model's predicted $\hat{y}$ — but that hands every imputed value the same conditional mean, which is unrealistically smooth (a 32-year-old's imputed triglycerides should look like 32-year-olds' actual triglycerides, not the regression's noiseless prediction at age 32). **PMM** keeps the regression as a *matching tool*: it predicts $\hat{y}$ for everyone, finds the $k$ observed cases whose own predictions are nearest, and donates one of *their actual observed values* as the imputation. The result is plausibly-realistic — every imputed value is a value that actually occurred somewhere in the data.
 
@@ -939,6 +951,8 @@ pretty_kable(
 ::: {.callout-note collapse="true"}
 ## Going deeper — derivation of Rubin's rules
 
+**Plain English.** You've imputed your missing data 5 different ways, run the same analysis on each version, and now have 5 different answers. How do you collapse those into one final answer plus one final confidence interval? The point estimate is easy — just average the 5. The uncertainty is trickier: it has two parts. First, the regular sampling noise you'd have on any single dataset (the *within-imputation* variance). Second, the extra noise from "the blanks could have been filled in differently" — measured by how much the 5 answers disagree with each other (the *between-imputation* variance). Rubin's rules add those two pieces (with a tiny correction for using only 5 imputations instead of infinity) to get one honest total. Skip the second piece and your CI is too narrow; you'll over-claim significance.
+
 **Intuition.** Pooling $m$ imputed estimates needs to combine two sources of uncertainty: the *usual* sampling uncertainty inside each completed dataset (the **within-imputation variance** $\bar{U}$), and the uncertainty *across* imputations introduced because the missing data could have been filled in many different plausible ways (the **between-imputation variance** $B$). Treating the $m$ estimates as if they were independent observations of the same quantity gives Rubin's rules.
 
 **Derivation.** Let $\hat{Q}_\ell$ and $U_\ell$ be the estimate and its variance from the $\ell$-th imputation. The pooled point estimate is the simple average:
@@ -1012,6 +1026,8 @@ pretty_kable(
 ::: {.callout-note collapse="true"}
 ## Going deeper — what "Fraction of Missing Information" actually measures
 
+**Plain English.** FMI sounds like "the percent of rows that had missing data" — but it's *not*. It's the percent of your final coefficient's *wobble* that comes from "I had to guess the missing values" (rather than from the regular sampling noise you'd have even with complete data). A high FMI (say 50%) means imputation is doing a lot of the heavy lifting — and 5 imputations isn't really enough; you should run 50. A low FMI (10%) means complete-case and imputed answers would barely differ — 5 is plenty. The rule of thumb "use at least $\text{FMI} \times 100$ imputations" comes from wanting the noise added by *having only finite imputations* to stay below ~1%.
+
 **Intuition.** FMI is *not* the fraction of rows that were missing on the variable; it's the fraction of the pooled coefficient's *variance* that comes from the imputation step (rather than from finite-sample uncertainty you would have had even with complete data). A coefficient with FMI = 0.5 is half-driven by the fact that some rows had to be filled in.
 
 **Formula.** With the Rubin-rules quantities from above ($\bar{U}$ = within-imputation variance, $B$ = between-imputation variance, $m$ = number of imputations):
@@ -1043,6 +1059,8 @@ Instead we ask a more interesting question: *how far can basic demographics and 
 
 ::: {.callout-note collapse="true"}
 ## Going deeper — how gradient boosting actually fits each tree
+
+**Plain English.** Imagine you're trying to predict who has metabolic syndrome from age, sex, and BMI. Tree 1 takes a rough first pass — say, "anyone over 50 with BMI > 30 is high risk." It's decent but misses lots of detail. Tree 2 looks at *only the people Tree 1 got wrong* and learns to correct those mistakes. Tree 3 looks at what Trees 1 + 2 still got wrong, and corrects again. You stack 400 of these "error-correcting" trees together — each only nudging the prediction by a tiny amount (5% of its vote) — and the result is a flexible nonlinear model that captures patterns no single decision tree could. That's gradient boosting.
 
 **Intuition.** Boosting is "ensemble by sequential correction": each new tree is fit *not to the labels*, but to the **residual errors of the running ensemble so far**. Tree 1 makes its best guess; tree 2 is asked "where did tree 1 still get it wrong?" and given that as its target; tree 3 tackles what trees 1+2 still miss; and so on. After $M$ trees, the prediction is a sum (with a small learning-rate multiplier) of all the trees' contributions. The "gradient" in "gradient boosting" refers to the fact that the residual being chased is, formally, the negative gradient of the loss function evaluated at the current prediction.
 
@@ -1089,6 +1107,8 @@ print(f"Brier: {brier_score_loss(y_te, p_te):.3f}")
 ::: {.callout-note collapse="true"}
 ## Going deeper — how a ROC curve is constructed
 
+**Plain English.** A risk model spits out a probability between 0 and 1, but to actually classify someone as "high risk" or "low risk" you need a cutoff (say 0.5). If you change the cutoff, you trade off two errors: too low = catch every sick person but generate lots of false alarms; too high = no false alarms but miss real cases. The ROC curve shows *every possible cutoff at once* by plotting true-positive rate vs false-positive rate as you slide the threshold from 1 down to 0. AUC = area under that curve — 1.0 is perfect, 0.5 is a random coin flip. It summarises how well the model *ranks* patients regardless of which cutoff you'd pick in practice.
+
 **Intuition.** A model that outputs probabilities doesn't classify until you pick a threshold. At threshold 0.5, anyone with $\hat{p} \geq 0.5$ gets called "positive." The **true positive rate (sensitivity)** and **false positive rate (1 − specificity)** at that threshold are one point. Move the threshold from 1 down to 0 and you trace out a curve in TPR-FPR space — the ROC curve.
 
 **Construction algorithm.**
@@ -1131,6 +1151,8 @@ plt.show()
 ::: {.callout-note collapse="true"}
 ## Going deeper — calibration binning (`n_bins=10, strategy="quantile"`)
 
+**Plain English.** A "calibration plot" answers: when the model says "30% risk," do 30% of those patients actually develop the condition? To draw the plot you can't show every patient as a dot (too noisy), so you group patients into 10 buckets, plot the average prediction in each bucket on the x-axis and the actual observed rate in each bucket on the y-axis. If the model is perfectly calibrated, all 10 dots land on the diagonal line y = x. **Quantile binning** makes each bucket the same size (100 patients per bucket — usually the right choice). **Uniform binning** makes each bucket the same width on the probability axis (0.0–0.1, 0.1–0.2, ...) — useful when you care about specific cutoffs like the 10% threshold for statin therapy.
+
 **Intuition.** A calibration curve needs to compare *predicted probability* against *empirical frequency* at multiple risk levels. Since the predictions are continuous, you have to **bin** them first. Two binning strategies:
 
 - **Uniform** (`strategy='uniform'`): split $[0, 1]$ into 10 equal intervals — $[0, 0.1), [0.1, 0.2), \ldots, [0.9, 1.0]$. Bins are equally-spaced on the probability scale, but the number of observations per bin can be wildly unequal — most bins near 0 for a rare outcome.
@@ -1162,6 +1184,8 @@ plt.show()
 
 ::: {.callout-note collapse="true"}
 ## Going deeper — SHAP values and the Shapley equation
+
+**Plain English.** A black-box model spits out a prediction but won't tell you *why* it landed there. SHAP fixes that. For every individual patient, SHAP decomposes their prediction into per-feature contributions: "starting from the population average risk of 33%, your age added +0.4 to your log-odds, your BMI added +0.6, your sex subtracted 0.1." The contributions add up *exactly* to your final prediction. The math comes from game theory — imagine each feature is a player on a team that "scored" your prediction, and SHAP fairly allocates credit across players. It's the *only* attribution scheme that satisfies four common-sense fairness rules at once (efficiency, symmetry, dummy, additivity), which is why it's become the standard for explaining ML predictions.
 
 **Intuition.** A model gives one prediction per person. SHAP decomposes that prediction into a sum of per-feature contributions: "your age added +0.4 to the log-odds; your BMI added +0.6; your sex subtracted 0.1; …". The contributions add up exactly to the difference between this individual's prediction and the population-average prediction. The mathematical foundation comes from **cooperative game theory**: the Shapley value is the unique way to distribute the "total payout" (the prediction) across "players" (features) such that four desirable properties all hold — efficiency, symmetry, dummy-player, and additivity.
 

@@ -313,6 +313,8 @@ pretty_kable(
 ::: {.callout-note collapse="true"}
 ## Going deeper — why $\text{Var} = E$ for Poisson, and what NB / ZINB / hurdle each fix
 
+**Plain English.** When your data is *counts* (number of beneficiaries, claims, visits), the simplest probability model is the **Poisson** — but Poisson has a weird hidden property: its variance always equals its average. If you see data where the variance is 5× the average, Poisson is *wrong*; the data is more spread out than the model can produce. You move to **negative binomial (NB)**, which adds a "fudge factor" for extra spread. If on top of that, *way* too many of your observations are zero (30% of doctors prescribe zero opioids — way more than NB predicts), you need **zero-inflated NB (ZINB)**, which models the zeros separately. The **VMR** (variance-to-mean ratio) is the quick screen: ≈ 1 → Poisson fits; > 2 → use NB; large with excess zeros → use ZINB or a hurdle model.
+
 **The Poisson identity.** A Poisson random variable with rate $\lambda$ has probability mass function $\Pr(X = k) = \frac{\lambda^k e^{-\lambda}}{k!}$. Computing its mean and variance from the moment-generating function $M_X(t) = e^{\lambda(e^t - 1)}$:
 $$E[X] = M_X'(0) = \lambda, \qquad E[X^2] = M_X''(0) = \lambda^2 + \lambda \;\Longrightarrow\; \text{Var}(X) = \lambda.$$
 So **for Poisson, $\text{Var}(X) = E[X]$ exactly** — they're the same number. The variance-to-mean ratio $\text{VMR} = \text{Var}/E$ equals 1 in expectation, with sampling fluctuations around 1. **VMR meaningfully greater than 1 falsifies Poisson** — the data have *overdispersion*.
@@ -427,6 +429,8 @@ Use robust z whenever your data have heavy tails (claims data, gene expression, 
 ::: {.callout-note collapse="true"}
 ## Going deeper — where the constant 1.4826 comes from
 
+**Plain English.** Imagine a spreadsheet of a thousand numbers, sorted smallest to largest. The middle one is the *median*. For every row, compute "how far is it from the median" — that's the absolute deviation. The median of *those* deviations is the **MAD** (median absolute deviation). MAD by itself is a small number — not the same scale as a standard deviation. The constant 1.4826 is the rescaling factor that turns MAD into something that *equals* the standard deviation, *if your data is normally distributed*. So a "robust z" computed as $(x - \text{median}) / (1.4826 \times \text{MAD})$ reads on the same scale as a regular z-score ("z = 5 means about 5 standard deviations from the median"), but built from numbers that don't blow up when outliers show up.
+
 **Intuition.** We want MAD to estimate $\sigma$ (so robust z and classical z line up under normality). But the *raw* MAD is much smaller than $\sigma$ for normal data — it's the median absolute deviation, not a true standard deviation. The constant 1.4826 is precisely the factor that rescales MAD to be a consistent estimator of $\sigma$ under the normal model.
 
 **Derivation.** Let $X \sim N(\mu, \sigma^2)$. The MAD is $\text{MAD} = \text{median}\!\left(|X - \mu|\right)$. By symmetry of the normal, $|X - \mu|$ has half-normal distribution, and its median satisfies
@@ -454,6 +458,8 @@ Use BH whenever you're testing many hypotheses simultaneously — genomics, neur
 
 ::: {.callout-note collapse="true"}
 ## Going deeper — why the BH algorithm actually controls FDR
+
+**Plain English.** You're running 10,000 statistical tests. If you call every test with $p < 0.05$ "significant," about 500 will look significant *just by chance* — even if nothing real is going on. That's the multiple-comparisons problem. **Bonferroni** is the heavy-handed fix: demand $p < 0.05/10{,}000 = 0.000005$ for any test to count. Very strict, but you'll miss real signals because the threshold is so harsh. **BH-FDR** is a smarter middle ground: it sorts your p-values smallest to largest, then sets a cutoff such that *at most 1% of the tests you call significant are false alarms, in expectation*. So 99 out of every 100 flagged hits are real (on average). The guarantee is weaker than Bonferroni's "no false alarms ever," but it's the right tradeoff when you're sifting through thousands of tests and want to keep some real signal.
 
 **Intuition.** The two key insights:
 1. **Under the null**, p-values are uniformly distributed on $[0, 1]$. So if you have $m_0$ true nulls, the expected number of them with $p_{(i)} \leq t$ is exactly $m_0 \cdot t$.
@@ -596,6 +602,8 @@ Use unsupervised methods (isolation forest, local outlier factor, one-class SVM,
 ::: {.callout-note collapse="true"}
 ## Going deeper — isolation forest scoring and the $c(n)$ normalisation
 
+**Plain English.** Suppose you have 10,000 data points in some feature space and you want to flag the weird ones — but you don't know in advance what "weird" looks like. Pick a feature at random, pick a cutoff at random, split the data into two halves. Repeat the split on each half. Keep going until every point sits alone in its own little leaf. **The weirdos get isolated first** — they're sitting out in low-density regions, so a single random cut separates them from the herd. The "anomaly score" for each point is roughly "how few splits did it take to isolate this point?" Run several hundred random trees, average the path lengths, and that's your score. The $c(n)$ formula below is just a rescaling factor that lets you compare scores across different sample sizes.
+
 **The construction.** Each isolation tree (iTree) is built by recursively splitting a random subsample of $\psi$ observations as follows: pick a feature uniformly at random, then a split value uniformly between the feature's min and max. Stop when each row is in its own leaf, or you hit a depth limit. A "normal" point requires many splits to isolate (it has many neighbours in feature space, each requiring a separate cut); an outlier — being in a low-density region — gets isolated quickly. The **path length** $h(x)$ from root to the leaf containing $x$ is the diagnostic.
 
 **Why path length needs normalising.** Path lengths depend on the subsample size $\psi$. To compare across different $\psi$ values (or to interpret on a fixed scale), divide by the *expected* path length of a binary search tree with $\psi$ nodes:
@@ -659,6 +667,8 @@ What the numbers mean here: `claims` and `beneficiaries` are essentially the sam
 
 ::: {.callout-note collapse="true"}
 ## Going deeper — singular values and the condition number $\kappa$
+
+**Plain English.** When you fit a regression with multiple predictors, some of those predictors might be near-duplicates of each other (BMI and waist circumference, total claims and beneficiaries). When two predictors carry essentially the same information, the regression has trouble deciding "which one is doing the work" — the coefficients become unstable, flipping around dramatically with tiny changes to the data. The **condition number** is a single-number diagnostic that quantifies "how nearly-duplicated are my predictors, *across the whole design at once*?" Below 10 = clean. Above 30 = trouble. The math under the hood (the SVD — singular value decomposition) decomposes your predictor matrix into the "most-correlated direction" and the "least-correlated direction"; the condition number is the ratio of their stretches.
 
 **Intuition.** A matrix $\mathbf{X}$ "stretches" different directions of input space by different amounts. The **singular values** $\sigma_1 \geq \sigma_2 \geq \cdots \geq \sigma_p \geq 0$ are the stretch factors along the most-stretched, second-most-stretched, ..., least-stretched orthogonal directions. The **condition number** $\kappa = \sigma_1 / \sigma_p$ asks: how much wider is the most-stretched direction than the least? When $\kappa$ is large, the matrix is *nearly singular* — small changes in $y$ produce huge changes in $\hat\beta$, because the "narrow" direction barely moves the prediction at all.
 
@@ -976,6 +986,8 @@ Use Gini for any concentration analysis: spending across counties, hospitalizati
 
 ::: {.callout-note collapse="true"}
 ## Going deeper — Gini derived from the Lorenz curve
+
+**Plain English.** Imagine you sort everyone in a country by income, poorest to richest, and plot "what fraction of total income belongs to the poorest X% of people?" If everyone earned exactly the same, the plot is the diagonal line y = x. If one person had all the income, the line would hug the bottom axis and then jump to 1 at the very end. Real inequality lives between. The **Gini coefficient** measures how far the actual line bends away from the diagonal: 0 = perfect equality (line *is* the diagonal), 1 = total inequality (one person has it all). Same idea works for Medicaid spending across counties: 0 = perfectly diffuse, 0.5 = moderately concentrated, > 0.7 = collapses onto a handful of counties.
 
 **The Lorenz curve.** Sort $n$ units ascending by their value $x_{(1)} \leq x_{(2)} \leq \cdots \leq x_{(n)}$. Plot, for each $k$, the *fraction of units* $k/n$ against the *fraction of total* held by the bottom-$k$ units: $L_k = \sum_{i=1}^k x_{(i)} \,/\, \sum_{i=1}^n x_{(i)}$. The resulting step curve, joined at the corners, is the Lorenz curve. Under perfect equality $L(p) = p$ — the diagonal. Under perfect inequality (one unit has everything) the curve hugs the bottom axis until the final point, then jumps to 1.
 

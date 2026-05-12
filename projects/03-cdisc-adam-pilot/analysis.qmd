@@ -115,6 +115,8 @@ ADSL is the subject-level analysis dataset — exactly one record per `USUBJID` 
 ::: {.callout-note collapse="true"}
 ## Going deeper — analysis populations: ITT, Safety, Per-Protocol, mITT
 
+**Plain English.** A clinical trial doesn't have a single "n" — it has several, and each one answers a slightly different question. **Intent-to-Treat (ITT)** = everyone who was *randomly assigned* a treatment, even if they never actually took the drug. **Safety** = everyone who took *at least one dose* of the drug. **Per-Protocol** = everyone who followed the protocol exactly, with no missed visits or dose deviations. So a 254-patient trial might report efficacy on n = 254 (ITT), safety on n = 250, and per-protocol on n = 238. Each number is a real answer to a real question — the FDA wants ITT for efficacy claims (because it preserves the protection randomisation gives) and Safety for adverse-event counts (because you can't have a drug-related AE from a drug you never took).
+
 **Why populations exist.** A clinical trial doesn't have one denominator — it has several, each suited to a different question. Every analysis must say *which* population it's run on, because randomised, treated, and protocol-compliant subjects answer different questions about the drug.
 
 **The four canonical populations** (ICH E9, FDA, EMA guidance):
@@ -197,6 +199,8 @@ ADLBC is the canonical Basic Data Structure: one record per parameter per visit 
 ::: {.callout-note collapse="true"}
 ## Going deeper — what `TRTEMFL` is actually attributing
 
+**Plain English.** A patient reports a headache on day 14 of taking a drug. Did the drug cause the headache? For any single patient we can never really know — that's why randomised trials compare *groups*. But for the safety table, we still need a deterministic rule for *counting*: was this event temporally consistent with drug exposure? "Treatment-emergent" is that rule. The event has to start *after* the patient began dosing AND *within* a follow-up window after dosing ended (typically 28 days — long enough for the drug to clear the body). Events before dosing are pre-existing; events long after are post-treatment. Only the treatment-emergent ones show up in the standard "adverse events on study drug" table.
+
 **The causality problem.** A subject reports a headache on Day 14 of dosing. Did the drug cause it? Strictly, we can never know about any one event — that's why we have randomised arms. But for AE *attribution* to a treatment period, we need a deterministic rule: was this event temporally consistent with drug exposure? "Treatment-emergent" is that rule.
 
 **The standard window.** An AE is **treatment-emergent** (`TRTEMFL = "Y"`) if:
@@ -217,6 +221,8 @@ Only the insomnia row contributes to the standard "treatment-emergent adverse ev
 
 ::: {.callout-note collapse="true"}
 ## Going deeper — baseline-adjusted analysis: why `CHG` and `PCHG` reduce variance
+
+**Plain English.** Suppose you want to know if a drug lowers cholesterol. You measure each patient *before* treatment ("baseline") and *after*. Now: do you compare just the after-numbers between treated and control, or do you compare the *change* in each patient from before to after? Comparing changes is *way* more statistically powerful — because patients naturally vary in their starting cholesterol, and that natural variability drowns out the small drug effect if you only look at end-of-trial numbers. By focusing on each patient's own change from their own baseline, you cancel out the baseline differences and zoom in on the treatment effect. Same drug, same trial, dramatically tighter confidence interval.
 
 **The problem.** A clinical lab value like serum creatinine has a baseline distribution spanning ~0.5–1.5 mg/dL across subjects. Most of that between-subject variance is *constitutional* (kidney size, muscle mass, age) and has nothing to do with the drug. If you compare *raw values at Week 12* between arms, that constitutional noise drowns out any treatment signal.
 
@@ -291,6 +297,8 @@ adsl |>
 
 ::: {.callout-note collapse="true"}
 ## Going deeper — why ICH E3 §14.2.1 demands this specific layout
+
+**Plain English.** When a drug company submits a trial to the FDA, the report follows a strict, internationally-harmonised template — every table has a specific section number and a specific layout that reviewers everywhere expect. Table 14-2.01 is "Demographics" — age, sex, race, baseline labs — broken out by treatment arm. The layout *always* has treatment arms across the columns and patient characteristics down the rows, because that's how a reviewer's eye flows when checking "are these groups comparable at baseline?" Continuous variables get mean (SD), categorical variables get n (%). No statistical tests are performed because randomisation already guarantees the groups should be similar — testing for "are they similar?" would just be testing whether randomisation worked, which is circular.
 
 **ICH E3 in one paragraph.** *Structure and Content of Clinical Study Reports* (CPMP/ICH/137/95) is the harmonised template the FDA, EMA, and PMDA all expect for the Clinical Study Report (CSR). Section 14.2 specifies efficacy and safety tables; **§14.2.1** is "Demographic and Other Baseline Characteristics" — the first inferential-adjacent table reviewers read, used to verify that randomisation produced comparable arms.
 
