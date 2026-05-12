@@ -1,0 +1,428 @@
+/*-- scss:defaults --*/
+
+// Shared "dark techy" theme for every project notebook on the portfolio.
+// Goals:
+//   - Deep slate-navy background; never pure black, never washed-out.
+//   - Two accents: a vibrant sky-blue and a soft lavender-purple, both
+//     calibrated for legibility on dark surfaces.
+//   - Editorial Fraunces serif for headings; Inter for body; JetBrains
+//     Mono ramped up across UI chrome (TOC, callout titles, table headers,
+//     section numbers) for a developer-tool feel without being cosplay.
+//   - Code blocks read like a terminal panel: subtle elevation, blue
+//     left rule, monospace at a comfortable 13px-equivalent.
+//   - Callouts get a heavy left rule + soft tinted body, so the
+//     "Why this test?" pattern across notebooks reads as one signature.
+
+// --- Surfaces ---
+$bg:           #0d1117;   // page background (GitHub-dark-inspired)
+$bg-soft:      #161b22;   // one tier up: code blocks, table stripes
+$bg-elev:      #1a2032;   // two tiers up: callout bodies, card surfaces
+$border:       #30363d;   // visible divider
+$border-soft:  #21262d;   // very subtle divider
+
+// --- Type colours ---
+$text:         #e6edf3;   // body text on dark
+$text-muted:   #9ba3af;   // secondary copy, captions
+$text-dim:     #6e7681;   // tertiary, fine print
+
+// --- Accents ---
+$blue:         #79c0ff;   // primary accent: links, h1/h2, code-rule, table-head
+$blue-bright:  #a5d8ff;   // hover, emphasis
+$blue-deep:    #1f6feb;   // saturated, used for the code-block left rule
+$blue-glow:    rgba(121, 192, 255, 0.18);
+
+$purple:       #d2a8ff;   // secondary accent: callout titles, inline code
+$purple-bright: #e2c3ff;
+$purple-deep:  #8957e5;   // saturated, used for callout-note left rule
+$purple-glow:  rgba(210, 168, 255, 0.18);
+
+// --- Bootstrap variable overrides ---
+$primary:               $blue;
+$secondary:             $purple;
+
+$body-bg:               $bg;
+$body-color:            $text;
+$body-secondary-color:  $text-muted;
+
+$link-color:            $blue;
+$link-hover-color:      $purple;
+$link-decoration:       none;
+$link-hover-decoration: underline;
+
+$font-family-sans-serif: "Inter", system-ui, -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+$font-family-serif:      "Fraunces", Georgia, "Times New Roman", serif;
+$font-family-monospace:  "JetBrains Mono", ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+$font-family-base:       $font-family-sans-serif;
+
+$headings-font-family:   $font-family-serif;
+$headings-color:         $blue;
+$headings-font-weight:   600;
+
+$h1-font-size:           2.5rem;
+$h2-font-size:           1.7rem;
+$h3-font-size:           1.25rem;
+$h4-font-size:           1.05rem;
+
+$line-height-base:       1.65;
+
+$border-color:           $border;
+$border-radius:          6px;
+$border-radius-sm:       4px;
+$border-radius-lg:       8px;
+
+$code-color:             $purple;
+$code-bg:                $bg-soft;
+$pre-bg:                 $bg-soft;
+$pre-color:              $text;
+
+$table-bg:               transparent;
+$table-color:            $text;
+$table-striped-bg:       rgba(121, 192, 255, 0.04);
+$table-hover-bg:         rgba(121, 192, 255, 0.10);
+$table-border-color:     $border-soft;
+
+// Callout colours: purple for `note` (most common — "Why this test?"
+// blocks read as the project's secondary signature), blue for `tip`
+// (TL;DR and "Key findings" panels).
+$callout-color-note:      $purple-deep;
+$callout-color-tip:       $blue-deep;
+$callout-color-important: $blue-deep;
+$callout-color-warning:   #b45309;
+$callout-color-caution:   #be123c;
+
+/*-- scss:rules --*/
+
+// Webfont load. Fraunces uses the variable-font opsz axis so headings
+// at large sizes get a tighter optical-size rendering.
+@import url("https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,600;9..144,700&family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap");
+
+// --- Page ---
+
+html, body {
+  background: $bg;
+  color: $text;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  letter-spacing: -0.005em;
+}
+
+// Subtle radial gradient at the top to give the page some depth without
+// being decorative. Roughly the brightness of $bg-elev fading to $bg.
+body::before {
+  content: "";
+  position: fixed;
+  top: -120px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 1200px;
+  height: 480px;
+  background: radial-gradient(ellipse at center top,
+                              rgba(121, 192, 255, 0.07),
+                              transparent 65%);
+  pointer-events: none;
+  z-index: -1;
+}
+
+// --- Headings ---
+
+h1, h2, h3, h4, h5, h6 {
+  letter-spacing: -0.015em;
+  font-feature-settings: "ss01", "ss02";
+  color: $blue;
+}
+
+h1.title {
+  font-size: 2.7rem;
+  margin-bottom: 0.3rem;
+  background: linear-gradient(120deg, $blue, $purple);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+.subtitle {
+  font-family: $font-family-serif;
+  font-style: italic;
+  font-weight: 500;
+  color: $text-muted;
+  font-size: 1.2rem;
+  margin-top: 0;
+  margin-bottom: 1.5rem;
+}
+
+.quarto-title-meta,
+.quarto-title-meta-heading,
+.quarto-title-meta-contents {
+  font-family: $font-family-monospace;
+  font-size: 0.78rem;
+  color: $text-muted;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+
+header.quarto-title-block {
+  border-bottom: 1px solid $border-soft;
+  padding-bottom: 1.2rem;
+  margin-bottom: 2rem;
+}
+
+// --- Section numbers — tiny mono badge on each heading ---
+
+.header-section-number {
+  font-family: $font-family-monospace;
+  font-size: 0.75em;
+  color: $purple;
+  font-weight: 500;
+  margin-right: 0.5rem;
+  background: $purple-glow;
+  padding: 0.05rem 0.45rem;
+  border-radius: $border-radius-sm;
+  vertical-align: 0.15em;
+}
+
+// --- Body type ---
+
+p, li {
+  color: $text;
+}
+
+strong, b {
+  color: $blue-bright;
+  font-weight: 600;
+}
+
+em {
+  color: $purple-bright;
+}
+
+hr {
+  border: none;
+  height: 1px;
+  background: $border-soft;
+  margin: 2rem 0;
+}
+
+// --- Links ---
+
+a {
+  color: $blue;
+  text-decoration: none;
+  border-bottom: 1px solid transparent;
+  transition: border-color 0.12s ease, color 0.12s ease;
+}
+a:hover {
+  color: $purple;
+  border-bottom-color: $purple-deep;
+}
+.callout a, nav a, table a, .header-anchor {
+  border-bottom: none;
+}
+
+// --- Inline code ---
+
+code:not(pre code) {
+  background: $bg-soft;
+  color: $purple;
+  padding: 0.08rem 0.4rem;
+  border-radius: $border-radius-sm;
+  font-size: 0.92em;
+  border: 1px solid $border-soft;
+  font-family: $font-family-monospace;
+}
+
+// --- Code blocks ---
+
+div.sourceCode,
+pre.sourceCode {
+  background: $bg-soft;
+  border: 1px solid $border-soft;
+  border-left: 3px solid $blue-deep;
+  border-radius: $border-radius;
+  margin: 1rem 0;
+}
+
+pre.sourceCode code,
+pre code {
+  font-family: $font-family-monospace;
+  font-size: 0.86rem;
+  line-height: 1.55;
+  color: $text;
+  background: transparent;
+  border: none;
+}
+
+// Quarto's syntax highlighter classes — soften the brights so they
+// read on a dark background without overpowering prose.
+pre code .co  { color: $text-dim; font-style: italic; }   // comments
+pre code .st  { color: #a5d6a7; }                          // strings
+pre code .dv,
+pre code .fl,
+pre code .bn  { color: $purple; }                          // numerics
+pre code .kw  { color: #ff7b72; font-weight: 500; }        // keywords
+pre code .fu  { color: $blue-bright; }                     // functions
+pre code .op  { color: $text-muted; }                      // operators
+pre code .va  { color: #ffa657; }                          // variables
+pre code .cn  { color: $purple-bright; }                   // constants
+
+// "Show code" toggle and code-tools button
+details > summary,
+.code-fold .quarto-toggle-container,
+.code-tools-button,
+.code-copy-button {
+  color: $blue;
+  font-family: $font-family-monospace;
+  font-size: 0.78rem;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+details > summary:hover { color: $purple; }
+
+// --- Callouts ---
+
+.callout {
+  border-left-width: 4px;
+  border-radius: $border-radius;
+  margin: 1.6rem 0;
+  padding: 0.5rem 1.1rem 0.3rem;
+  background: $bg-elev;
+  border-color: $border-soft $border-soft $border-soft $purple-deep;
+  box-shadow: 0 0 0 1px $border-soft, 0 6px 20px -10px $purple-glow;
+}
+.callout-note      { border-left-color: $purple-deep; background: linear-gradient(180deg, rgba(137, 87, 229, 0.08), $bg-elev 30%); }
+.callout-tip       { border-left-color: $blue-deep;   background: linear-gradient(180deg, rgba(31, 111, 235, 0.10), $bg-elev 30%); }
+.callout-important { border-left-color: $blue-deep;   background: linear-gradient(180deg, rgba(31, 111, 235, 0.12), $bg-elev 30%); }
+.callout-warning   { border-left-color: #b45309;      background: linear-gradient(180deg, rgba(180, 83, 9, 0.10), $bg-elev 30%); }
+.callout-caution   { border-left-color: #be123c;      background: linear-gradient(180deg, rgba(190, 18, 60, 0.10), $bg-elev 30%); }
+
+.callout .callout-title,
+.callout .callout-title-container,
+.callout-header {
+  font-family: $font-family-monospace;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  font-size: 0.82rem;
+  color: $blue-bright;
+}
+
+// "## Why this test?" pattern (h2 inside a callout body)
+.callout > .callout-body h2,
+.callout > .callout-body-container h2 {
+  font-family: $font-family-serif;
+  font-size: 1.15rem;
+  margin: 0.3rem 0 0.7rem;
+  color: $purple-bright;
+  text-transform: none;
+  letter-spacing: -0.01em;
+}
+
+.callout p { color: $text; }
+.callout strong { color: $blue-bright; }
+
+// --- Blockquotes ---
+
+blockquote {
+  border-left: 3px solid $purple-deep;
+  background: $bg-soft;
+  padding: 0.8rem 1rem;
+  color: $text-muted;
+  font-style: italic;
+  border-radius: 0 $border-radius $border-radius 0;
+}
+
+// --- Tables ---
+
+table {
+  font-family: $font-family-sans-serif;
+  font-size: 0.92rem;
+  border-collapse: collapse;
+  background: transparent;
+  color: $text;
+}
+table thead th {
+  font-family: $font-family-monospace;
+  font-size: 0.78rem;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  background: rgba(31, 111, 235, 0.10);
+  color: $blue-bright;
+  font-weight: 600;
+  border-bottom: 2px solid $blue-deep;
+  padding: 0.55rem 0.9rem;
+}
+table tbody td {
+  border-bottom: 1px solid $border-soft;
+  padding: 0.5rem 0.9rem;
+  color: $text;
+}
+table.table-striped > tbody > tr:nth-of-type(odd) > * {
+  background: rgba(121, 192, 255, 0.04);
+}
+table.table-hover > tbody > tr:hover > * {
+  background: rgba(121, 192, 255, 0.10);
+}
+
+// --- TOC ---
+
+nav#TOC,
+nav.toc-active {
+  font-family: $font-family-monospace;
+  font-size: 0.78rem;
+}
+nav#TOC > ul {
+  border-left: 1px solid $border-soft;
+  padding-left: 0.8rem;
+}
+nav#TOC a {
+  color: $text-muted;
+  border-left: 2px solid transparent;
+  padding-left: 0.6rem;
+  margin-left: -0.8rem;
+  display: inline-block;
+}
+nav#TOC a:hover {
+  color: $blue;
+}
+nav#TOC a.active {
+  color: $blue-bright;
+  border-left-color: $purple;
+  font-weight: 600;
+}
+nav#TOC .toc-title {
+  font-family: $font-family-monospace;
+  font-size: 0.7rem;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  color: $purple;
+}
+
+// --- Math ---
+
+.math.display {
+  margin: 1.2rem 0;
+  font-size: 1.02em;
+  color: $text;
+}
+
+// --- Figure captions ---
+
+.quarto-figure figcaption,
+.figure-caption {
+  font-family: $font-family-monospace;
+  font-size: 0.78rem;
+  color: $text-muted;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  margin-top: 0.4rem;
+}
+
+// --- Quarto badges (e.g., from kableExtra) ---
+
+.kable-styled,
+.table {
+  background: transparent;
+  color: $text;
+}
+
+// Selection
+::selection { background: $purple-glow; color: $blue-bright; }

@@ -14,86 +14,178 @@
   </script>
   <script defer src="/_vercel/insights/script.js"></script>
   <style>
+    /* ---- Hero ---- */
     .projects-hero {
       padding: 5rem 0 3rem;
       border-bottom: 1px solid var(--line);
       background:
-        radial-gradient(900px 400px at 90% -10%, rgba(13, 92, 99, 0.1), transparent 60%),
+        radial-gradient(900px 400px at 90% -10%, rgba(13, 92, 99, 0.10), transparent 60%),
         var(--paper);
+    }
+    .projects-hero .eyebrow {
+      font-family: "JetBrains Mono", ui-monospace, "SF Mono", Menlo, monospace;
+      font-size: 0.78rem;
+      text-transform: uppercase;
+      letter-spacing: 0.14em;
+      color: var(--accent);
+      margin: 1.4rem 0 0.5rem;
+      display: block;
     }
     .projects-hero h1 {
       font-family: var(--font-serif);
       font-size: clamp(2rem, 4vw, 3rem);
-      margin: 0.4rem 0 1rem;
+      margin: 0.2rem 0 1rem;
+      letter-spacing: -0.02em;
     }
     .projects-hero p {
       color: var(--ink-soft);
       max-width: 42rem;
       font-size: 1.05rem;
+      line-height: 1.6;
     }
+
+    /* ---- Project list ---- */
     .project-list {
       list-style: none;
       padding: 0;
       margin: 0;
       display: grid;
-      gap: 1.25rem;
+      gap: 1rem;
     }
+
+    /* ---- Card ---- */
     .project-card {
       display: grid;
-      grid-template-columns: 110px 1fr auto;
+      grid-template-columns: 96px 1fr auto;
       gap: 1.5rem;
       align-items: center;
-      padding: 1.75rem;
+      padding: 1.6rem 1.75rem;
       background: var(--white);
       border: 1px solid var(--line);
+      border-left: 3px solid transparent;
       border-radius: var(--radius);
       box-shadow: var(--shadow-sm);
-      transition: transform 0.2s ease, box-shadow 0.2s ease, border-color 0.2s ease;
+      transition: transform 0.2s ease, box-shadow 0.2s ease,
+                  border-left-color 0.2s ease, border-color 0.2s ease;
+      color: inherit;
     }
-    .project-card:hover {
+    a.project-card:hover {
       transform: translateY(-2px);
       box-shadow: var(--shadow-md);
-      border-color: var(--accent);
+      border-left-color: var(--accent);
     }
+    .project-card.is-planned {
+      cursor: default;
+      opacity: 0.78;
+      background: var(--paper);
+    }
+    .project-card.is-planned:hover {
+      transform: none;
+      box-shadow: var(--shadow-sm);
+    }
+
+    /* ---- Project number (mono) ---- */
     .project-num {
-      font-family: var(--font-serif);
-      font-size: 2.4rem;
+      font-family: "JetBrains Mono", ui-monospace, "SF Mono", Menlo, monospace;
+      font-size: 1.6rem;
+      font-weight: 500;
       color: var(--accent);
       line-height: 1;
+      letter-spacing: -0.02em;
     }
+    .project-num::before {
+      content: "// ";
+      color: var(--muted);
+      font-weight: 400;
+    }
+    .project-card.is-planned .project-num { color: var(--muted); }
+
+    /* ---- Title row ---- */
     .project-title {
       font-family: var(--font-serif);
-      font-size: 1.25rem;
-      margin: 0 0 0.35rem;
+      font-size: 1.3rem;
+      margin: 0 0 0.5rem;
       color: var(--ink);
+      letter-spacing: -0.01em;
+      line-height: 1.25;
+      display: flex;
+      align-items: center;
+      flex-wrap: wrap;
+      gap: 0.6rem;
     }
+
+    /* ---- Status indicator: dot + uppercase mono label ---- */
+    .project-status {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.4rem;
+      font-family: "JetBrains Mono", ui-monospace, "SF Mono", Menlo, monospace;
+      font-size: 0.68rem;
+      font-weight: 500;
+      text-transform: uppercase;
+      letter-spacing: 0.1em;
+      color: var(--muted);
+      padding: 0;
+      background: none;
+    }
+    .project-status::before {
+      content: "";
+      width: 0.45rem;
+      height: 0.45rem;
+      border-radius: 50%;
+      background: var(--muted);
+      flex-shrink: 0;
+    }
+    .project-status.live    { color: var(--accent); }
+    .project-status.live::before { background: var(--accent); box-shadow: 0 0 0 3px rgba(13, 92, 99, 0.12); }
+    .project-status.progress { color: #b66409; }
+    .project-status.progress::before { background: #b66409; }
+    .project-status.planned::before {
+      background: transparent;
+      border: 1px solid var(--muted);
+      width: 0.5rem;
+      height: 0.5rem;
+    }
+
+    /* ---- Blurb ---- */
     .project-blurb {
-      margin: 0 0 0.6rem;
+      margin: 0 0 0.75rem;
       color: var(--ink-soft);
-      font-size: 0.95rem;
+      font-size: 0.93rem;
+      line-height: 1.55;
     }
+
+    /* ---- Tags: outlined chips, mono labels ---- */
     .project-tags {
       list-style: none;
       padding: 0;
       margin: 0;
       display: flex;
       flex-wrap: wrap;
-      gap: 0.4rem;
+      gap: 0.35rem;
     }
     .project-tags li {
-      font-size: 0.75rem;
-      padding: 0.2rem 0.6rem;
-      border-radius: 999px;
-      background: var(--accent-soft);
-      color: var(--accent);
-      font-weight: 600;
-      letter-spacing: 0.04em;
+      font-family: "JetBrains Mono", ui-monospace, "SF Mono", Menlo, monospace;
+      font-size: 0.7rem;
+      font-weight: 500;
+      padding: 0.18rem 0.55rem;
+      border-radius: 4px;
+      background: transparent;
+      border: 1px solid var(--line);
+      color: var(--ink-soft);
+      letter-spacing: 0.02em;
     }
-    .project-tags li.py { background: #fdf1e0; color: #8a6a33; }
-    .project-tags li.r  { background: #e6f1f2; color: #0d5c63; }
-    .project-tags li.sas { background: #e3eefc; color: #0766d1; }
+    .project-tags li.r   { color: #0d5c63; border-color: rgba(13, 92, 99, 0.25); }
+    .project-tags li.py  { color: #8a6a33; border-color: rgba(138, 106, 51, 0.30); }
+    .project-tags li.sas { color: #0766d1; border-color: rgba(7, 102, 209, 0.28); }
+
+    /* ---- CTA ---- */
     .project-cta {
-      font-weight: 600;
+      font-family: "JetBrains Mono", ui-monospace, "SF Mono", Menlo, monospace;
+      font-size: 0.78rem;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      font-weight: 500;
       color: var(--accent);
       white-space: nowrap;
     }
@@ -102,39 +194,31 @@
       transition: transform 0.2s ease;
       display: inline-block;
     }
-    .project-card:hover .project-cta::after { transform: translateX(4px); }
-    .project-status {
-      display: inline-block;
-      font-size: 0.7rem;
-      text-transform: uppercase;
-      letter-spacing: 0.12em;
-      padding: 0.15rem 0.5rem;
-      border-radius: 4px;
-      background: var(--paper-2);
-      color: var(--muted);
-      margin-left: 0.5rem;
-      vertical-align: middle;
-      font-weight: 600;
-    }
-    .project-status.live { background: var(--accent-soft); color: var(--accent); }
+    a.project-card:hover .project-cta::after { transform: translateX(4px); }
+    .project-card.is-planned .project-cta { color: var(--muted); }
+
+    /* ---- Back link ---- */
     .back-link {
       display: inline-flex;
       align-items: center;
       gap: 0.4rem;
       color: var(--muted);
-      font-size: 0.9rem;
+      font-family: "JetBrains Mono", ui-monospace, "SF Mono", Menlo, monospace;
+      font-size: 0.78rem;
       text-transform: uppercase;
       letter-spacing: 0.1em;
-      font-weight: 600;
+      font-weight: 500;
     }
     .back-link:hover { color: var(--accent); }
 
+    /* ---- Responsive ---- */
     @media (max-width: 640px) {
       .project-card {
         grid-template-columns: 1fr;
-        gap: 0.5rem;
+        gap: 0.6rem;
+        padding: 1.25rem 1.4rem;
       }
-      .project-num { font-size: 1.8rem; }
+      .project-num { font-size: 1.3rem; }
       .project-cta { justify-self: start; }
     }
   </style>
@@ -165,12 +249,14 @@
     <section class="projects-hero">
       <div class="container">
         <a href="../index.html" class="back-link">&larr; Back to home</a>
+        <span class="eyebrow">// Portfolio &middot; 6 projects</span>
         <h1>Projects &amp; case studies</h1>
         <p>
-          Reproducible analyses of publicly available health datasets — NHANES, CDC WONDER,
-          SEER, openFDA — written in a mix of <strong>R</strong> and <strong>Python</strong> and
-          rendered with Quarto so the full code, outputs, and figures sit on a single page.
-          Every project links to its GitHub source.
+          Reproducible analyses of publicly available health datasets — NHANES, CMS Medicaid
+          and Medicare, CDC WONDER, SEER, openFDA — written in a mix of <strong>R</strong>,
+          <strong>Python</strong>, and <strong>SAS</strong>, rendered with Quarto so the full
+          code, outputs, and figures sit on a single page. Every project links to its GitHub
+          source.
         </p>
       </div>
     </section>
@@ -235,7 +321,7 @@
               <div>
                 <h2 class="project-title">
                   CDISC Pilot 01 — SDTM to ADaM in SAS and R
-                  <span class="project-status">In progress</span>
+                  <span class="project-status progress">In progress</span>
                 </h2>
                 <p class="project-blurb">
                   Double-program an FDA-grade analysis package on the publicly redistributable
@@ -260,7 +346,7 @@
               <div>
                 <h2 class="project-title">
                   The $35 Insulin Cap and Medicare Part D
-                  <span class="project-status">In progress</span>
+                  <span class="project-status progress">In progress</span>
                 </h2>
                 <p class="project-blurb">
                   A difference-in-differences evaluation of the Inflation Reduction Act's
@@ -283,12 +369,12 @@
           </li>
 
           <li>
-            <div class="project-card" style="cursor: default;">
-              <span class="project-num" style="color: var(--muted);">05</span>
+            <div class="project-card is-planned">
+              <span class="project-num">05</span>
               <div>
                 <h2 class="project-title">
                   openFDA Pharmacovigilance Signal Detection
-                  <span class="project-status">Planned</span>
+                  <span class="project-status planned">Planned</span>
                 </h2>
                 <p class="project-blurb">
                   Disproportionality analysis (PRR, ROR, IC) on FAERS adverse-event reports,
@@ -300,17 +386,17 @@
                   <li>RxNorm</li>
                 </ul>
               </div>
-              <span class="project-cta" style="color: var(--muted);">Coming soon</span>
+              <span class="project-cta">Coming soon</span>
             </div>
           </li>
 
           <li>
-            <div class="project-card" style="cursor: default;">
-              <span class="project-num" style="color: var(--muted);">06</span>
+            <div class="project-card is-planned">
+              <span class="project-num">06</span>
               <div>
                 <h2 class="project-title">
                   TCGA Somatic Mutations &amp; Survival
-                  <span class="project-status">Planned</span>
+                  <span class="project-status planned">Planned</span>
                 </h2>
                 <p class="project-blurb">
                   Integrate TCGA somatic mutation data with clinical outcomes for a solid-tumor
@@ -323,7 +409,7 @@
                   <li>Genomics</li>
                 </ul>
               </div>
-              <span class="project-cta" style="color: var(--muted);">Coming soon</span>
+              <span class="project-cta">Coming soon</span>
             </div>
           </li>
         </ul>

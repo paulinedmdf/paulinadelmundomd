@@ -5,7 +5,8 @@ author: "Paulina Del Mundo Del Fierro, MD, MPH"
 date: last-modified
 format:
   html:
-    theme: cosmo
+    theme: [cosmo, ../_theme.scss]
+    highlight-style: github-dark
     toc: true
     toc-depth: 3
     toc-location: right
@@ -111,6 +112,27 @@ list(DM = dim(dm), AE = dim(ae), EX = dim(ex), LB = dim(lb), SV = dim(sv), VS = 
 
 ADSL is the subject-level analysis dataset — exactly one record per `USUBJID` — and the parent of every other ADaM. The derivations below follow ADaM IG v1.3 §3.1 and the CDISC Pilot 01 ADSL spec.
 
+::: {.callout-note collapse="true"}
+## Going deeper — analysis populations: ITT, Safety, Per-Protocol, mITT
+
+**Why populations exist.** A clinical trial doesn't have one denominator — it has several, each suited to a different question. Every analysis must say *which* population it's run on, because randomised, treated, and protocol-compliant subjects answer different questions about the drug.
+
+**The four canonical populations** (ICH E9, FDA, EMA guidance):
+
+| Population | Flag in ADSL | Who's in | Answers the question |
+|---|---|---|---|
+| **Intent-to-Treat (ITT)** | `ITTFL` | Every randomised subject, analysed as randomised — even if they never received treatment, withdrew, or got the wrong arm by mistake | "What is the effect of *being assigned* the treatment?" — the policy-relevant estimand |
+| **Safety** | `SAFFL` | Every subject who received at least one dose of study drug, analysed as treated (per actual exposure) | "What harms occurred in people actually exposed?" — the adverse-event denominator |
+| **Per-Protocol (PP)** | `PPROTFL` | Subjects with no major protocol deviations, who completed treatment as specified | "What is the effect of *receiving* the treatment as intended?" — the biological-effect estimand |
+| **Modified ITT (mITT)** | `MITTFL` | A pre-specified, narrower ITT — e.g., subjects who received at least one dose AND had a baseline outcome measurement | "ITT with the minimum-quality data filter applied" |
+
+**Why ITT is the regulatory default for efficacy.** ITT preserves randomisation. Excluding non-compliers makes the comparison non-randomised — adherent subjects are systematically different from non-adherent ones (the "healthy-adherer" effect), so dropping them biases the treatment effect toward whatever adherence is correlated with. ITT keeps the comparison clean at the cost of *diluting* the treatment effect when adherence is poor — a feature for regulators (it's conservative) and a frustration for sponsors.
+
+**Why Safety is the default for harms.** Symmetrically: you can't have an adverse event from a drug you never took. Counting AEs against the assigned arm (rather than the dosed arm) would conflate "drug didn't cause this AE" with "the subject never received the drug."
+
+**Worked example.** In a 254-subject trial, suppose 250 received at least one dose (`SAFFL = "Y"` for 250). Of those, 12 had major protocol deviations (`PPROTFL = "Y"` for 238). Three subjects were randomised but withdrew before dosing (`ITTFL = "Y"` for all 254; `SAFFL = "N"` for those 3). The efficacy headline uses $n = 254$ (ITT). The AE table uses $n = 250$ (Safety). The dose-response analysis uses $n = 238$ (PP). All three are reported in the CSR — each in the population that answers the question being asked.
+:::
+
 ```{r derive-adsl}
 #| label: derive-adsl
 #| eval: false
@@ -172,6 +194,49 @@ ADAE is occurrence-level (one record per AE per subject). The submission-critica
 
 ADLBC is the canonical Basic Data Structure: one record per parameter per visit per subject, with `PARAMCD`, `AVAL`, `AVISIT`, `ABLFL` (baseline flag), and `CHG` (change from baseline). The lab unit conversions key off the CDISC LB controlled terminology.
 
+::: {.callout-note collapse="true"}
+## Going deeper — what `TRTEMFL` is actually attributing
+
+**The causality problem.** A subject reports a headache on Day 14 of dosing. Did the drug cause it? Strictly, we can never know about any one event — that's why we have randomised arms. But for AE *attribution* to a treatment period, we need a deterministic rule: was this event temporally consistent with drug exposure? "Treatment-emergent" is that rule.
+
+**The standard window.** An AE is **treatment-emergent** (`TRTEMFL = "Y"`) if:
+$$\text{AE start date} \geq \text{TRTSDT}, \quad \text{and} \quad \text{AE start date} \leq \text{TRTEDT} + \Delta,$$
+where $\Delta$ is the protocol-specified post-treatment follow-up window (commonly 28 or 30 days, depending on drug half-life). Events before `TRTSDT` are *pre-existing*; events after `TRTEDT + Δ` are usually labelled *post-treatment* (`POSTFL`) and analysed separately.
+
+**The half-life logic.** $\Delta$ should cover ~5 half-lives of the drug — by then, plasma concentration is < 5% of peak. For donepezil ($t_{1/2} \approx 70$ h), 5 half-lives is ~14 days, so a 14- or 28-day TRTEM window is justified. For drugs with long half-lives (e.g., monoclonal antibodies, $t_{1/2} = $ weeks), $\Delta$ stretches to 60–90 days. Getting $\Delta$ right matters because *the same AE counted under TRTEM = Y vs. TRTEM = N changes the safety table*.
+
+**Why also gate on `TRTEDT + Δ`, not just `TRTSDT`.** Without the upper bound, every adverse event the subject ever reports for the rest of their life would count as treatment-emergent — which is clearly wrong. The upper bound is the formal statement of "the drug is no longer in the body at clinically meaningful concentration."
+
+**Worked example.** Subject 101 has `TRTSDT = 2008-04-01`, `TRTEDT = 2008-09-30`, protocol $\Delta = 28$ days. Three AEs:
+- Headache, onset 2008-03-15. Pre-treatment ($< $ TRTSDT). `TRTEMFL = "N"`, `PREFL = "Y"`.
+- Insomnia, onset 2008-05-20. During treatment. `TRTEMFL = "Y"`.
+- Nausea, onset 2008-11-15. 46 days post-treatment (> TRTEDT + 28). `TRTEMFL = "N"`, `POSTFL = "Y"`.
+
+Only the insomnia row contributes to the standard "treatment-emergent adverse event (TEAE)" tables. The other two appear in the listings but not the headline counts.
+:::
+
+::: {.callout-note collapse="true"}
+## Going deeper — baseline-adjusted analysis: why `CHG` and `PCHG` reduce variance
+
+**The problem.** A clinical lab value like serum creatinine has a baseline distribution spanning ~0.5–1.5 mg/dL across subjects. Most of that between-subject variance is *constitutional* (kidney size, muscle mass, age) and has nothing to do with the drug. If you compare *raw values at Week 12* between arms, that constitutional noise drowns out any treatment signal.
+
+**The fix.** Define:
+$$\text{CHG} = \text{AVAL} - \text{BASE}, \qquad \text{PCHG} = 100 \cdot \frac{\text{AVAL} - \text{BASE}}{\text{BASE}} = 100 \cdot \frac{\text{CHG}}{\text{BASE}}.$$
+The constitutional component sits in BASE; subtracting it out leaves only the *within-subject change* — which is much less variable across subjects than the raw level.
+
+**Variance reduction, quantified.** Under simple assumptions ($\text{AVAL}$ and BASE bivariate normal with correlation $\rho$):
+$$\text{Var}(\text{CHG}) = \text{Var}(\text{AVAL}) + \text{Var}(\text{BASE}) - 2\rho \cdot \text{SD}(\text{AVAL}) \cdot \text{SD}(\text{BASE}).$$
+For lab markers where the within-subject correlation is typically $\rho \approx 0.7$, change-from-baseline has roughly 30–40% the variance of the raw level. The same trial detects effects ~$\sqrt{0.35} \approx 0.6$× the size at the same power, or — equivalently — needs ~35% the sample size for the same detection threshold.
+
+**`ABLFL` and which visit is "baseline".** The Analysis Baseline Flag (`ABLFL = "Y"`) is set on exactly one record per `(USUBJID, PARAMCD)` — almost always the latest pre-treatment value. Multiple pre-treatment readings are allowed; the rule for picking the one to flag is in the SAP (commonly "Day −1 unless missing, otherwise screening").
+
+**ANCOVA vs change-score.** A small but important refinement: rather than just modelling CHG as the outcome with treatment as the predictor, the gold standard is ANCOVA — model AVAL with BASE as a covariate:
+$$\text{AVAL}_i = \beta_0 + \beta_1 \cdot \text{TRT}_i + \beta_2 \cdot \text{BASE}_i + \varepsilon_i.$$
+ANCOVA is at least as efficient as change-from-baseline and is unbiased even when randomisation produces small baseline imbalances. Most modern SAPs use ANCOVA; CHG and PCHG remain in ADLBC because they're the standard *display* metric, even when the *analysis* uses ANCOVA.
+
+**Worked example.** Two arms, $n = 100$ each. Raw Week-12 creatinine: Placebo mean = 0.95 (SD 0.20), Active = 0.85 (SD 0.20). The two-sample t for raw AVAL has SE $= \sqrt{0.2^2/100 + 0.2^2/100} = 0.028$, so the standardised effect $= 0.10 / 0.028 = 3.5$. With change-from-baseline (assuming $\rho = 0.7$): Var(CHG) = $2 \cdot 0.04 - 2 \cdot 0.7 \cdot 0.2 \cdot 0.2 = 0.024$, SD = 0.155. The two-sample t for CHG has SE $= \sqrt{2 \cdot 0.024/100} = 0.022$, and the standardised effect is $0.10 / 0.022 = 4.5$. Same data, sharper conclusion.
+:::
+
 ```{r derive-adae-adlbc}
 #| label: derive-adae-adlbc
 #| eval: false
@@ -223,6 +288,35 @@ adsl |>
 ```
 
 ## Demographics — ICH E3 §14.2.1
+
+::: {.callout-note collapse="true"}
+## Going deeper — why ICH E3 §14.2.1 demands this specific layout
+
+**ICH E3 in one paragraph.** *Structure and Content of Clinical Study Reports* (CPMP/ICH/137/95) is the harmonised template the FDA, EMA, and PMDA all expect for the Clinical Study Report (CSR). Section 14.2 specifies efficacy and safety tables; **§14.2.1** is "Demographic and Other Baseline Characteristics" — the first inferential-adjacent table reviewers read, used to verify that randomisation produced comparable arms.
+
+**Why arms-as-columns + characteristics-as-rows.** A clinical reviewer comparing arms scans *across* a row to check imbalance on each characteristic. Stacking arms as rows would force the reviewer to flip pages and mentally pivot. The standardised layout is not aesthetic — it's optimised for the specific cognitive task ("are these arms similar enough that randomisation worked?").
+
+**Why mean (SD) for continuous and n (%) for categorical.**
+
+- **Continuous, roughly symmetric**: mean (SD) preserves location and spread; reviewers compare both to spot location shifts (mean difference) and dispersion shifts (SD ratio).
+- **Continuous, skewed** (e.g., baseline lab values with long upper tails): the SAP typically calls for **median (Q1–Q3)** instead. Mean and SD on heavily-skewed data exaggerate both — the displayed values become inappropriate descriptors of the typical subject.
+- **Categorical**: n (%) gives both raw count and proportion. Percentages alone hide rare-cell instability ("10%" on a 5-subject denominator is one event); raw count alone hides relative magnitude.
+
+**Why no formal hypothesis tests.** Demographic comparisons across randomised arms are *not tested* by convention (some journals still do it; ICH explicitly does not recommend it). The reasons: (1) randomisation guarantees baseline balance in expectation, so any observed imbalance is by definition chance — testing it is testing whether randomisation worked, which is circular. (2) Multiple testing across ~15 baseline characteristics guarantees one or two p < 0.05 results by chance, which then trigger ad-hoc covariate adjustments that compromise the planned analysis. The proper handling of baseline imbalance is to pre-specify covariate adjustment in the SAP (commonly: age, sex, baseline severity), not to test post hoc.
+
+**Why "safety population" is the denominator here.** Subjects who never received study drug have nothing to contribute to the question "are the treated arms comparable at baseline?" — they aren't treated arms. ITT would include them and answer a slightly different question (about the randomised cohort, not the treated cohort).
+
+**Worked example.** Three arms (Placebo / Donepezil 5 mg / Donepezil 10 mg). Table 14-2.01 might list:
+
+| Characteristic | Placebo (n=84) | Donepezil 5 (n=86) | Donepezil 10 (n=84) | Overall (n=254) |
+|---|---|---|---|---|
+| Age, mean (SD), years | 75.2 (8.1) | 74.8 (7.9) | 75.5 (8.4) | 75.2 (8.1) |
+| Sex, n (%) — Female | 47 (56) | 49 (57) | 46 (55) | 142 (56) |
+| Race, n (%) — White | 80 (95) | 82 (95) | 80 (95) | 242 (95) |
+| Baseline MMSE, median (Q1–Q3) | 17 (14–20) | 18 (15–21) | 17 (14–20) | 17 (14–20) |
+
+The reviewer scans the Age row, sees 75.2 / 74.8 / 75.5 — well within trivial noise. They scan Sex — 56% / 57% / 55%. Randomisation worked. They move to the efficacy tables.
+:::
 
 ```{r tab-14-2-01}
 #| label: tab-14-2-01
