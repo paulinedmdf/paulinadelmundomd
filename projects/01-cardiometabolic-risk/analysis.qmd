@@ -179,7 +179,7 @@ miss_long <- nhanes_raw |>
 
 ggplot(miss_long,
        aes(x = stats::reorder(variable, pct_missing), y = pct_missing)) +
-  geom_col(fill = "#0d5c63") +
+  geom_col(fill = "#020073") +
   geom_text(aes(label = sprintf("%.1f%%", pct_missing)),
             hjust = -0.1, size = 3.2, color = "#333") +
   coord_flip(clip = "off") +
@@ -215,9 +215,9 @@ thresholds <- tibble::tibble(
 )
 
 ggplot(cont_long, aes(value)) +
-  geom_histogram(fill = "#0d5c63", color = "white", bins = 40) +
+  geom_histogram(fill = "#020073", color = "white", bins = 40) +
   geom_vline(data = thresholds, aes(xintercept = cut),
-             color = "#b08a49", linetype = "dashed", linewidth = 0.6) +
+             color = "#FF2E00", linetype = "dashed", linewidth = 0.6) +
   facet_wrap(~ variable, scales = "free", ncol = 3) +
   labs(x = NULL, y = "Count")
 ```
@@ -239,7 +239,7 @@ ggplot(cells, aes(race_eth, n, fill = sex)) +
   geom_col(position = position_dodge(0.75), width = 0.7) +
   geom_text(aes(label = n),
             position = position_dodge(0.75), vjust = -0.3, size = 3.1) +
-  scale_fill_manual(values = c("Male" = "#0d5c63", "Female" = "#b08a49")) +
+  scale_fill_manual(values = c("Male" = "#020073", "Female" = "#FF2E00")) +
   scale_y_continuous(expand = expansion(mult = c(0, 0.12))) +
   labs(x = NULL, y = "Adult complete-case count", fill = NULL) +
   theme(legend.position = "top",
@@ -574,7 +574,7 @@ ggplot(prev_tbl, aes(x = reorder(race_eth, metsyn_pct), y = metsyn_pct, fill = s
     position = position_dodge(0.75), width = 0.2
   ) +
   coord_flip() +
-  scale_fill_manual(values = c("Male" = "#0d5c63", "Female" = "#b08a49")) +
+  scale_fill_manual(values = c("Male" = "#020073", "Female" = "#FF2E00")) +
   labs(x = NULL, y = "Prevalence (%)", fill = NULL) +
   theme(legend.position = "top")
 ```
@@ -671,7 +671,7 @@ Before running any regression we need to know which candidate predictors are too
 
 ```{r collinearity-corr}
 #| label: collinearity-corr
-#| fig-cap: "Pairwise Pearson correlations among continuous candidate predictors. Cells with |r| ≥ 0.7 are flagged in gold — the conventional threshold above which two variables shouldn't enter the same regression. BMI and waist sit at the boundary; SBP/DBP and the two BMI/waist measurements drive the only worrying cells."
+#| fig-cap: "Pairwise Pearson correlations among continuous candidate predictors. Cells with |r| ≥ 0.7 are flagged in orange — the conventional threshold above which two variables shouldn't enter the same regression. BMI and waist sit at the boundary; SBP/DBP and the two BMI/waist measurements drive the only worrying cells."
 #| fig-width: 7.5
 #| fig-height: 5.5
 
@@ -692,8 +692,8 @@ ggplot(corr_long, aes(x, y, fill = r)) +
                 color = abs(r) > 0.5),
             size = 3.2, fontface = "bold") +
   geom_tile(data = subset(corr_long, flag),
-            fill = NA, color = "#b08a49", linewidth = 1.2) +
-  scale_fill_gradient2(low = "#3f007d", mid = "white", high = "#0d5c63",
+            fill = NA, color = "#FF2E00", linewidth = 1.2) +
+  scale_fill_gradient2(low = "#FF2E00", mid = "#F6F9F7", high = "#020073",
                        midpoint = 0, limits = c(-1, 1),
                        name = "Pearson r") +
   scale_color_manual(values = c(`TRUE` = "white", `FALSE` = "#333"),
@@ -1118,9 +1118,9 @@ The area under those step segments is $\tfrac{1}{2} + \tfrac{1}{3} = 0.83$ — t
 #| fig-cap: "ROC curve, held-out 25% test set. Demographics + BMI alone achieve useful discrimination — well below the perfect AUC that including ATP III components would falsely produce."
 fpr, tpr, _ = roc_curve(y_te, p_te)
 fig, ax = plt.subplots(figsize=(6, 5))
-_ = ax.plot(fpr, tpr, color="#0d5c63", lw=2,
+_ = ax.plot(fpr, tpr, color="#020073", lw=2,
             label=f"XGBoost (AUC = {roc_auc_score(y_te, p_te):.3f})")
-_ = ax.plot([0, 1], [0, 1], ls="--", color="#b08a49", lw=1)
+_ = ax.plot([0, 1], [0, 1], ls="--", color="#FF2E00", lw=1)
 _ = ax.set(xlabel="False positive rate", ylabel="True positive rate")
 _ = ax.legend(frameon=False)
 _ = ax.spines[["top", "right"]].set_visible(False)
@@ -1152,8 +1152,8 @@ Plot $(\bar{p}_b, \bar{y}_b)$ for each bin. A perfectly calibrated model has $\b
 #| fig-cap: "Calibration. Perfectly calibrated models lie on the diagonal; dots above the line mean the model under-estimates true risk in that decile."
 prob_true, prob_pred = calibration_curve(y_te, p_te, n_bins=10, strategy="quantile")
 fig, ax = plt.subplots(figsize=(6, 5))
-_ = ax.plot(prob_pred, prob_true, "o-", color="#0d5c63", lw=2)
-_ = ax.plot([0, 1], [0, 1], ls="--", color="#b08a49", lw=1)
+_ = ax.plot(prob_pred, prob_true, "o-", color="#020073", lw=2)
+_ = ax.plot([0, 1], [0, 1], ls="--", color="#FF2E00", lw=1)
 _ = ax.set(xlabel="Predicted probability", ylabel="Observed frequency")
 _ = ax.spines[["top", "right"]].set_visible(False)
 plt.tight_layout()
@@ -1229,7 +1229,7 @@ ggplot(dat_pce, aes(x = factor(metsyn,
                     y = pce_risk,
                     fill = metsyn)) +
   geom_boxplot(width = 0.5, outlier.alpha = 0.3) +
-  scale_fill_manual(values = c("FALSE" = "#0d5c63", "TRUE" = "#b08a49"),
+  scale_fill_manual(values = c("FALSE" = "#020073", "TRUE" = "#FF2E00"),
                     guide = "none") +
   scale_y_continuous(labels = scales::percent_format(accuracy = 1)) +
   labs(x = NULL, y = "PCE 10-year ASCVD risk")
@@ -1286,11 +1286,11 @@ fpr_pce, tpr_pce, _ = roc_curve(yp_te, p_pce)
 fpr_xgb, tpr_xgb, _ = roc_curve(y_te, p_te)
 
 fig, ax = plt.subplots(figsize=(6, 5))
-_ = ax.plot(fpr_pce, tpr_pce, color="#54278f", lw=2,
+_ = ax.plot(fpr_pce, tpr_pce, color="#746aff", lw=2,
             label=f"PCE inputs, logit (AUC = {auc_pce:.3f})")
-_ = ax.plot(fpr_xgb, tpr_xgb, color="#0d5c63", lw=2,
+_ = ax.plot(fpr_xgb, tpr_xgb, color="#020073", lw=2,
             label=f"Demographics + BMI, XGBoost (AUC = {auc_xgb:.3f})")
-_ = ax.plot([0, 1], [0, 1], ls="--", color="#b08a49", lw=1)
+_ = ax.plot([0, 1], [0, 1], ls="--", color="#FF2E00", lw=1)
 _ = ax.set(xlabel="False positive rate", ylabel="True positive rate")
 _ = ax.legend(frameon=False, loc="lower right")
 _ = ax.spines[["top", "right"]].set_visible(False)

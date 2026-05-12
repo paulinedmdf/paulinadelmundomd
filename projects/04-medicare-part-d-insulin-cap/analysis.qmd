@@ -353,7 +353,7 @@ ggplot(es_tidy, aes(year, estimate, colour = period)) +
   geom_pointrange(aes(ymin = conf.low, ymax = conf.high), size = 0.4) +
   geom_line(aes(group = 1), linewidth = 0.4, alpha = 0.6) +
   scale_x_continuous(breaks = sort(unique(es_tidy$year))) +
-  scale_colour_manual(values = c(Pre = "#666666", Post = "#0d5c63")) +
+  scale_colour_manual(values = c(Pre = "#5c5c5c", Post = "#020073")) +
   labs(
     title    = "Event-study coefficients on log(30-day fills)",
     subtitle = sprintf("Reference year %d; vertical line marks the IRA cap effective date",
@@ -557,7 +557,7 @@ loo <- purrr::map_dfr(treated_drugs, function(g) {
 
 ggplot(loo, aes(reorder(dropped, estimate), estimate)) +
   geom_hline(yintercept = coef(m_fills)[["treated_post"]],
-             colour = "#0d5c63", linetype = "dashed") +
+             colour = "#020073", linetype = "dashed") +
   geom_pointrange(aes(ymin = conf.low, ymax = conf.high), size = 0.3) +
   coord_flip() +
   labs(

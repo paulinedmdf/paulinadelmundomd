@@ -32,7 +32,7 @@ A laptop-scale analysis of the HHS Medicaid Provider Spending file (11 GB CSV) u
 | Unsupervised | Isolation forest on 4 standardized features with collinearity diagnostics (Pearson correlation matrix, condition number, approximate VIFs) |
 | Geography | NPPES → ZCTA → county FIPS via Census 2020 ZCTA relationship file |
 | Categorization | Rule-based HCPCS → 12 spending categories (`classify_hcpcs()` mirrors the prep CASE) |
-| Map | Leaflet choropleth, within-category decile shading (10-step purple ramp), 12-option dropdown |
+| Map | Leaflet choropleth, within-category decile shading (10-step navy ramp), 12-option dropdown |
 | Explorer | Top-5 HCPCS / spatial Gini + top-10-county share / state hotspot table — all 12 categories in one pass |
 
 ## Reproducing locally

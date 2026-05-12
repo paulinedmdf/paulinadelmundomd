@@ -183,7 +183,7 @@ dplyr::bind_rows(
 
 ```{r eda-distribution}
 #| label: eda-distribution
-#| fig-cap: "Three distributional sanity checks. **Top-left** — paid per beneficiary across all (NPI × HCPCS) rows on a log10 scale; the long upper tail is exactly why MAD-based robust z's outperform a mean/SD z-score here. **Top-right** — beneficiary count per row, capped at 5,000 for visibility. **Bottom-left** — peer-group sizes per HCPCS (the denominators behind every robust z); HCPCS with peer_n < 25 are filtered out in prep. **Bottom-right** — robust-z values (those with a finite z) showing the long right tail; the gold dashed line marks the program-integrity ≥ 5 cutoff."
+#| fig-cap: "Three distributional sanity checks. **Top-left** — paid per beneficiary across all (NPI × HCPCS) rows on a log10 scale; the long upper tail is exactly why MAD-based robust z's outperform a mean/SD z-score here. **Top-right** — beneficiary count per row, capped at 5,000 for visibility. **Bottom-left** — peer-group sizes per HCPCS (the denominators behind every robust z); HCPCS with peer_n < 25 are filtered out in prep. **Bottom-right** — robust-z values (those with a finite z) showing the long right tail; the orange dashed line marks the program-integrity ≥ 5 cutoff."
 #| fig-width: 10
 #| fig-height: 6.2
 
@@ -191,7 +191,7 @@ paid_per_bene_plot <- ggplot(
   outliers |> dplyr::filter(paid_per_bene > 0, !is.na(paid_per_bene)),
   aes(paid_per_bene)
 ) +
-  geom_histogram(fill = "#0d5c63", color = "white", bins = 60) +
+  geom_histogram(fill = "#020073", color = "white", bins = 60) +
   scale_x_log10(labels = scales::label_dollar()) +
   labs(x = "Paid per beneficiary (log10)", y = "Rows", subtitle = "Per-row paid/bene")
 
@@ -199,11 +199,11 @@ bene_plot <- ggplot(
   outliers |> dplyr::filter(beneficiaries > 0, beneficiaries <= 5000),
   aes(beneficiaries)
 ) +
-  geom_histogram(fill = "#0d5c63", color = "white", bins = 60) +
+  geom_histogram(fill = "#020073", color = "white", bins = 60) +
   labs(x = "Beneficiaries (≤ 5,000)", y = "Rows", subtitle = "Per-row beneficiary count")
 
 peer_plot <- ggplot(hcpcs_sum, aes(peer_n)) +
-  geom_histogram(fill = "#0d5c63", color = "white", bins = 60) +
+  geom_histogram(fill = "#020073", color = "white", bins = 60) +
   scale_x_log10(labels = scales::label_comma()) +
   labs(x = "Peer providers per HCPCS (log10)", y = "HCPCS codes",
        subtitle = "Peer-group sizes")
@@ -213,9 +213,9 @@ z_plot <- ggplot(
                             robust_z >= -10, robust_z <= 50),
   aes(robust_z)
 ) +
-  geom_histogram(fill = "#0d5c63", color = "white", bins = 60) +
+  geom_histogram(fill = "#020073", color = "white", bins = 60) +
   geom_vline(xintercept = 5, linetype = "dashed",
-             color = "#b08a49", linewidth = 0.6) +
+             color = "#FF2E00", linewidth = 0.6) +
   labs(x = "Robust z (clipped to [-10, 50])", y = "Rows",
        subtitle = "Robust-z distribution")
 
@@ -399,8 +399,8 @@ hcpcs_totals <- hcpcs_sum |>
   )
 
 ggplot(hcpcs_totals, aes(rank_pct, cum_share)) +
-  geom_line(color = "#0d5c63", linewidth = 1) +
-  geom_hline(yintercept = 0.8, linetype = "dashed", color = "#b08a49") +
+  geom_line(color = "#020073", linewidth = 1) +
+  geom_hline(yintercept = 0.8, linetype = "dashed", color = "#FF2E00") +
   scale_x_continuous(labels = percent_format()) +
   scale_y_continuous(labels = percent_format()) +
   labs(x = "HCPCS codes ranked by total paid (ascending)",
@@ -548,7 +548,7 @@ pretty_kable(
 ```
 
 ```{r specialty-boxplot}
-#| fig-cap: "Per-beneficiary spend by specialty (top 15 by flagged-outlier count). Box spans p25–p75 with median; whiskers are p05 / p95 from the full peer distribution computed in the DuckDB prep step. Gold dots are the individual robust-z ≥ 5 outliers layered on top."
+#| fig-cap: "Per-beneficiary spend by specialty (top 15 by flagged-outlier count). Box spans p25–p75 with median; whiskers are p05 / p95 from the full peer distribution computed in the DuckDB prep step. Orange dots are the individual robust-z ≥ 5 outliers layered on top."
 
 top_specialties <- specialty_sum |>
   arrange(desc(flagged_ge_5)) |>
@@ -571,11 +571,11 @@ ggplot(box_df, aes(specialty_name)) +
       ymax   = p95
     ),
     stat = "identity",
-    fill = "#e6f1f2", color = "#0d5c63", width = 0.7
+    fill = "#e8edff", color = "#020073", width = 0.7
   ) +
   geom_jitter(data = jitter_df,
               aes(y = paid_per_bene),
-              color = "#b08a49", width = 0.2, size = 0.7, alpha = 0.5) +
+              color = "#FF2E00", width = 0.2, size = 0.7, alpha = 0.5) +
   scale_y_log10(labels = scales::label_dollar()) +
   coord_flip() +
   labs(x = NULL, y = "Paid per beneficiary (log scale)")
@@ -694,11 +694,11 @@ print("Overlap with robust-z ≥ 5:",
 ```
 
 ```{python iforest-scatter}
-#| fig-cap: "Paid-per-beneficiary vs. beneficiary count for the top 20 HCPCS codes by spend. Isolation-forest flags in gold overlap substantially with — but not identically to — the robust-z rule."
+#| fig-cap: "Paid-per-beneficiary vs. beneficiary count for the top 20 HCPCS codes by spend. Isolation-forest flags in orange overlap substantially with — but not identically to — the robust-z rule."
 
 fig, ax = plt.subplots(figsize=(7, 5))
 _ = ax.scatter(sub["beneficiaries"], sub["paid_per_bene"],
-               c=np.where(sub["iforest_flag"], "#b08a49", "#cccccc"),
+               c=np.where(sub["iforest_flag"], "#FF2E00", "#c3c3c3"),
                s=10, alpha=0.5)
 _ = ax.set(xscale="log", yscale="log",
            xlabel="Unique beneficiaries (log)", ylabel="Paid per beneficiary (log)")
@@ -752,14 +752,14 @@ county_atlas <- county_atlas |>
 group_totals |>
   mutate(category = fct_reorder(disease_group, total_paid)) |>
   ggplot(aes(category, total_paid)) +
-  geom_col(fill = "#756bb1") +
+  geom_col(fill = "#746aff") +
   coord_flip() +
   scale_y_continuous(labels = format_money) +
   labs(x = NULL, y = "Total paid (USD)")
 ```
 
 ```{r county-choropleth}
-#| fig-cap: "Interactive county-level cost atlas: Medicaid paid per beneficiary ranked into within-category deciles (darker purple = higher cost relative to other counties for that same category). Each panel is its own choropleth so coloring is comparable within category, not across categories. Use the top-right dropdown to switch across all 12 HCPCS spending categories. Alaska, Hawaii, and territories omitted for contiguous-US framing; grey counties have no Medicaid providers billing that category."
+#| fig-cap: "Interactive county-level cost atlas: Medicaid paid per beneficiary ranked into within-category deciles (darker navy = higher cost relative to other counties for that same category). Each panel is its own choropleth so coloring is comparable within category, not across categories. Use the top-right dropdown to switch across all 12 HCPCS spending categories. Alaska, Hawaii, and territories omitted for contiguous-US framing; grey counties have no Medicaid providers billing that category."
 
 options(tigris_use_cache = TRUE)
 counties_sf <- tigris::counties(year = 2020, cb = TRUE, resolution = "5m", progress_bar = FALSE) |>
@@ -767,8 +767,8 @@ counties_sf <- tigris::counties(year = 2020, cb = TRUE, resolution = "5m", progr
   dplyr::filter(!stringr::str_detect(GEOID, "^(02|15|60|66|69|72|78)")) |>
   sf::st_transform(4326)
 
-purples <- grDevices::colorRampPalette(c("#fcfbfd", "#3f007d"))(10)
-pal <- leaflet::colorFactor(purples, domain = factor(1:10))
+navies <- grDevices::colorRampPalette(c("#F6F9F7", "#020073"))(10)
+pal <- leaflet::colorFactor(navies, domain = factor(1:10))
 
 atlas_sub <- county_atlas |>
   filter(disease_group %in% top_categories)
@@ -880,7 +880,7 @@ lmap |>
   htmlwidgets::onRender(dropdown_js) |>
   leaflet::addLegend(
     position = "bottomleft",
-    colors   = purples,
+    colors   = navies,
     labels   = c("1 (lowest)", "2", "3", "4", "5", "6", "7", "8", "9", "10 (highest)"),
     title    = "Decile of paid<br/>per beneficiary",
     opacity  = 0.85
@@ -946,7 +946,7 @@ top_hcpcs_per_category <- hcpcs_by_category |>
 ggplot(top_hcpcs_per_category,
        aes(x = stats::reorder(paste(hcpcs, row_id), total_paid),
            y = total_paid)) +
-  geom_col(fill = "#54278f") +
+  geom_col(fill = "#746aff") +
   geom_text(aes(label = format_money(total_paid)),
             hjust = -0.08, size = 3, color = "#333") +
   facet_wrap(~ category, scales = "free", ncol = 3) +
@@ -1021,7 +1021,7 @@ spatial_conc <- county_atlas |>
 spatial_conc |>
   mutate(category = fct_reorder(category, gini_paid)) |>
   ggplot(aes(category, gini_paid)) +
-  geom_col(fill = "#756bb1") +
+  geom_col(fill = "#746aff") +
   geom_text(aes(label = sprintf("Gini %.2f · top-10 share %s",
                                 gini_paid,
                                 scales::percent(top10_share, accuracy = 1))),
@@ -1079,7 +1079,7 @@ state_excess <- state_sum |>
   slice_head(n = 25)
 
 ggplot(state_excess, aes(reorder(state, excess_paid), excess_paid)) +
-  geom_col(fill = "#0d5c63") +
+  geom_col(fill = "#020073") +
   coord_flip() +
   scale_y_continuous(labels = format_money) +
   labs(x = NULL, y = "Paid above HCPCS peer median ($)")
