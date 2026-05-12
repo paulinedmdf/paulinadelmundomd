@@ -409,9 +409,20 @@ ggplot(hcpcs_totals, aes(rank_pct, cum_share)) +
        y = "Cumulative share of total paid")
 ```
 
-## Peer-group outlier detection (R)
+## Peer-group outlier surfacing (R) — exploratory
 
 > **In one sentence.** Compute a MAD-based robust z per (NPI × HCPCS) row, then apply Benjamini–Hochberg FDR ≤ 0.01 instead of a hard z-cutoff so the flag list comes with a multiplicity guarantee, not just an arbitrary threshold.
+
+::: {.callout-warning}
+## This is *surfacing*, not *detection* — read the flag list as exploratory
+
+Two reasons the framing matters for a portfolio reader:
+
+1. **The peer group is too broad.** "Everyone billing this HCPCS" mixes specialties, panel sizes, and care settings into one comparison. A correct peer group is `specialty × panel-size band × setting`. This is the foundational caveat in the README and it isn't resolved in the current pipeline — every flagged outlier could be explained by "wrong peer group" before "anomalous billing behaviour." A publication-grade or deployable version of this analysis would require a re-run with that peer-group adjustment as the first step.
+2. **No ground-truth validation.** The flag list has not been compared against the HHS-OIG **List of Excluded Individuals/Entities (LEIE)** or any other ground-truth set of providers known to have been sanctioned. The robust-z + BH-FDR output is therefore a *prioritisation* tool — "look at these rows first" — not a *detector* whose precision and recall have been measured.
+
+Read every "flagged" count below in that frame: surfaced for review, not confirmed as anomalous. The methodology is correct; the validation step that turns it into a deployable detector is the missing piece.
+:::
 
 ::: {.callout-note}
 ## Why a robust (MAD-based) z and not a normal z?
@@ -1102,7 +1113,7 @@ ggplot(state_excess, aes(reorder(state, excess_paid), excess_paid)) +
 The seven-step pipeline (DuckDB aggregate → robust z → NPPES enrichment → ZCTA-county join → category classifier → atlas → explorer) supports five conclusions that each tie back to a specific diagnostic on this page:
 
 - **Heavy tails are the regime, not the exception.** The paid-per-beneficiary distribution in [`eda-distribution`](#cell-fig-eda-distribution) is log-skewed across four orders of magnitude. That's why a mean/SD z-score is unusable here: the SD is dominated by one or two mega-providers and every other observation looks "normal" by comparison. The MAD-based robust z is invariant to those tail rows, which is why the same threshold (≥ 5) generalizes across HCPCS codes with very different peer-group sizes.
-- **Rule-based and unsupervised flags agree on the high-confidence set.** The overlap between robust-z ≥ 5 and the isolation-forest 1%-contamination flag is the set a Program Integrity team would prioritize. Disagreement between the two is the *interesting* set — it's where a tail-only metric (robust z) and a joint-distribution metric (isolation forest) see different things, which is usually a signal worth a second human look.
+- **Rule-based and unsupervised flags agree on a "highest-confidence-for-review" set.** The overlap between robust-z ≥ 5 and the isolation-forest 1%-contamination flag is the set a Program Integrity team would prioritise for *human review* — not a list of confirmed bad actors. Without an LEIE / sanctioned-providers cross-check, the precision of this surfacing is unmeasured. Disagreement between the two methods is the *interesting* set — where a tail-only metric (robust z) and a joint-distribution metric (isolation forest) see different things, usually worth a second human look.
 - **Collinearity didn't break the isolation forest, but it constrained tree diversity.** The condition number on the four standardized features lands above the rule-of-thumb threshold because `claims` and `beneficiaries` are nearly identical by construction. We kept both for interpretability — but the cost is that some trees in the ensemble split on essentially the same axis. A leaner three-feature variant (drop `claims`) would produce a slightly more diverse forest at the cost of a slightly less interpretable feature set; for a fraud-review prompt list, that tradeoff goes the way we chose.
 - **Categories are an HCPCS lens, not a disease lens.** The 12-bucket atlas is honest about what it is: a procedure-code taxonomy projected onto county geography, not a disease taxonomy. Reading the choropleth for "where Medicaid spends money on Behavioral Health procedures" is supportable; reading it for "where Medicaid pays for treating depression" is not — depression doesn't have a HCPCS code, only the *services* delivered for depression do. The Gini concentration plot is a useful tie-breaker: categories with high Gini (Dialysis & ESRD, parts of DME) genuinely cluster geographically; categories with low Gini (LTSS, E&M) are diffuse across the country and shouldn't be read as having geographic "hotspots" at all.
 - **Geography is the start of an interpretation, never the end.** State-level Medicaid rate schedules, MCO contracting differences, and referral-network composition can all produce county-level patterns that look like billing outliers but are artifacts of policy. The state hotspot tables in the explorer make those patterns visible; deciding which are actionable requires a payer-policy lens this notebook does not pretend to provide.

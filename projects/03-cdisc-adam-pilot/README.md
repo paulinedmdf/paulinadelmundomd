@@ -75,7 +75,7 @@ If you do not have SAS access, the R/`{admiral}` half renders standalone and the
 
 ## Status
 
-In progress — scaffolding committed, ADSL derivation in flight. Tracking against the [pharmaverseadam](https://github.com/pharmaverse/pharmaverseadam) reference implementation as the secondary check.
+**Design + SAS complete; R implementation pending execution.** The SAS submission package, the YAML define-XML extract, and the R/`{admiral}` derivation scaffolding are all written and committed. The R chunks carry `eval: false` in the rendered notebook and do not execute until `make data` is run and the `{admiral}` family is added to `renv.lock`. The reconciliation step (SAS-derived vs R-derived vs CDISC-reference ADSL) is the project's intended deliverable and is the next step before this becomes a self-running portfolio sample. Tracking against the [pharmaverseadam](https://github.com/pharmaverse/pharmaverseadam) reference implementation.
 
 ## References
 

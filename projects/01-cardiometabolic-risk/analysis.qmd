@@ -270,6 +270,46 @@ cat(sprintf(
 
 The unweighted prevalence above is what a naive analyst would report. The weighted estimate in the next section will land in a different place — that gap is the methodological reason we apply the survey design.
 
+::: {.callout-note}
+## Cohort flow — n surviving each filtering step
+
+A reviewer's first question on any observational analysis is "where did the n come from?" The pipeline filters the raw NHANES merge in three stages; the table below makes the staged attrition explicit, mirroring the CONSORT / STROBE flow expectation for an observational cohort. Each row's count is recomputed live from the in-memory objects so it stays consistent with whatever filter set is currently in effect.
+
+```{r cohort-flow}
+#| label: cohort-flow
+#| echo: false
+n_raw    <- nrow(nhanes_raw)
+n_pooled <- nrow(nhanes_raw)
+n_adult  <- sum(nhanes_raw$age_years >= 20, na.rm = TRUE)
+# `dat_full` (built later) and `dat` (complete-case) are not yet in scope at
+# this point in the rendered flow; the downstream chunks compute them and the
+# corresponding numbers are reported in their own cat() outputs. The flow
+# table below documents the *staged* design so the reader can locate each n
+# in the chunk that produces it.
+flow <- data.frame(
+  Step = c("1. Pooled raw merge (cycles 2015-2018)",
+           "2. Adult subset (age >= 20 yrs)",
+           "3. Pre-complete-case cohort (valid MEC weight, age 20+)  -- see `define-outcome` chunk for n",
+           "4. Complete-case cohort (all 5 ATP III components observed) -- see `define-outcome` chunk for n",
+           "5. MI cohort (Rubin's-rules over m = 5 imputations) -- see `mi-impute` for the pre-CC denominator"),
+  n    = c(format(n_raw,    big.mark = ","),
+           format(n_pooled, big.mark = ","),
+           format(n_adult,  big.mark = ","),
+           "see chunk",
+           "see chunk"),
+  `Filter that drops rows` = c(
+    "Merge across DEMO, BMX, BPX, GLU, HDL, TRIG, DIQ, TCHOL, SMQ, BPQ for both cycles",
+    "Removes children and adolescents (CDC standard age cutoff for cardiometabolic adult analyses)",
+    "Removes non-examined participants (zero MEC weight)",
+    "Removes rows missing any of waist, trig, HDL, SBP, DBP, fasting glucose -- the binding constraint is the morning fasting subsample",
+    "Carries forward design columns + demographics as auxiliary predictors; imputes the 8 clinical measurements"
+  ),
+  check.names = FALSE
+)
+knitr::kable(flow, caption = "Cohort flow diagram in tabular form. Steps 1 and 2 are computed live; steps 3 and 4 are reported by the `define-outcome` chunk below; step 5 by the `mi-impute` chunk further down. Together they document the inclusion / exclusion path from raw merge to the MI-pooled analytic sample.")
+```
+:::
+
 ## Defining metabolic syndrome (ATP III, harmonized)
 
 An adult meets criteria if **≥ 3 of 5** are true:
@@ -1058,6 +1098,14 @@ We hand the same cohort to Python via `reticulate`. Critically, we **do not** us
 Instead we ask a more interesting question: *how far can basic demographics and adiposity alone carry us toward identifying people at elevated metabolic-syndrome risk?* The answer is a useful screening tool — not a replacement for labs.
 
 ::: {.callout-note collapse="true"}
+## Why these XGBoost hyperparameters (and what's missing)
+
+**The chosen values.** `n_estimators=400, max_depth=4, learning_rate=0.05, subsample=0.9, colsample_bytree=0.9`. These are the "slow learner ensemble" defaults — shallow trees, low learning rate, many iterations — which is the standard choice for tabular biomedical data where smooth, regularised decision boundaries usually beat aggressive single-tree depth. Depth 4 caps each tree at 16 leaves (only low-order interactions); learning rate 0.05 means each tree's contribution is small; the subsample / colsample dropouts add stochasticity for variance reduction. The XGBoost README, the Kaggle community, and Steyerberg-tradition clinical-prediction work all converge on roughly these settings as the safe starting point.
+
+**What's missing for a publication-grade fit.** No k-fold cross-validation inside the train set for hyperparameter selection — only a single 75/25 train/test split with `random_state = 42`. That means: (1) hyperparameters are *fixed* rather than tuned; (2) the test set isn't a true held-out evaluation because no model variants compete for it. A defensible portfolio version would: nest 5-fold CV inside the train fold to select among (depth ∈ {3, 4, 6}) × (lr ∈ {0.05, 0.10}) × (n_est ∈ {200, 400, 800}), and only at the end touch the test set for the final discrimination + calibration numbers. The fixed-grid choice here is acknowledged as a portfolio shortcut, not as defended methodology.
+:::
+
+::: {.callout-note collapse="true"}
 ## Going deeper — how gradient boosting actually fits each tree
 
 **Plain English.** Imagine you're trying to predict who has metabolic syndrome from age, sex, and BMI. Tree 1 takes a rough first pass — say, "anyone over 50 with BMI > 30 is high risk." It's decent but misses lots of detail. Tree 2 looks at *only the people Tree 1 got wrong* and learns to correct those mistakes. Tree 3 looks at what Trees 1 + 2 still got wrong, and corrects again. You stack 400 of these "error-correcting" trees together — each only nudging the prediction by a tiny amount (5% of its vote) — and the result is a flexible nonlinear model that captures patterns no single decision tree could. That's gradient boosting.
@@ -1343,11 +1391,22 @@ Seven analytic steps support seven findings that each tie back to a diagnostic a
 
 ## Next steps
 
-- **Decision-curve analysis** at clinically-relevant probability thresholds (5%, 10%, 20%) for each model, with net-benefit reported alongside AUC. That's the analysis a clinical-utility paper actually needs.
+### Publication-grade gaps to close before submission
+
+These are the items a reviewer at *Circulation*, *JAMA*, or *BMJ* would block on. Each is listed as a TRIPOD+AI gap in the appendix; addressing them is a prerequisite for converting this portfolio analysis into a peer-reviewed manuscript.
+
+- **Subgroup SHAP within race/ethnicity strata** — closes the TRIPOD+AI algorithmic-fairness gap (items 14, 18). Currently flagged as **Gap** in the appendix table; the analysis is methodologically simple given the existing SHAP infrastructure but has been deferred.
+- **Decision-curve analysis** at clinically-relevant probability thresholds (5%, 10%, 20%), with net-benefit reported alongside AUC. The discrimination + calibration story already in the notebook is *necessary* but not *sufficient* for the clinical-utility claim; DCA is the standard add-on (Vickers & Elkin 2006).
+- **k-fold cross-validation on the XGBoost hyperparameters** instead of the current fixed grid — addresses the implicit-tuning concern flagged in the hyperparameter callout above.
+- **External validation cohort** — the TRIPOD+AI checklist marks validation as **Partial** because the 25% holdout is from the same NHANES cycles. A true external validation needs a different cohort (e.g., the All of Us biobank, or a later NHANES cycle as a temporal hold-out).
+
+### Future-research extensions
+
+These are larger methodological directions that go beyond closing this analysis and would each be a separate paper.
+
 - **PREVENT score comparator** alongside PCE — the 2023 AHA model is the published replacement and the natural sensitivity check on PCE's race term.
 - **NHANES-LMF survival analysis** for the real PCE head-to-head on incident ASCVD over 10-year follow-up.
 - **SDoH enrichment** from ACS / CDC PLACES at census-tract level and a re-fit to test whether mis-ranking of socioeconomically vulnerable groups shrinks materially with structural covariates.
-- **Subgroup SHAP** within race/ethnicity strata to test for differential prediction — the algorithmic-fairness check that any clinical-prediction reviewer will request.
 - **Splines on age and age × sex interaction** in the design-aware logit — the two most common reviewer comments on cardiometabolic models.
 
 ## Appendix — TRIPOD+AI reporting checklist

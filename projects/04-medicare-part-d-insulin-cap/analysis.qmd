@@ -281,6 +281,18 @@ pretty_kable(
 
 The `treated_post` coefficient is the log-percentage change in the outcome for insulin relative to the non-insulin counterfactual after 2023. Because the outcome is logged, the coefficient is approximately a relative change: $\beta = 0.05$ implies roughly $\exp(0.05) - 1 \approx 5.1\%$ more 30-day fills for insulin than the control-group counterfactual predicts. A negative coefficient says the opposite — insulin grew *less* than controls.
 
+::: {.callout-note}
+## Translating the ATT for a non-statistical audience
+
+A policy team or executive sponsor will not read "ATT on log 30-day fills = 0.085 (SE 0.030)" — they need three translation steps before that number is decision-useful:
+
+1. **Relative effect.** The point estimate exponentiates to $e^{0.085} - 1 \approx 8.9\%$. Headline: *"after the IRA cap took effect, insulin 30-day fills grew 8.9% faster than the non-insulin antihyperglycemic counterfactual would have predicted."*
+2. **Confidence-interval translation.** The 95% CI in log-space exponentiates asymmetrically. If the log-CI is $[0.026, 0.144]$, the relative-effect CI is roughly $[2.6\%, 15.5\%]$ — wide, but excludes zero.
+3. **Absolute-scale anchor.** Multiply the percent change by the pre-period insulin baseline. If insulin averaged 25 million 30-day fills per year before the cap, an 8.9% effect = ~2.2 million additional fills per year attributable to the policy. That's the number policy audiences engage with.
+
+Steps 1 and 2 are arithmetic; step 3 requires the pre-period denominator. Always carry the absolute anchor into the executive summary, not just the log coefficient. The drug-clustered SE and the few-cluster caveats above apply to all three layers of the translation equally — the reported numbers inherit the inference framework, they don't get to bypass it.
+:::
+
 ::: {.callout-note collapse="true"}
 ## Going deeper — interpreting a log-outcome coefficient as a percent change
 
@@ -609,7 +621,9 @@ bind_rows(
   pretty_kable(caption = "Effect is robust to absorbing prescriber-level variation", digits = 4)
 ```
 
-## Heterogeneity by prescriber specialty
+## Heterogeneity by prescriber specialty (exploratory)
+
+> **Pre-specification note.** This stratification was *not* included in the original analysis plan and is therefore exploratory — hypothesis-generating, not hypothesis-confirming. A reviewer should read the specialty-level coefficients as candidate patterns worth following up in a pre-registered analysis, not as confirmatory findings about how the IRA cap differentially affected practice types. The placebo and parallel-trends tests above apply to the *primary* drug-year specification; they do not separately validate identification within each specialty bucket.
 
 ::: {.callout-note}
 ## Why average effects can hide important variation
@@ -670,7 +684,7 @@ ggplot(het_table, aes(reorder(specialty, estimate), estimate)) +
 
 - **Annual granularity.** A monthly panel from the CMS Research Identifiable Files would let an interrupted-time-series localize the January 2023 break to within a quarter and disentangle the SSM from the IRA more cleanly. The PUF is annual, so the event-study resolves at year-aggregates.
 - **`Tot_Drug_Cst` is total payer cost, not beneficiary OOP.** The cap operates on cost-sharing; the PUF reports total drug spend. Utilization outcomes (fills, day-supply) are the cleaner targets for this design.
-- **2024 catastrophic redesign and 2025 OOP cap.** The IRA also eliminated the 5% catastrophic coinsurance in 2024 and capped total beneficiary OOP at $2,000 in 2025. Both can affect the *control* group's OOP costs and, indirectly, utilization. The primary 30-day-fills result is robust to this because the 2024 catastrophic change is small relative to total Part D demand at the drug-class level; OOP-based outcomes should restrict to 2019–2023.
+- **The `log_cost` coefficient as run uses the full 2019–2024 panel and is therefore contaminated.** A correct cost analysis would restrict the panel to 2019–2023 to exclude the 2024 catastrophic-redesign shock (the IRA also eliminated the 5% catastrophic coinsurance in 2024 and capped total beneficiary OOP at $2,000 in 2025). Both affect the *control* group's cost trajectory in a way that the cleaner utilization outcomes (fills, day-supply) sidestep. The cost coefficient in the primary table should therefore be read as **exploratory** until the panel is restricted. The 30-day-fills result is the headline; the cost result is illustrative.
 - **GLP-1 demand shock.** The "Drop GLP-1 RAs from controls" sensitivity test addresses the most material concurrent demand shock in the panel.
 - **Off-label and indication mix.** Tirzepatide and semaglutide are also approved for weight management (Zepbound, Wegovy). Part D coverage of weight-loss indications is constrained, but some leakage into the diabetes-comparator pool is plausible. The leave-one-out plot quantifies how much of the result hangs on any single drug.
 - **Senior Savings Model partial treatment.** SSM applied to enrollees of participating MA-PD plans starting 2021. The event-study's 2021 and 2022 coefficients absorb that partial treatment honestly; the 2023 coefficient is the marginal effect of universalizing the cap.
@@ -781,7 +795,7 @@ The IRA cap took effect 2023-01-01 *for every covered insulin product simultaneo
 - Abadie, A., Athey, S., Imbens, G. W., & Wooldridge, J. M. (2023). When should you adjust standard errors for clustering? *Quarterly Journal of Economics*, 138(1).
 - Angrist, J. D., & Pischke, J.-S. (2009). *Mostly Harmless Econometrics: An Empiricist's Companion.* Princeton University Press.
 - Athey, S., & Imbens, G. W. (2017). The state of applied econometrics: causality and policy evaluation. *Journal of Economic Perspectives*, 31(2).
-- Bergé, L. (2018). *Efficient estimation of maximum likelihood models with multiple fixed-effects: the R package* `fixest`. CREA Discussion Papers.
+- Bergé, L. (2018). *Efficient estimation of maximum likelihood models with multiple fixed-effects: the R package* `FENmlm` (later renamed `fixest`). DEM/CREA Discussion Paper Series, University of Luxembourg, 18-13.
 - Borusyak, K., Jaravel, X., & Spiess, J. (2024). Revisiting event-study designs: robust and efficient estimation. *Review of Economic Studies*, 91(6).
 - Callaway, B., & Sant'Anna, P. H. C. (2021). Difference-in-differences with multiple time periods. *Journal of Econometrics*, 225(2).
 - Cameron, A. C., & Miller, D. L. (2015). A practitioner's guide to cluster-robust inference. *Journal of Human Resources*, 50(2).

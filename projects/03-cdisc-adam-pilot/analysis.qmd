@@ -47,9 +47,13 @@ execute:
 :::
 
 ::: {.callout-warning icon=false}
-## Status — scaffold only (in progress)
+## Status — design + SAS complete; R implementation pending execution
 
-This page is the published scaffold. Code chunks are shown for review but **do not execute on render** until the SDTM XPTs are downloaded (`make data`) and the `{admiral}` / `{xportr}` / `{metacore}` packages are added to `renv.lock`. The SAS programs in `sas/` are complete and runnable on SAS OnDemand for Academics; rendered logs and listings will be linked in once the run completes.
+**What's complete.** The double-programming *design*, the full SAS submission package (`sas/adsl.sas`, `sas/adae.sas`, `sas/adlbc.sas`, `sas/t_14_2_01_demog.sas`, the demographic table program), the YAML extract of the define-XML value-level metadata, and the R/`{admiral}` derivation scaffolding are all written and committed.
+
+**What's pending.** The R chunks below carry `eval: false` and **do not execute on render**. To make this notebook self-running you need to: (1) `make data` to pull the CDISC Pilot 01 SDTM XPTs; (2) add `{admiral}`, `{xportr}`, `{metacore}`, `{metatools}` to `renv.lock`; (3) remove the chunk-level `eval: false`. The reconciliation step that compares the SAS-derived, R-derived, and CDISC-reference ADSLs byte-for-byte — the *point* of the analysis — is the chunk that would fire pass/fail on render. As shipped, it shows what would happen, not what does happen.
+
+**Read this notebook as.** A complete SAS submission package + an R double-programming design specification, not an executed cross-language reconciliation. The latter is the next step before this becomes a defensible portfolio sample for a regulated-industry role.
 :::
 
 ## Why this analysis
@@ -369,6 +373,7 @@ The `{xportr}` writers enforce variable-level metadata (length, type, label, for
 
 ## Limitations
 
+- **R derivations do not execute on render.** This is the most material limitation as currently shipped. The R chunks carry `eval: false`; the reconciliation chunk that would compare the SAS, R, and CDISC-reference ADSLs is the project's intended deliverable, and it doesn't run until `make data` is run and the `{admiral}` family is restored to `renv.lock`. Read the R blocks as a derivation specification, not as executed output.
 - **Fictional data.** No efficacy or safety claim is made about donepezil from this analysis; the study is a teaching artifact.
 - **One TLF, not the full SAP.** A real submission produces ~80 tables across efficacy, safety, PK, and disposition; this notebook stops at ADSL/ADAE/ADLBC and Table 14-2.01.
 - **No PGx layer in v1.** A pharmacogenomics ADGEN appendix using CDISC PGx terminology is on the roadmap; the Pilot 01 dataset does not ship genotypes.
