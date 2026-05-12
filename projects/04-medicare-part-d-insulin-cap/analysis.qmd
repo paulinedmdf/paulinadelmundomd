@@ -34,12 +34,11 @@ execute:
 ---
 
 ::: {.callout-tip icon=false}
-## Key findings — TL;DR
+## Abstract
 
-- **The IRA's $35 insulin cap is a clean natural experiment.** Treatment hits one therapeutic class on one date (2023-01-01), with non-insulin antihyperglycemics as an internally valid control group — a setting where **two-way fixed effects (TWFE)** are unbiased without the staggered-adoption corrections that more complex DiD designs require.
-- **Primary outcome — log total 30-day fills at the drug-year level.** A positive **ATT (average treatment effect on the treated)** is the expected sign: a binding price cap that lowers beneficiary out-of-pocket cost should raise utilization. The 95% CI and event-study coefficients populate from `data/processed/drug_year_panel.parquet`.
-- **Pre-trends are the load-bearing assumption** — and the event-study plot is where it has to be defended. The 2021 coefficient is *not* expected to be zero because the CMS Senior Savings Model partially treated MA-PD insulin enrollees that year; the IRA effect is the marginal jump in 2023 once the cap went universal.
-- **Methods used (every claim ties back to a specific chunk):** DuckDB streaming filter of the CMS Part D Prescriber PUFs, drug-year and prescriber-drug-year panels, TWFE DiD with drug-clustered SEs, event-study with a parallel-trends F-test, placebo cap-year tests, leave-one-out drug robustness, prescriber-FE specification, and specialty-stratified heterogeneity. Each step has an inline "**Why this test?**" callout explaining what it tests and why it earns its place at this specific moment in the analysis.
+In January 2023 the Inflation Reduction Act capped Medicare beneficiaries' monthly out-of-pocket cost for insulin at $35 — the first time the federal government has imposed a uniform price ceiling on a specific drug class for everyone on Medicare Part D. The empirical question is whether the cap actually changed how much insulin patients filled, or whether it just shifted who paid (from patient to insurer) without moving the underlying volume. This notebook addresses that question using six years of public CMS data on every Medicare Part D prescription, by comparing the change in insulin fills before and after January 2023 against the parallel change in fills for other diabetes drugs (metformin, GLP-1s, SGLT2s, and friends) that weren't capped. The design — comparing two differences ("before vs after" for insulin minus the same gap for other diabetes drugs) — is a textbook difference-in-differences study, and the IRA's clean policy structure makes it one of the cleanest natural experiments in recent drug-policy research.
+
+The analysis depends critically on whether insulin and the comparator drugs were trending similarly before the cap took effect. The notebook checks this with a year-by-year event-study plot and a formal statistical test, then re-runs the analysis under several adversarial conditions (fake cap years, dropping one drug at a time, removing GLP-1s because of their concurrent demand surge from off-label weight-loss prescribing) to confirm the headline effect doesn't depend on any single fragile choice. A standalone exploratory section also breaks out the effect by prescriber specialty. Headline coefficients and confidence intervals populate live from the panel; numbers in the executive summary should be read alongside the small-sample caveats noted in the methods.
 :::
 
 ## Why this analysis
@@ -236,21 +235,9 @@ where $i$ indexes a generic name, $t$ indexes calendar year, $\alpha_i$ is a dru
 ::: {.callout-note collapse="true"}
 ## Going deeper — the Liang–Zeger cluster-robust ("sandwich") variance
 
-**Plain English.** Ordinary regression assumes every observation is *independent* — like rolling a fresh die each time. But real-world panel data isn't independent: observations within the same drug (or the same patient, or the same firm) are correlated because they share unobserved factors. If you ignore that and use ordinary standard errors, your confidence intervals come out *too narrow* and you'll claim significance for results that aren't really there. The "sandwich" estimator (named because the formula visually looks like bread–meat–bread) fixes this by *estimating* the within-group correlations directly from your residuals instead of assuming independence. You don't have to specify the correlation structure — the sandwich figures it out empirically. The standard rule is "cluster the SEs at the level where treatment was assigned," which here is the drug.
-
-**Intuition.** OLS gives one variance formula assuming all errors are i.i.d.: $\widehat{\text{Var}}(\hat\beta) = \hat\sigma^2 (\mathbf{X}^\top \mathbf{X})^{-1}$. If errors are correlated within clusters (drugs), that formula understates variance because it pretends each within-cluster observation is independent new evidence — when in reality they carry overlapping information. The cluster-robust ("sandwich") estimator replaces the i.i.d. assumption with an empirical estimate of the within-cluster correlation structure, *whatever* it happens to be.
-
-**The sandwich formula.** With $G$ clusters indexed by $g$, residuals $\hat e_g$, and design block $\mathbf{X}_g$ for cluster $g$:
-$$\widehat{\text{Var}}_{\text{CR}}(\hat\beta) = (\mathbf{X}^\top \mathbf{X})^{-1} \underbrace{\!\left[ \sum_{g=1}^G \mathbf{X}_g^\top \hat{\mathbf e}_g \hat{\mathbf e}_g^\top \mathbf{X}_g \right]}_{\text{the "meat"}} (\mathbf{X}^\top \mathbf{X})^{-1} \cdot c_G,$$
-where $c_G = \tfrac{G}{G-1} \cdot \tfrac{N-1}{N-p}$ is a small-cluster finite-sample correction. The two outer terms (the "bread") are the same as OLS. The middle term (the "meat") sums *across* clusters the *outer product* of within-cluster residuals — this lets within-cluster residuals contribute jointly to the variance, not as independent draws.
-
-**Why "sandwich".** $(\mathbf{X}^\top\mathbf{X})^{-1} \cdot [\text{meat}] \cdot (\mathbf{X}^\top\mathbf{X})^{-1}$ — bread, meat, bread.
-
-**What independence assumption is replaced.** OLS assumes $E[\hat{\mathbf e}\hat{\mathbf e}^\top] = \sigma^2 \mathbf{I}$. Cluster-robust assumes only that the matrix is block-diagonal: zero between clusters, *any* structure within. Within-cluster heteroskedasticity, autocorrelation, and unobserved random effects are all absorbed. (HC1 — heteroskedasticity-robust without clustering — is the special case where each cluster has size 1.)
-
-**Asymptotic regime.** Cluster-robust SEs are consistent as $G \to \infty$ (clusters grow), *not* as $N \to \infty$ within a fixed number of clusters. This is why **the number of clusters, not the total sample size, drives reliability**.
-
-**Worked example.** 30 drug clusters, 6 years each ($N = 180$, $p = 30 + 6 + 1 = 37$). The finite-sample correction is $c_{30} = \tfrac{30}{29} \cdot \tfrac{179}{143} \approx 1.30$. If the classical OLS SE on `treated_post` is 0.020 and the i.i.d. assumption is wildly wrong (residuals are positively autocorrelated within drug), the cluster-robust SE might inflate to 0.045 — more than 2×. The DiD coefficient's 95% CI widens proportionally; what looked statistically significant at the i.i.d. SE could lose significance at the cluster-robust SE — and the cluster-robust version is the honest one.
+OLS assumes errors are i.i.d., giving $\widehat{\text{Var}}(\hat\beta) = \hat\sigma^2 (\mathbf{X}^\top\mathbf{X})^{-1}$. When errors are correlated within clusters (same drug across years), that formula understates variance — it pretends each within-cluster observation is independent new evidence when really they carry overlapping information. The cluster-robust estimator replaces the i.i.d. assumption with an *empirical* estimate of the within-cluster correlation structure, whatever it happens to be:
+$$\widehat{\text{Var}}_{\text{CR}}(\hat\beta) = (\mathbf{X}^\top\mathbf{X})^{-1} \underbrace{\!\left[ \sum_{g=1}^G \mathbf{X}_g^\top \hat{\mathbf e}_g \hat{\mathbf e}_g^\top \mathbf{X}_g \right]}_{\text{the "meat"}} (\mathbf{X}^\top\mathbf{X})^{-1} \cdot c_G,$$
+where $c_G = \tfrac{G}{G-1} \cdot \tfrac{N-1}{N-p}$ is a small-cluster finite-sample correction. The outer terms (the "bread") are the same as OLS; the middle term (the "meat") sums *across* clusters the outer products of within-cluster residuals, letting them contribute jointly rather than as independent draws — hence "sandwich." Crucially, only the *between-cluster* part of the residual covariance is required to be zero; within-cluster heteroskedasticity, autocorrelation, and unobserved random effects are all absorbed. (HC1, the standard heteroskedasticity-robust SE, is the special case where each cluster has size 1.) The asymptotic property is consistent as $G \to \infty$ — *number of clusters*, not total $N$, drives reliability. With 30 drugs over 6 years ($G = 30$, $N = 180$) the finite-sample correction is $c_{30} \approx 1.30$; an OLS SE of 0.020 might inflate to 0.045 under cluster-robust correction if within-drug residuals are strongly autocorrelated — and the cluster-robust SE is the honest one.
 :::
 
 ```{r did-primary}
@@ -296,33 +283,7 @@ Steps 1 and 2 are arithmetic; step 3 requires the pre-period denominator. Always
 ::: {.callout-note collapse="true"}
 ## Going deeper — interpreting a log-outcome coefficient as a percent change
 
-**Plain English.** When your outcome variable in a regression is the *logarithm* of something (log of fills, log of sales), a coefficient of $0.05$ doesn't mean "the outcome increases by 0.05" — it means "the *log* of the outcome increases by 0.05." To translate that to percent change in the actual outcome, you compute $e^{0.05} - 1 \approx 0.0513$, or about 5.1%. For *small* coefficients (under ~0.10) the coefficient itself is close enough to the percent change. For bigger coefficients the gap grows and you should report the exponentiated version explicitly. The reason regressions use log-outcomes in the first place is that *percent* changes — not absolute changes — are usually the meaningful quantity for things like prescription volumes or sales (doubling fills is the same magnitude of event whether you start at 100 or 10,000).
-
-**Setup.** When the outcome is $\log Y$, a one-unit increase in a regressor $X$ changes $\log Y$ by $\beta$ — i.e., $Y$ scales by $e^\beta$. So the percent change in $Y$ is exactly
-$$\frac{\Delta Y}{Y} = e^{\beta} - 1.$$
-For small $\beta$, the Taylor expansion $e^\beta = 1 + \beta + \tfrac{\beta^2}{2} + \cdots$ gives $e^\beta - 1 \approx \beta$. So *for small effects*, "the coefficient is approximately the percent change" — but the approximation breaks down quickly:
-
-| $\beta$ | $e^\beta - 1$ (exact) | $\beta$ (approx) | Approximation error |
-|---:|---:|---:|---:|
-| 0.01 | 1.005% | 1.000% | 0.5% |
-| 0.05 | 5.127% | 5.000% | 2.5% |
-| 0.10 | 10.517% | 10.000% | 5.2% |
-| 0.25 | 28.403% | 25.000% | 13.6% |
-| 0.50 | 64.872% | 50.000% | 29.7% |
-
-**Rule of thumb.** For $|\beta| < 0.10$ the approximation is within ~5%; report either. For $|\beta| \geq 0.10$ always use the exact $e^\beta - 1$, otherwise you're meaningfully understating the effect.
-
-**The delta-method CI.** A 95% CI for $\beta$ on the log scale, $[\beta_L, \beta_U]$, exponentiates to a 95% CI for the multiplicative effect $e^\beta$: $[e^{\beta_L}, e^{\beta_U}]$. Note this is *asymmetric* on the original scale — $e^x$ is convex, so the upper half of the CI is wider than the lower half once you map back. Reporting "ATT = 7.2% (95% CI: 3.1%, 11.5%)" rather than "$\beta = 0.07$ (SE 0.02)" is the publication-standard transform.
-
-**Why log in the first place.** Three reasons drive the choice:
-1. **Multiplicative effects are natural for utilization.** Doubling fills is the same kind of event whether you start at 100 or 10,000; absolute differences are not.
-2. **Heteroskedasticity shrinks.** Pharmaceutical fill counts have variance growing with the mean. $\log Y$ stabilises that — the residuals from a log model are usually approximately homoskedastic, satisfying OLS assumptions.
-3. **Skewness shrinks.** Fill counts are right-skewed; $\log$ pulls the tail in, producing residuals closer to normal and making asymptotic inference more accurate at modest $N$.
-
-**Worked example.** Suppose the DiD on log 30-day fills returns $\hat\beta = 0.085$ with SE 0.030, $z = 2.83$, 95% CI $[0.026, 0.144]$ on the log scale. Translating:
-$$\text{Point estimate}: \; e^{0.085} - 1 = 8.87\%.$$
-$$\text{95% CI}: \; [e^{0.026} - 1, \; e^{0.144} - 1] = [2.63\%, \; 15.49\%].$$
-"The IRA cap is associated with an 8.9% increase in insulin 30-day fills relative to the non-insulin counterfactual (95% CI: 2.6%, 15.5%)." The naive $\beta \approx 8.5\%$ approximation understates by 0.4 points — small but trending toward "meaningful" at this effect size.
+When the outcome is $\log Y$, a coefficient of $\beta$ on a regressor means a one-unit increase scales $Y$ by $e^\beta$, so the percent change is *exactly* $e^\beta - 1$. The Taylor expansion $e^\beta = 1 + \beta + \tfrac{\beta^2}{2} + \cdots$ gives $e^\beta - 1 \approx \beta$ for small $\beta$, but the approximation breaks down quickly: at $\beta = 0.05$, exact = 5.13% (error 2.5%); at 0.10, 10.52% (error 5.2%); at 0.25, 28.4% (error 13.6%); at 0.50, 64.9% (error 30%). **Rule of thumb**: for $|\beta| < 0.10$ either form is fine; for larger $\beta$, always report the exact $e^\beta - 1$. A 95% CI on the log scale $[\beta_L, \beta_U]$ exponentiates to the multiplicative-scale CI $[e^{\beta_L}, e^{\beta_U}]$ — *asymmetric* on the original scale because $e^x$ is convex. Logs aren't arbitrary here: percent changes are the meaningful unit for prescription volumes (doubling is the same event at 100 fills or 10,000), and the log transform also stabilises heteroskedasticity (variance growing with mean) and shrinks the right-skew of fill counts toward something OLS-friendly. Concrete example: if the DiD returns $\hat\beta = 0.085$ (SE 0.030, 95% CI $[0.026, 0.144]$) on the log scale, the headline becomes "an 8.9% increase in insulin 30-day fills (95% CI 2.6%, 15.5%)" — the naive $\beta \approx 8.5\%$ approximation understates by 0.4 percentage points, small but trending toward meaningful at this size.
 :::
 
 ## Event study — does the effect line up with the policy date?
@@ -397,23 +358,9 @@ We run the F-test twice: once on all pre-period leads, and once dropping 2021 (w
 ::: {.callout-note collapse="true"}
 ## Going deeper — the Wald F-statistic formula and what it tests
 
-**Plain English.** Sometimes you want to test, not "is *this one* coefficient zero?", but "are these *three* coefficients all jointly zero, considered together?" The Wald F-test is the tool for that joint question. It's essentially a multidimensional t-test: take your three coefficient estimates, divide them by their joint uncertainty (which accounts for how correlated they are with each other), square and sum. Under the null hypothesis "all three really are zero," the resulting statistic follows a known F distribution, so you can read off a p-value. A small F-statistic = "the data is consistent with all three coefficients being zero" — good news for parallel trends. A big F-statistic = "something is going on in those pre-period years that *isn't* zero," and the parallel-trends assumption is shaky.
-
-**Setup.** We have $\hat\beta$ (a $p$-vector of coefficient estimates) and $\widehat{\text{Var}}(\hat\beta)$ (its $p \times p$ variance matrix). We want to test a *set* of $q$ linear restrictions on $\beta$ simultaneously — e.g., "the pre-period event-study leads $\hat\beta_{2019}, \hat\beta_{2020}, \hat\beta_{2021}$ are all jointly equal to zero." Encode that as $\mathbf{R}\beta = \mathbf{r}$, where $\mathbf{R}$ is a $q \times p$ "selector" matrix and $\mathbf{r}$ a $q$-vector.
-
-**The Wald statistic.**
-$$W = (\mathbf{R}\hat\beta - \mathbf{r})^\top \!\left[\mathbf{R}\, \widehat{\text{Var}}(\hat\beta)\, \mathbf{R}^\top\right]^{-1} \!(\mathbf{R}\hat\beta - \mathbf{r}).$$
-Under the null, $W \sim \chi^2_q$ asymptotically. The F-version divides by $q$ and uses an F distribution:
-$$F = \frac{W}{q} \sim F_{q, \, n-p}.$$
-In words: the Wald test asks "*how far is $\hat\beta$ from satisfying the restrictions, in units that account for $\hat\beta$'s own sampling variance and the correlations among its components?*" The middle term is a Mahalanobis-style metric — distances along high-variance directions of $\hat\beta$ get down-weighted.
-
-**Why "the leads jointly equal zero" is the right test.** Pre-period coefficients individually can be near zero by chance even when they share a common drift. The joint test asks whether the *collection* has zero center — robust to single-coefficient noise and sensitive to coordinated deviation. Conversely, individual leads can each be borderline significant but combine into a strong joint signal (or vice versa: each individually significant by random chance but the joint is fine after multiplicity).
-
-**Why a non-rejection isn't proof.** Power. The Wald test has power proportional to $\sqrt{q}$, and pre-period leads usually have wide SEs (year-by-treatment interactions on small subsamples). With only 2–3 pre-period years and SEs of 0.05–0.10 each, the test cannot detect drift smaller than ~0.10 — which would still bias the DiD if the post-period drift continued. Reporting the test result *alongside* the event-study plot is the practice; reading the test in isolation is the trap.
-
-**Worked example.** Three pre-period coefficients with the following estimates and variance matrix (clustering and FE-induced correlation make off-diagonal entries non-zero):
-$$\mathbf{R}\hat\beta = \begin{pmatrix} 0.02 \\ -0.01 \\ 0.04 \end{pmatrix}, \quad \mathbf{R}\widehat{V}\mathbf{R}^\top = \begin{pmatrix} 0.0025 & 0.0010 & 0.0005 \\ 0.0010 & 0.0030 & 0.0010 \\ 0.0005 & 0.0010 & 0.0020 \end{pmatrix}.$$
-Inverting and computing $W = (0.02, -0.01, 0.04) [\cdot]^{-1} (0.02, -0.01, 0.04)^\top \approx 2.6$. With $q = 3$, $F \approx 0.87$. Under $F_{3, \infty}$ the p-value is roughly 0.46 — well above 0.05, so the parallel-trends null is *not* rejected. The data are consistent with parallel pre-trends; that is the formal statement of what the event-study plot suggested.
+The Wald test answers the joint question "are these $q$ coefficients all simultaneously zero?" rather than testing one at a time. Encode the restrictions as $\mathbf{R}\beta = \mathbf{r}$ (with $\mathbf{R}$ a $q \times p$ selector matrix); the Wald statistic is
+$$W = (\mathbf{R}\hat\beta - \mathbf{r})^\top \!\left[\mathbf{R}\, \widehat{\text{Var}}(\hat\beta)\, \mathbf{R}^\top\right]^{-1} \!(\mathbf{R}\hat\beta - \mathbf{r}),$$
+and the F-version is $F = W/q \sim F_{q, n-p}$ under the null. The middle term is a Mahalanobis-style metric: it measures how far $\hat\beta$ is from satisfying the restrictions in units that account for the coefficients' own sampling variance and correlations. The joint test is the right tool because individually, pre-period coefficients can each be near zero by chance even when they share a common drift; the joint test detects whether the *collection* has a zero center, robust to single-coefficient noise and sensitive to coordinated deviation. **A non-rejection isn't proof of parallel trends**, only failure to falsify. Pre-period leads usually have wide SEs (year-by-treatment interactions on small subsamples), and with only 2–3 pre-period years the test cannot detect drift smaller than ~0.10 — which would still bias the post-period coefficient. The event-study plot and the F-test together are the test; either alone is a trap. Concrete example: three pre-period coefficient estimates $(0.02, -0.01, 0.04)$ with an SE-and-correlation structure producing $W \approx 2.6$ and $F \approx 0.87$ under $F_{3, \infty}$ gives $p \approx 0.46$ — the parallel-trends null is *not* rejected, the data are consistent with what the event-study plot suggested.
 :::
 
 ```{r pretrends-f}
@@ -736,23 +683,9 @@ A 2021 wave of econometrics papers (Goodman-Bacon, Callaway–Sant'Anna, Sun–A
 ::: {.callout-note collapse="true"}
 ## Going deeper — the Goodman-Bacon decomposition and "forbidden comparisons"
 
-**Plain English.** For decades economists used "two-way fixed effects" (TWFE) as the all-purpose DiD tool. Then a wave of 2021 papers showed that TWFE can produce *garbage* in "staggered adoption" settings — when different units get treated at different times. The problem: TWFE implicitly compares already-treated units against later-treated units, and treats the already-treated unit as the *control* for the later one. But that unit *isn't a control anymore* — it's been treated, so the comparison is contaminated by whatever post-treatment dynamics are unfolding. Goodman-Bacon proved that TWFE is a weighted sum of every possible 2×2 comparison, and showed which weights are "clean" and which are contaminated. **None of this applies to the insulin cap**, because every insulin product was treated on the exact same date — no staggering, no contaminated comparisons.
-
-**The result.** In a staggered-adoption panel (units adopt treatment at different times), the TWFE estimator on $\text{Treated}_{it} \times \text{Post}_{it}$ is a *weighted average* of every possible 2×2 DiD between treated and untreated subsets — but the weights include some that are **negative**, and some 2×2s use already-treated units as the "control" for later-treated units.
-
-**The decomposition.** With $K$ treatment-timing groups (units that adopt treatment in year $k$) and a never-treated group, the TWFE coefficient $\hat\beta_{\text{TWFE}}$ decomposes as
-$$\hat\beta_{\text{TWFE}} = \sum_{k} w_k \cdot \text{DiD}_{k, \text{never-treated}} + \sum_{k < \ell} w_{k\ell} \cdot \text{DiD}_{k, \ell} + \sum_{k < \ell} w'_{k\ell} \cdot \text{DiD}_{\ell, k},$$
-where the first sum is "clean" (treated vs. never-treated), the second is "earlier-treated vs. later-treated using the later-treated unit as a *control* before its own treatment kicks in" (clean), and the **third sum** is "**later-treated vs. earlier-treated using the earlier-treated unit as a control *after* it's already been treated**" — the *forbidden comparison*. The weights $w'$ can be negative; the corresponding DiD compares "pure year effect on later-treated" against "year effect on earlier-treated + dynamic post-treatment effect on earlier-treated." If the dynamic effect on earlier-treated is positive, the DiD reads negative, and that flips the sign of its contribution to $\hat\beta_{\text{TWFE}}$.
-
-**The bias mechanism.** If treatment effects evolve over time (a "dose-response" — common: people adapt gradually, demand builds, supply constraints relax), the forbidden-comparison DiDs are systematically *off*. With negative weights, those biased DiDs subtract from the total instead of adding. The net result: $\hat\beta_{\text{TWFE}}$ is some weighted average that doesn't correspond to any economically meaningful estimand — it can even have the *opposite sign* of every actual treatment effect.
-
-**Why this analysis is safe.** The Goodman-Bacon decomposition's bias terms vanish when:
-1. **No treatment heterogeneity over time** (treatment effect is constant after adoption), OR
-2. **No staggering** (all treated units adopt at the same date).
-
-The IRA cap took effect 2023-01-01 *for every covered insulin product simultaneously*. No insulin product is "earlier-treated" than another. The forbidden-comparison weights are structurally zero. TWFE collapses to the canonical 2×2 DiD between treated drugs and never-treated drugs — exactly what the picture says it's doing.
-
-**Worked example.** Imagine the same insulin data but with treatment staggered: glargine treated in 2021, lispro in 2022, aspart in 2023. After glargine's 2021 treatment, its 2022 observation is a "control" for lispro's 2022 treatment in some 2×2 — but glargine is already treated, so it's not a clean control. If glargine's treatment effect grew from 5% in 2021 to 12% in 2022, that growth contaminates the lispro DiD with a negative weight, dragging $\hat\beta_{\text{TWFE}}$ downward. The Callaway–Sant'Anna estimator handles this by averaging only the clean DiDs and assigning non-negative weights — but in our actual data, the simultaneous-treatment structure makes the cleanup unnecessary.
+For decades, two-way fixed effects (TWFE) was the universal DiD tool. The 2021 wave of papers (Goodman-Bacon, Callaway–Sant'Anna, Sun–Abraham, de Chaisemartin–D'Haultfœuille) showed it can produce garbage in *staggered-adoption* settings. The decomposition: with $K$ treatment-timing groups, $\hat\beta_{\text{TWFE}}$ is a weighted average of every possible 2×2 DiD:
+$$\hat\beta_{\text{TWFE}} = \sum_{k} w_k \cdot \text{DiD}_{k, \text{never-treated}} + \sum_{k<\ell} w_{k\ell} \cdot \text{DiD}_{k, \ell} + \sum_{k<\ell} w'_{k\ell} \cdot \text{DiD}_{\ell, k}.$$
+The first sum is clean (treated vs. never-treated); the second is clean (earlier-treated as control *before* its own treatment kicks in); the **third sum** is the *forbidden comparison* — later-treated vs. earlier-treated, using the earlier-treated unit as a "control" *after* it's already been treated. The weights $w'$ on those terms can be negative. If treatment effects evolve over time (a dose-response: people adapt, demand builds), the forbidden-comparison DiDs are systematically off, and the negative weights subtract them from $\hat\beta$ in a way that destroys the estimand's meaning — sometimes flipping its sign entirely. The decomposition's bias terms vanish when either (1) treatment effects don't evolve over time, or (2) **all treated units adopt simultaneously**. The IRA insulin cap satisfies condition (2): every insulin product was treated on 2023-01-01, so the forbidden-comparison weights are structurally zero and TWFE collapses to the canonical 2×2 DiD. If treatment *had* been staggered — say glargine in 2021, lispro in 2022, aspart in 2023 — Callaway–Sant'Anna or Borusyak–Jaravel–Spiess estimators would be required to assign only non-negative weights to clean comparisons. Here, simultaneous treatment makes that cleanup unnecessary.
 :::
 
 ### Few clusters and finite-sample correctness
@@ -760,29 +693,7 @@ The IRA cap took effect 2023-01-01 *for every covered insulin product simultaneo
 ::: {.callout-note collapse="true"}
 ## Going deeper — the few-cluster problem and wild cluster bootstrap
 
-**Plain English.** Cluster-robust standard errors only work well when you have *many* clusters (40+). With only 20–30 clusters — which is what we have here, since there are only a few dozen distinct drugs — the math overstates how precise your estimate really is. You get p-values smaller than they should be, and false-significance becomes a real risk. The fix is a **bootstrap**: instead of trusting the asymptotic math, you re-sample your data thousands of times (with a twist that preserves the clustering), refit the model on each resample, and build up an empirical distribution of test statistics. The "wild" version flips residual signs at the cluster level — preserving within-cluster correlation while creating valid null draws. The bootstrap p-value is the more honest number when clusters are few.
-
-**The asymptotic regime.** Cluster-robust SEs are consistent as $G \to \infty$. The typical asymptotic distribution claims rely on $G$ being "large" — but how large? Cameron, Gelbach, Miller (2008) and follow-ups suggest **$G \geq 40$** is the conventional comfort zone for asymptotic clustered inference. Below that, the asymptotic normal approximation systematically *over-rejects* — t-statistics that should follow a $t_{G-1}$ distribution are compared to a standard normal, giving p-values that are too small.
-
-**Why this matters here.** This panel has roughly 20–30 drugs. We are squarely in the "few clusters" regime. The asymptotic clustered SEs reported above are likely *too small* — confidence intervals too narrow, p-values too small, false-positive rate too high. Two corrections close the gap.
-
-**Correction 1: t-distribution with $G-1$ degrees of freedom.** Replace the standard-normal critical value with $t_{G-1}$. With $G = 25$, the 95% critical value rises from 1.96 to 2.06 — a ~5% widening of all CIs. `feols` reports this automatically with `cluster = ~`, so the table above already does this.
-
-**Correction 2: wild cluster bootstrap.** Resampling at the cluster level — but with a twist that handles the few-cluster problem. The algorithm:
-
-1. Fit the model; save residuals $\hat e_g$ for each cluster $g$.
-2. For each bootstrap replication $b = 1, \ldots, B$ (typically $B = 999$):
-   a. For each cluster $g$, draw $w_g \in \{-1, +1\}$ with equal probability (Rademacher weights).
-   b. Construct synthetic residuals $\tilde e_g = w_g \cdot \hat e_g$ for every observation in cluster $g$.
-   c. Build $\tilde y_{it} = \mathbf{X}_{it}^\top \hat\beta_{H_0} + \tilde e_{it}$, where $\hat\beta_{H_0}$ is the model fit *under the null* (i.e., treatment effect constrained to zero).
-   d. Refit the model on $(\tilde y, \mathbf{X})$ and save the test statistic $t^{(b)}$.
-3. The wild-bootstrap p-value is the fraction of $|t^{(b)}| \geq |t_{\text{observed}}|$.
-
-**Why "wild".** The Rademacher weights flip residual signs at the cluster level. This preserves the within-cluster correlation structure while creating valid null draws. The procedure has near-correct size even with $G$ as small as 5–10, where asymptotic SEs over-reject by 3–5×.
-
-**When to deploy it.** With $G \leq 30$ — like this analysis — wild cluster bootstrap should be the headline inference. The `fwildclusterboot` R package implements it for fixed-effect models. The procedure is computationally intensive but trivial conceptually: every reported p-value should round-trip through a bootstrap whose null is correctly imposed.
-
-**Worked example.** Asymptotic clustered $t$-statistic on `treated_post` = 3.2, p < 0.01. After wild cluster bootstrap with $B = 999$ and $G = 25$: 67 of the 999 bootstrap $|t|$ values exceed 3.2, so the bootstrap p-value = 67/999 ≈ 0.067. The asymptotic test rejects at 5% but the bootstrap does not — a real "few-cluster over-rejection" episode. The bootstrap p-value is the conservative one to report.
+Cluster-robust SEs are consistent as the *number of clusters* $G$ grows. Cameron, Gelbach & Miller (2008) and follow-ups identify $G \geq 40$ as the conventional comfort zone for asymptotic clustered inference; below that, the asymptotic normal approximation over-rejects — t-statistics that should follow $t_{G-1}$ get compared to a standard normal, giving p-values that are systematically too small. This panel has roughly 20–30 drugs, squarely in the few-cluster regime. Two corrections close the gap. First, replace the standard normal with $t_{G-1}$: at $G = 25$, the 95% critical value rises from 1.96 to 2.06, widening CIs by ~5% (`feols` does this automatically when `cluster = ~`). Second, the **wild cluster bootstrap**: resample at the cluster level with a sign-flip twist. The algorithm: (1) fit under the null with the treatment effect constrained to zero, save residuals $\hat e_g$ for each cluster; (2) for each of $B = 999$ replications, draw Rademacher weights $w_g \in \{-1, +1\}$ per cluster, construct $\tilde e_g = w_g \cdot \hat e_g$ and synthetic $\tilde y_{it} = \mathbf{X}_{it}^\top \hat\beta_{H_0} + \tilde e_{it}$; (3) refit and save the test statistic; (4) bootstrap p-value = fraction of $|t^{(b)}|$ exceeding $|t_{\text{observed}}|$. The sign-flip preserves within-cluster correlation while creating valid null draws — even with $G$ as small as 5–10, the procedure has near-correct size where asymptotic SEs over-reject by 3–5×. Concrete: an asymptotic $t = 3.2$ ($p < 0.01$) might bootstrap to $p \approx 0.07$ — non-significant — under wild cluster bootstrap with $G = 25$. That's the conservative number to report. The `fwildclusterboot` R package implements this for fixed-effect models.
 :::
 
 ---

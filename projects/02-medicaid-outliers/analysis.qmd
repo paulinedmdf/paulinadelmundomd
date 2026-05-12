@@ -34,13 +34,11 @@ execute:
 ---
 
 ::: {.callout-tip icon=false}
-## Key findings — TL;DR
+## Abstract
 
-- **Heavy tails are the regime, not the exception.** Paid-per-beneficiary spans four orders of magnitude on a log scale. MAD-based robust z's are usable here; mean/SD z's aren't.
-- **BH-FDR ≤ 0.01 keeps a much smaller, much higher-confidence flag list than raw z ≥ 5.** The intersection of the two rules is the set a Program Integrity team would prioritize first.
-- **The 12-bucket cost atlas is an HCPCS lens, not a disease lens.** Reading it as "Behavioral Health spending geography" is supportable; reading it as "depression cost geography" is not (HCPCS doesn't carry diagnosis).
-- **Spatial concentration varies by category.** Dialysis & ESRD and parts of DME concentrate geographically (high Gini); LTSS and E&M diffuse across the country (low Gini) and shouldn't be read as having "hotspots."
-- **Methods used (every claim ties back to a specific chunk):** DuckDB streaming aggregate of the 11 GB CSV, robust z + BH-FDR, isolation forest with collinearity diagnostics, ZCTA → county join, within-category decile shading on a leaflet choropleth, three-view category explorer (top HCPCS / Gini / state hotspots).
+Medicaid is the largest source of health coverage for low-income Americans, and the federal government releases monthly snapshots of who got paid for what. The interesting question isn't "who bills the most" (huge hospital systems dominate by default) but "who bills *atypically* compared to other providers doing the same thing?" That signal is what flags candidates for fraud review or atypical practice patterns worth a second look. This notebook works through 11 GB of provider-level billing data on a laptop using a small streaming-database trick, then computes, for every provider on every billing code, how far their per-patient spending sits from the typical spending in their peer group.
+
+Two key findings come out. First, the spending data is extremely lopsided — payments per patient span four orders of magnitude — so the textbook "z-score" method fails completely. A robustness fix that's resistant to extreme values (the median absolute deviation) works instead. Second, when you apply that to thousands of providers, raw cutoffs produce huge numbers of false alarms; pairing the robust z-score with a false-discovery-rate correction keeps the alert list to providers actually worth investigating. The notebook also builds a county-level interactive map of where Medicaid dollars flow by category of care. Two caveats are load-bearing: the peer group as currently defined is too broad ("everyone billing this code" mixes specialties and practice sizes), and there's no comparison against a list of known excluded providers — so the output is best read as "exploratory surfacing for human review," not validated fraud detection.
 :::
 
 ## Why this analysis
@@ -313,23 +311,7 @@ pretty_kable(
 ::: {.callout-note collapse="true"}
 ## Going deeper — why $\text{Var} = E$ for Poisson, and what NB / ZINB / hurdle each fix
 
-**Plain English.** When your data is *counts* (number of beneficiaries, claims, visits), the simplest probability model is the **Poisson** — but Poisson has a weird hidden property: its variance always equals its average. If you see data where the variance is 5× the average, Poisson is *wrong*; the data is more spread out than the model can produce. You move to **negative binomial (NB)**, which adds a "fudge factor" for extra spread. If on top of that, *way* too many of your observations are zero (30% of doctors prescribe zero opioids — way more than NB predicts), you need **zero-inflated NB (ZINB)**, which models the zeros separately. The **VMR** (variance-to-mean ratio) is the quick screen: ≈ 1 → Poisson fits; > 2 → use NB; large with excess zeros → use ZINB or a hurdle model.
-
-**The Poisson identity.** A Poisson random variable with rate $\lambda$ has probability mass function $\Pr(X = k) = \frac{\lambda^k e^{-\lambda}}{k!}$. Computing its mean and variance from the moment-generating function $M_X(t) = e^{\lambda(e^t - 1)}$:
-$$E[X] = M_X'(0) = \lambda, \qquad E[X^2] = M_X''(0) = \lambda^2 + \lambda \;\Longrightarrow\; \text{Var}(X) = \lambda.$$
-So **for Poisson, $\text{Var}(X) = E[X]$ exactly** — they're the same number. The variance-to-mean ratio $\text{VMR} = \text{Var}/E$ equals 1 in expectation, with sampling fluctuations around 1. **VMR meaningfully greater than 1 falsifies Poisson** — the data have *overdispersion*.
-
-**Negative binomial.** Built as a Poisson-Gamma mixture: $X \mid \mu \sim \text{Poisson}(\mu)$ where $\mu$ itself varies (e.g., $\mu \sim \text{Gamma}(\theta)$). The marginal distribution of $X$ has
-$$E[X] = \mu_0, \qquad \text{Var}(X) = \mu_0 + \frac{\mu_0^2}{\theta}.$$
-The extra $\mu_0^2/\theta$ is unobserved heterogeneity — different observations have different true rates, even after conditioning on covariates. NB is the workhorse fix for overdispersed counts.
-
-**Zero-inflated NB (ZINB).** A *mixture* model with two latent components: with probability $\pi$, the observation is a "structural zero" (always $X = 0$); with probability $1 - \pi$, it's drawn from a regular NB:
-$$\Pr(X = 0) = \pi + (1 - \pi)\Pr_{\text{NB}}(0), \qquad \Pr(X = k > 0) = (1 - \pi)\Pr_{\text{NB}}(k).$$
-Use ZINB when zeros are *categorically different* from small counts — e.g., a doctor who *never* prescribes opioids vs. one who prescribes them rarely. The structural-zero process is modeled with a logistic regression on a possibly-different predictor set.
-
-**Hurdle model.** Different mechanism: model the zero/positive *threshold* with one distribution (typically logistic), then model the *positive counts only* with a truncated NB. Use when "any vs none" is governed by a different process than "how much" — e.g., insurance enrollment (any claims at all) is determined by enrollment, but conditional on enrolling, claim volume depends on health.
-
-**Worked example.** 1,000 NPIs, each filing a count of beneficiaries. If $E[X] = 40$ and $\text{Var}(X) = 380$, then VMR $= 9.5$ — strongly overdispersed. An NB fit gives $\mu_0 = 40$ and $\theta$ from $380 = 40 + 1600/\theta$, so $\theta = 4.7$ — moderately heavy heterogeneity. If 5% of NPIs have $X = 0$ but the NB predicts 8% zeros, the NB fit is fine; if 25% of NPIs have $X = 0$ vs. NB's 8%, you need ZINB or a hurdle.
+The Poisson distribution with rate $\lambda$ has the curious property that its variance equals its mean: $\Pr(X = k) = \lambda^k e^{-\lambda}/k!$, and from the moment-generating function $E[X] = \lambda$ and $\text{Var}(X) = \lambda$. So **VMR = variance/mean = 1** in expectation; a sample with VMR much above 1 falsifies the Poisson assumption — the data are *overdispersed*. **Negative binomial (NB)** is the standard fix, built as a Poisson-Gamma mixture: $X \mid \mu \sim \text{Poisson}(\mu)$ where $\mu$ itself varies as $\text{Gamma}(\theta)$. The marginal has $\text{Var}(X) = \mu_0 + \mu_0^2/\theta$ — the extra term absorbs unobserved heterogeneity across observations. **Zero-inflated NB** layers a second mechanism on top: with probability $\pi$ the observation is a *structural zero* (forced to $X = 0$), and with probability $1 - \pi$ it's an ordinary NB draw. Use ZINB when zeros are categorically different from small counts (a doctor who *never* prescribes opioids vs. one who prescribes them rarely). A **hurdle model** is similar but cleaner: model "any vs. none" with one distribution, then conditional on positive, model "how much" with a truncated NB — useful when enrollment and intensity are governed by different processes. As a concrete example, 1,000 providers each filing a beneficiary count with $E[X] = 40$ and $\text{Var}(X) = 380$ has VMR = 9.5, strongly overdispersed; the NB fit solves $380 = 40 + 1600/\theta$ for $\theta \approx 4.7$.
 :::
 
 ### Within-flagged-set selection bias
@@ -440,19 +422,7 @@ Use robust z whenever your data have heavy tails (claims data, gene expression, 
 ::: {.callout-note collapse="true"}
 ## Going deeper — where the constant 1.4826 comes from
 
-**Plain English.** Imagine a spreadsheet of a thousand numbers, sorted smallest to largest. The middle one is the *median*. For every row, compute "how far is it from the median" — that's the absolute deviation. The median of *those* deviations is the **MAD** (median absolute deviation). MAD by itself is a small number — not the same scale as a standard deviation. The constant 1.4826 is the rescaling factor that turns MAD into something that *equals* the standard deviation, *if your data is normally distributed*. So a "robust z" computed as $(x - \text{median}) / (1.4826 \times \text{MAD})$ reads on the same scale as a regular z-score ("z = 5 means about 5 standard deviations from the median"), but built from numbers that don't blow up when outliers show up.
-
-**Intuition.** We want MAD to estimate $\sigma$ (so robust z and classical z line up under normality). But the *raw* MAD is much smaller than $\sigma$ for normal data — it's the median absolute deviation, not a true standard deviation. The constant 1.4826 is precisely the factor that rescales MAD to be a consistent estimator of $\sigma$ under the normal model.
-
-**Derivation.** Let $X \sim N(\mu, \sigma^2)$. The MAD is $\text{MAD} = \text{median}\!\left(|X - \mu|\right)$. By symmetry of the normal, $|X - \mu|$ has half-normal distribution, and its median satisfies
-$$\Pr(|X - \mu| \leq \text{MAD}) = \tfrac{1}{2} \;\Longleftrightarrow\; \Pr\!\left(\tfrac{|X-\mu|}{\sigma} \leq \tfrac{\text{MAD}}{\sigma}\right) = \tfrac{1}{2}.$$
-The standardised quantity $|Z| = |X-\mu|/\sigma$ has CDF $2\Phi(z) - 1$. Setting that equal to $\tfrac{1}{2}$ gives
-$$\Phi(\text{MAD}/\sigma) = \tfrac{3}{4} \;\Longrightarrow\; \text{MAD}/\sigma = \Phi^{-1}(0.75) \approx 0.6745.$$
-Inverting: $\sigma \approx \text{MAD} / 0.6745 = 1.4826 \cdot \text{MAD}$. The constant is exact for normal data; for other symmetric distributions it's an approximation.
-
-**Breakdown point.** The fraction of arbitrarily-bad observations an estimator can tolerate before producing nonsense. The mean has breakdown point 0 — one bad observation moves it arbitrarily. The median has breakdown point 0.5 (you'd need to corrupt more than half the data to move it). MAD has breakdown point 0.5 as well — it's the same robustness as the median, applied to deviations rather than levels.
-
-**Worked example.** Take ten observations: $\{10, 11, 12, 13, 14, 15, 16, 17, 18, 1000\}$. The mean is 112.6; the SD is ~313. A classical z for the value 1000 is $(1000 - 112.6)/313 \approx 2.83$ — barely flagged. The median is 14.5; absolute deviations from the median are $\{4.5, 3.5, 2.5, 1.5, 0.5, 0.5, 1.5, 2.5, 3.5, 985.5\}$; the MAD = 2.5. Robust z for 1000: $(1000 - 14.5)/(1.4826 \cdot 2.5) \approx 266$. The robust estimator sees what the classical one missed because its scale parameter didn't get inflated by the outlier itself.
+The MAD by itself is a small number, not the same scale as a standard deviation; 1.4826 is the rescaling factor that makes MAD estimate $\sigma$ *if your data is normally distributed*. The derivation: for $X \sim N(\mu, \sigma^2)$, the absolute deviation $|X - \mu|$ has a half-normal distribution. The median of $|X - \mu|$ satisfies $\Pr(|X - \mu| \le \text{MAD}) = \tfrac{1}{2}$. Since the standardised $|Z| = |X - \mu|/\sigma$ has CDF $2\Phi(z) - 1$, setting this equal to $\tfrac{1}{2}$ gives $\Phi(\text{MAD}/\sigma) = \tfrac{3}{4}$, so $\text{MAD}/\sigma = \Phi^{-1}(0.75) \approx 0.6745$, and $\sigma \approx \text{MAD}/0.6745 = 1.4826 \cdot \text{MAD}$. Exact for normal data; approximate otherwise. The corresponding "robust z" $= (x - \text{median})/(1.4826 \cdot \text{MAD})$ reads on the same scale as a regular z-score but is built from quantities with high **breakdown point** — the fraction of arbitrarily bad observations an estimator tolerates before producing nonsense. The mean has breakdown 0 (one bad point moves it arbitrarily); both median and MAD have breakdown 0.5. Example: for $\{10, 11, 12, \ldots, 18, 1000\}$, mean = 112.6, SD ≈ 313, so the classical z for 1000 is just 2.83 (barely flagged — the outlier inflated its own scale). The median is 14.5, MAD = 2.5, so robust z = 266 — the outlier shows up as obviously extreme because the scale didn't bend to accommodate it.
 :::
 
 ::: {.callout-note}
@@ -470,35 +440,7 @@ Use BH whenever you're testing many hypotheses simultaneously — genomics, neur
 ::: {.callout-note collapse="true"}
 ## Going deeper — why the BH algorithm actually controls FDR
 
-**Plain English.** You're running 10,000 statistical tests. If you call every test with $p < 0.05$ "significant," about 500 will look significant *just by chance* — even if nothing real is going on. That's the multiple-comparisons problem. **Bonferroni** is the heavy-handed fix: demand $p < 0.05/10{,}000 = 0.000005$ for any test to count. Very strict, but you'll miss real signals because the threshold is so harsh. **BH-FDR** is a smarter middle ground: it sorts your p-values smallest to largest, then sets a cutoff such that *at most 1% of the tests you call significant are false alarms, in expectation*. So 99 out of every 100 flagged hits are real (on average). The guarantee is weaker than Bonferroni's "no false alarms ever," but it's the right tradeoff when you're sifting through thousands of tests and want to keep some real signal.
-
-**Intuition.** The two key insights:
-1. **Under the null**, p-values are uniformly distributed on $[0, 1]$. So if you have $m_0$ true nulls, the expected number of them with $p_{(i)} \leq t$ is exactly $m_0 \cdot t$.
-2. The BH cutoff is chosen so that *if we declare the smallest $i$ p-values significant*, the **expected** count of false rejections among those $i$ rejections is at most $\alpha \cdot i$.
-
-**The algorithm.** Sort p-values: $p_{(1)} \leq p_{(2)} \leq \cdots \leq p_{(m)}$. Find the largest index $i^*$ such that
-$$p_{(i^*)} \leq \frac{i^*}{m} \cdot \alpha.$$
-Reject the null for tests $1, 2, \ldots, i^*$. Equivalently, define the **q-value**
-$$q_{(i)} = \min_{j \geq i} \frac{m \cdot p_{(j)}}{j},$$
-and reject all tests with $q_{(i)} \leq \alpha$. The min-from-the-right ensures monotonicity (we never reject a less-significant test while keeping a more-significant one).
-
-**Why it controls FDR.** Under independence (or "positive regression dependency"), Benjamini & Hochberg proved
-$$\text{FDR} = E\!\left[\frac{V}{\max(R, 1)}\right] \leq \frac{m_0}{m} \cdot \alpha \leq \alpha,$$
-where $V$ = false discoveries, $R$ = total discoveries, $m_0$ = number of true nulls. The proof uses a martingale argument on the ordered p-values; the key step is that, conditional on a null p-value taking a particular value $t$, the remaining nulls are still uniform on $[t, 1]$ — and the cutoff $i\alpha/m$ scales linearly with $i$, exactly cancelling that uniformity.
-
-**Bonferroni contrast.** Bonferroni rejects $p_{(i)} \leq \alpha/m$ for *all* $i$ — a fixed, much tighter threshold. It controls the **family-wise error rate (FWER)**: the probability of *any* false rejection $\leq \alpha$. That's a much stronger guarantee, and it costs power: with $m = 1{,}000$ tests at $\alpha = 0.05$, Bonferroni demands $p \leq 5 \times 10^{-5}$, while BH could reject all tests up to $p \leq 0.05$ if the empirical distribution supports it.
-
-**Worked example.** Ten tests sorted by p-value: $0.001, 0.008, 0.012, 0.04, 0.05, 0.10, 0.15, 0.30, 0.50, 0.80$. Target $\alpha = 0.05$, $m = 10$. The BH cutoffs $i\alpha/m$ are $0.005, 0.010, 0.015, 0.020, 0.025, 0.030, 0.035, 0.040, 0.045, 0.050$. Compare element-wise:
-
-| $i$ | $p_{(i)}$ | $i\alpha/m$ | Pass? |
-|---:|---:|---:|---|
-| 1 | 0.001 | 0.005 | ✓ |
-| 2 | 0.008 | 0.010 | ✓ |
-| 3 | 0.012 | 0.015 | ✓ |
-| 4 | 0.040 | 0.020 | ✗ |
-| 5 | 0.050 | 0.025 | ✗ |
-
-The largest $i^*$ where the test passes is 3, so BH rejects the first 3 hypotheses. Bonferroni would reject only $p \leq 0.005$ — just test 1. BH found 2 extra discoveries with at most 5% expected false-discovery proportion.
+Two facts power BH. First, **under the null, p-values are uniformly distributed on $[0,1]$**, so among $m_0$ true nulls, the expected number with $p \leq t$ is exactly $m_0 t$. Second, the BH cutoff is set so that *if we reject the smallest $i$ p-values, the expected count of false rejections among them is at most $\alpha i$*. The algorithm: sort p-values $p_{(1)} \leq p_{(2)} \leq \cdots \leq p_{(m)}$, find the largest $i^*$ with $p_{(i^*)} \leq (i^*/m) \cdot \alpha$, and reject everything up to $i^*$. Equivalently, define the q-value $q_{(i)} = \min_{j \geq i} m \cdot p_{(j)}/j$ and reject all tests with $q \leq \alpha$. Under independence (or "positive regression dependency"), Benjamini & Hochberg proved $\text{FDR} = E[V / \max(R, 1)] \leq (m_0/m) \cdot \alpha \leq \alpha$, where $V$ is false discoveries and $R$ is total discoveries — a martingale argument on the ordered p-values. **Contrast with Bonferroni**: Bonferroni rejects $p \leq \alpha/m$ for every test, controlling the family-wise error rate (probability of *any* false rejection); much stricter, much less powerful. As a 10-test example with $\alpha = 0.05$: p-values $(0.001, 0.008, 0.012, 0.04, 0.05, 0.10, \ldots)$ compared against the cutoffs $(0.005, 0.010, 0.015, 0.020, 0.025, \ldots)$ — the first three pass the linear BH cutoff while the fourth ($p = 0.04 > 0.020$) does not. BH rejects 3 hypotheses; Bonferroni at the same $\alpha$ would reject only the very first ($p < 0.005$). BH finds 2 extra real discoveries while keeping the expected false-discovery proportion at 5%.
 :::
 
 The DuckDB prep computed a robust z-score per HCPCS using the median-of-absolute-deviations (MAD) scaled by 1.4826. Values ≥ 5 correspond roughly to "5σ from the peer median for this code," which is the threshold CMS Program Integrity uses as a first-pass screen — but at this scale of testing (hundreds of thousands of NPI × HCPCS rows), a fixed z-cutoff with no multiplicity control will produce many false positives by chance. We compute Benjamini–Hochberg false discovery rate adjusted q-values alongside the raw z, and use FDR ≤ 0.01 as the publishable flagging threshold.
@@ -613,26 +555,9 @@ Use unsupervised methods (isolation forest, local outlier factor, one-class SVM,
 ::: {.callout-note collapse="true"}
 ## Going deeper — isolation forest scoring and the $c(n)$ normalisation
 
-**Plain English.** Suppose you have 10,000 data points in some feature space and you want to flag the weird ones — but you don't know in advance what "weird" looks like. Pick a feature at random, pick a cutoff at random, split the data into two halves. Repeat the split on each half. Keep going until every point sits alone in its own little leaf. **The weirdos get isolated first** — they're sitting out in low-density regions, so a single random cut separates them from the herd. The "anomaly score" for each point is roughly "how few splits did it take to isolate this point?" Run several hundred random trees, average the path lengths, and that's your score. The $c(n)$ formula below is just a rescaling factor that lets you compare scores across different sample sizes.
-
-**The construction.** Each isolation tree (iTree) is built by recursively splitting a random subsample of $\psi$ observations as follows: pick a feature uniformly at random, then a split value uniformly between the feature's min and max. Stop when each row is in its own leaf, or you hit a depth limit. A "normal" point requires many splits to isolate (it has many neighbours in feature space, each requiring a separate cut); an outlier — being in a low-density region — gets isolated quickly. The **path length** $h(x)$ from root to the leaf containing $x$ is the diagnostic.
-
-**Why path length needs normalising.** Path lengths depend on the subsample size $\psi$. To compare across different $\psi$ values (or to interpret on a fixed scale), divide by the *expected* path length of a binary search tree with $\psi$ nodes:
-$$c(\psi) = 2\,H(\psi - 1) - \frac{2(\psi - 1)}{\psi}, \quad H(i) = \ln(i) + 0.5772 \;(\text{Euler–Mascheroni}).$$
-This is the average path length to a random leaf in an unsuccessful BST search — Knuth's classical result.
-
-**The anomaly score.** With $E[h(x)]$ the average path length across all trees,
-$$s(x, \psi) = 2^{-E[h(x)] / c(\psi)}.$$
-Properties:
-- $s \to 1$ as $E[h(x)] \to 0$ (instantly isolated → strong anomaly).
-- $s \to 0$ as $E[h(x)] \to \infty$ (hard to isolate → likely inlier).
-- $s \approx 0.5$ when $E[h(x)] \approx c(\psi)$ (average-depth leaf → no signal).
-
-The exponential form maps an unbounded path length onto a bounded $[0, 1]$ score, making the threshold "anomaly if $s > 0.5$" interpretable.
-
-**The contamination parameter.** `contamination=0.01` tells the model to threshold at the empirical 1% upper tail — i.e., flag the top 1% of scores as anomalies. The choice is *not* a property of the data; it's a budget for how many alerts you're willing to investigate. Set higher when you can afford more reviews; set lower when false positives are expensive.
-
-**Worked example.** Sample size $\psi = 256$ (the default). Then $H(255) = \ln(255) + 0.5772 \approx 6.12$, so $c(256) = 12.24 - 1.99 = 10.25$. A row with average path length 4 across 100 trees gets score $s = 2^{-4/10.25} = 0.764$ — strong anomaly. A row with average path length 12 gets $s = 2^{-12/10.25} = 0.446$ — inlier-ish, below threshold.
+Each isolation tree is built by recursively splitting a random subsample of $\psi$ observations on a random feature at a random cutoff. The split continues until every point is alone in its own leaf. "Normal" points require many splits to isolate (they have many neighbours, each requiring a cut); outliers — sitting in low-density regions — get isolated quickly with few splits. The **path length** $h(x)$ from root to leaf is the diagnostic. To make path lengths comparable across sample sizes, divide by the expected path length of a binary search tree with $\psi$ nodes:
+$$c(\psi) = 2\,H(\psi - 1) - \tfrac{2(\psi - 1)}{\psi}, \quad H(i) = \ln(i) + 0.5772 \text{ (Euler–Mascheroni)}.$$
+The anomaly score $s(x, \psi) = 2^{-E[h(x)]/c(\psi)}$ then maps the unbounded path length onto $[0, 1]$ — values near 1 indicate strong anomalies (isolated near the root), values near 0 indicate likely inliers, and ~0.5 means average-depth (no signal). The `contamination=0.01` parameter isn't a property of the data; it's an *alert budget* — flag the top 1% of scores for human review. Set higher when reviews are cheap, lower when false positives are expensive. Concrete numbers: with the default $\psi = 256$, $c(256) \approx 10.25$; a row with average path length 4 across 100 trees scores $2^{-4/10.25} \approx 0.76$ (strong anomaly), while a row with path length 12 scores $\approx 0.45$ (inlier-ish).
 :::
 
 A peer-group z-score is simple and auditable but scale-sensitive. An unsupervised model sees the joint distribution of features and can flag records that look unusual across multiple axes at once. We fit an isolation forest on the top 20 HCPCS by total spend, standardize, and score.
@@ -679,22 +604,9 @@ What the numbers mean here: `claims` and `beneficiaries` are essentially the sam
 ::: {.callout-note collapse="true"}
 ## Going deeper — singular values and the condition number $\kappa$
 
-**Plain English.** When you fit a regression with multiple predictors, some of those predictors might be near-duplicates of each other (BMI and waist circumference, total claims and beneficiaries). When two predictors carry essentially the same information, the regression has trouble deciding "which one is doing the work" — the coefficients become unstable, flipping around dramatically with tiny changes to the data. The **condition number** is a single-number diagnostic that quantifies "how nearly-duplicated are my predictors, *across the whole design at once*?" Below 10 = clean. Above 30 = trouble. The math under the hood (the SVD — singular value decomposition) decomposes your predictor matrix into the "most-correlated direction" and the "least-correlated direction"; the condition number is the ratio of their stretches.
-
-**Intuition.** A matrix $\mathbf{X}$ "stretches" different directions of input space by different amounts. The **singular values** $\sigma_1 \geq \sigma_2 \geq \cdots \geq \sigma_p \geq 0$ are the stretch factors along the most-stretched, second-most-stretched, ..., least-stretched orthogonal directions. The **condition number** $\kappa = \sigma_1 / \sigma_p$ asks: how much wider is the most-stretched direction than the least? When $\kappa$ is large, the matrix is *nearly singular* — small changes in $y$ produce huge changes in $\hat\beta$, because the "narrow" direction barely moves the prediction at all.
-
-**Formula.** The **singular value decomposition (SVD)** of any $n \times p$ matrix is $\mathbf{X} = \mathbf{U} \mathbf{\Sigma} \mathbf{V}^\top$ where $\mathbf{U}$ and $\mathbf{V}$ are orthogonal and $\mathbf{\Sigma}$ is diagonal with the $\sigma_i$ on the diagonal. The condition number is
-$$\kappa(\mathbf{X}) = \frac{\sigma_1}{\sigma_p}.$$
-For the OLS normal equations, the relative error in $\hat\beta$ is bounded by $\kappa$ times the relative error in $y$ — so $\kappa = 100$ means tiny perturbations in $y$ can shift $\hat\beta$ by up to 100×.
-
-**Why $\kappa > 30$ is "problematic".** Belsley, Kuh & Welsch (1980) tied condition-number thresholds to specific levels of numerical instability:
-- $\kappa < 10$ — multicollinearity is negligible.
-- $10 \leq \kappa < 30$ — moderate; coefficients have inflated SEs but are interpretable.
-- $\kappa \geq 30$ — severe; near-collinear directions; coefficients are unstable to small data perturbations.
-
-**Connection to VIF.** Both diagnose the same thing. VIF is per-feature ("how much is *this* coefficient's variance inflated?"); $\kappa$ is global ("how badly conditioned is the *whole* design?"). They're related: $\kappa^2 \geq \max_j \text{VIF}_j$ for a standardised design matrix, so a high VIF implies a high $\kappa$, but $\kappa$ can be elevated by interactions VIF misses.
-
-**Worked example.** Three standardised features. Their covariance matrix's eigenvalues are 2.8, 0.95, 0.05 (the SVD gives $\sigma_i^2 = $ eigenvalues, so $\sigma$ values are $\sqrt{2.8}, \sqrt{0.95}, \sqrt{0.05} \approx 1.67, 0.97, 0.22$). Then $\kappa = 1.67 / 0.22 \approx 7.6$ — moderate, no action needed. If the smallest singular value were 0.01 instead, $\kappa = 167$ — drop a feature, or use ridge regression to add a small constant to the diagonal of $\mathbf{X}^\top\mathbf{X}$ (which is exactly what ridge does to bound $\kappa$).
+A design matrix $\mathbf{X}$ stretches different directions of input space by different amounts. The **singular value decomposition** $\mathbf{X} = \mathbf{U}\mathbf{\Sigma}\mathbf{V}^\top$ writes those stretch factors as the singular values $\sigma_1 \geq \sigma_2 \geq \cdots \geq \sigma_p \geq 0$ on the diagonal of $\mathbf{\Sigma}$. The **condition number** is the ratio of the most-stretched direction to the least:
+$$\kappa(\mathbf{X}) = \sigma_1 / \sigma_p.$$
+A large $\kappa$ means the matrix is nearly singular — small changes in $y$ produce huge changes in $\hat\beta$, because there's a near-zero-stretch direction the predictions barely depend on. Concretely, the relative error in $\hat\beta$ is bounded by $\kappa$ times the relative error in $y$. Belsley, Kuh & Welsch's conventional thresholds: $\kappa < 10$ negligible multicollinearity, $10$–$30$ moderate (coefficients interpretable but inflated SEs), $\geq 30$ severe (coefficients unstable under small data perturbations). VIF is the per-feature counterpart of the same diagnostic — global vs. per-coefficient. The relationship: $\kappa^2 \geq \max_j \text{VIF}_j$ for a standardised design, so a high VIF implies high $\kappa$ but $\kappa$ can also be inflated by interaction patterns VIF misses. Example: three standardised features whose covariance eigenvalues are 2.8, 0.95, 0.05 produce $\kappa = \sqrt{2.8/0.05} \approx 7.5$ — moderate, no action. If the smallest eigenvalue were 0.01 instead, $\kappa$ jumps to 17, and dropping a feature or applying ridge regression (which adds a small constant to the diagonal to bound $\kappa$) becomes appropriate.
 :::
 
 ### Fitting the isolation forest
@@ -998,23 +910,11 @@ Use Gini for any concentration analysis: spending across counties, hospitalizati
 ::: {.callout-note collapse="true"}
 ## Going deeper — Gini derived from the Lorenz curve
 
-**Plain English.** Imagine you sort everyone in a country by income, poorest to richest, and plot "what fraction of total income belongs to the poorest X% of people?" If everyone earned exactly the same, the plot is the diagonal line y = x. If one person had all the income, the line would hug the bottom axis and then jump to 1 at the very end. Real inequality lives between. The **Gini coefficient** measures how far the actual line bends away from the diagonal: 0 = perfect equality (line *is* the diagonal), 1 = total inequality (one person has it all). Same idea works for Medicaid spending across counties: 0 = perfectly diffuse, 0.5 = moderately concentrated, > 0.7 = collapses onto a handful of counties.
-
-**The Lorenz curve.** Sort $n$ units ascending by their value $x_{(1)} \leq x_{(2)} \leq \cdots \leq x_{(n)}$. Plot, for each $k$, the *fraction of units* $k/n$ against the *fraction of total* held by the bottom-$k$ units: $L_k = \sum_{i=1}^k x_{(i)} \,/\, \sum_{i=1}^n x_{(i)}$. The resulting step curve, joined at the corners, is the Lorenz curve. Under perfect equality $L(p) = p$ — the diagonal. Under perfect inequality (one unit has everything) the curve hugs the bottom axis until the final point, then jumps to 1.
-
-**Gini = twice the area between the diagonal and the Lorenz curve.** Geometrically,
-$$G = \frac{\text{Area between diagonal and Lorenz curve}}{\text{Area under the diagonal}} = 1 - 2 \int_0^1 L(p)\, dp.$$
-Since the area under the diagonal is $\tfrac{1}{2}$, $G$ is exactly 2× the gap-area. Maximum $G = 1$ (Lorenz curve hugs the axis); minimum $G = 0$ (Lorenz curve = diagonal).
-
-**The discrete formula.** Substituting the Lorenz step formula and computing the integral via trapezoids gives, for sorted ascending values:
-$$G = \frac{2 \sum_{i=1}^n i \cdot x_{(i)}}{n \sum_{i=1}^n x_{(i)}} - \frac{n + 1}{n}.$$
-This is the formula in the `gini()` function above. Sanity check: with equal values $x_{(i)} = c$, $\sum i \cdot c = c \cdot n(n+1)/2$ and $\sum x = cn$, so the first term is $\tfrac{n+1}{n}$, giving $G = 0$. ✓
-
-**Theil index** is the natural alternative — entropy-based: $T = \tfrac{1}{n}\sum (x_i / \bar{x})\log(x_i / \bar{x})$. Theil is *decomposable* into within- and between-group components (Gini isn't), so it's the choice when you want to attribute concentration to subgroups.
-
-**Worked example.** Four counties with paid totals $\{10, 20, 50, 200\}$. Sorted, sum $= 280$. Then $\sum i \cdot x_{(i)} = 1\cdot10 + 2\cdot20 + 3\cdot50 + 4\cdot200 = 10 + 40 + 150 + 800 = 1000$. So
-$$G = \frac{2 \cdot 1000}{4 \cdot 280} - \frac{5}{4} = \frac{2000}{1120} - 1.25 = 1.786 - 1.25 = 0.536.$$
-Substantial concentration — the top county holds 71% of the spend, and Gini $\approx 0.54$ confirms it.
+Sort $n$ units ascending by value, then plot the cumulative fraction held by the bottom $k$ units against the fraction $k/n$. The resulting step curve is the **Lorenz curve** $L(p)$. Under perfect equality everyone has the same value, so $L(p) = p$ — the diagonal. Under perfect inequality one unit has everything, so the curve hugs the bottom axis until the very end. Real distributions live between. **Gini is twice the area between the diagonal and the Lorenz curve**:
+$$G = 1 - 2 \int_0^1 L(p)\, dp.$$
+Since the area under the diagonal is $\tfrac{1}{2}$, this expression sits cleanly in $[0, 1]$: 0 when the Lorenz curve *is* the diagonal, 1 when it hugs the axis. Substituting the discrete Lorenz step formula and integrating gives the working formula
+$$G = \tfrac{2 \sum_i i \cdot x_{(i)}}{n \sum_i x_{(i)}} - \tfrac{n + 1}{n},$$
+where $x_{(i)}$ are the sorted values. (Sanity check: with equal values $x_{(i)} = c$, the first term equals $(n+1)/n$ and $G = 0$.) Four counties with paid totals $(10, 20, 50, 200)$ give $\sum i \cdot x_{(i)} = 1000$, $\sum x = 280$, and $G = 2000/(4 \cdot 280) - 5/4 \approx 0.54$ — substantial concentration, with the top county holding 71% of the spend. The **Theil index** $T = \tfrac{1}{n}\sum (x_i/\bar{x})\log(x_i/\bar{x})$ is the natural alternative: entropy-based, *decomposable* into within- and between-group components in a way Gini isn't, so it's the right choice when you want to attribute concentration across subgroups.
 :::
 
 ```{r category-concentration}
