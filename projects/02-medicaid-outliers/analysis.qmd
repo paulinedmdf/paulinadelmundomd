@@ -41,15 +41,49 @@ Medicaid is the largest source of health coverage for low-income Americans, and 
 Two key findings come out. First, the spending data is extremely lopsided — payments per patient span four orders of magnitude — so the textbook "z-score" method fails completely. A robustness fix that's resistant to extreme values (the median absolute deviation) works instead. Second, when you apply that to thousands of providers, raw cutoffs produce huge numbers of false alarms; pairing the robust z-score with a false-discovery-rate correction keeps the alert list to providers actually worth investigating. The notebook also builds a county-level interactive map of where Medicaid dollars flow by category of care. Two caveats are load-bearing: the peer group as currently defined is too broad ("everyone billing this code" mixes specialties and practice sizes), and there's no comparison against a list of known excluded providers — so the output is best read as "exploratory surfacing for human review," not validated fraud detection.
 :::
 
-## Why this analysis
+## Why this analysis, and what you'll learn from it
 
-Medicaid is the single largest source of health coverage for low-income Americans — and its claims data, released monthly by HHS, is a rare window into how public dollars flow through the US provider network. The question for any physician-scientist looking at this data is not *"who spends the most"* (large systems dominate by construction) but *"who spends atypically, given their peers?"* That's the signal that drives fraud-and-abuse reviews, network-integrity audits, and honest comparative-effectiveness work alike.
+Medicaid is the largest source of health insurance for low-income Americans, and the federal Department of Health and Human Services releases a public file every month listing how much each healthcare provider was paid for each procedure or product they billed. That file is around 11 gigabytes of comma-separated text — far too large to open in Excel, but well within reach of a laptop if you process it the right way.
 
-This notebook does three things end-to-end:
+The question we want to ask is *not* "who got paid the most" — that's always going to be huge hospital systems and dialysis chains by sheer size. The interesting question is "**who got paid atypically, given what their peers were paid for the same procedure?**" That's the signal that fraud-and-abuse review teams, network-integrity auditors, and health-services researchers all want to surface from this kind of data.
 
-1. **Streams the 11 GB Medicaid Provider Spending CSV with DuckDB**, aggregates to the NPI × HCPCS level, and flags peer-group outliers using a median/MAD-based robust z-score — resistant to the heavy tails claims data is famous for.
-2. **Joins NPPES, NUCC taxonomy, and US Census ZCTA centroids** so every flagged provider carries an interpretable specialty and a map-able location. Nothing in the analysis requires cloud infrastructure — everything runs on a laptop against committed Parquet artifacts.
-3. **Contrasts a deterministic rule (robust z) against an unsupervised model (isolation forest)** on the same cohort, in R and Python respectively. Agreement between the two is the real outlier story; disagreement is where a physician-scientist earns their keep.
+By the end of this notebook, you should understand:
+
+1. **How to process a dataset much larger than your computer's memory** — the streaming-database approach in `prep.py` reads 11 GB of text without ever loading it all at once.
+2. **Why the textbook z-score fails on real-world spending data**, and how the *robust z-score* (built on median and median absolute deviation instead of mean and standard deviation) fixes it.
+3. **What the false discovery rate (FDR) is, and why ranking provider rows by an FDR-adjusted q-value is honest about the fact that you're running thousands of statistical tests at once.**
+4. **How an isolation forest** — an unsupervised, tree-based anomaly detector — produces a *second opinion* on the same data using the *joint* distribution of multiple features, not just one variable at a time.
+5. **How to draw inequality conclusions about geographic spending patterns** using the Gini coefficient and the Lorenz curve.
+6. **What real research-grade caveats look like** when you can only see "who billed what" but not "what diagnosis the patient had" or "whether the provider was later sanctioned."
+
+::: {.callout-note}
+## A note on terminology — the acronyms used in this notebook
+
+Healthcare claims data carries a lot of jargon. Here are the terms we'll use repeatedly:
+
+| Term | What it means |
+|---|---|
+| **HCPCS** | Healthcare Common Procedure Coding System — a code system for billable procedures, drugs, services, and equipment. CPT codes are a subset of HCPCS. |
+| **NPI** | National Provider Identifier — the unique 10-digit number every US healthcare provider has. |
+| **NPPES** | National Plan & Provider Enumeration System — the CMS database that links every NPI to a provider's address, specialty, and credentials. |
+| **NUCC taxonomy** | A code system maintained by the National Uniform Claim Committee that maps providers to specialties (e.g., "207RC0000X" = Cardiology). |
+| **ZCTA** | ZIP Code Tabulation Area — the Census Bureau's polygon approximations of ZIP code boundaries. ZIPs themselves are postal-route definitions, not geographic shapes. |
+| **FIPS** | Federal Information Processing Standard — codes for US states (2 digits) and counties (5 digits). |
+| **MAD** | Median Absolute Deviation — for a set of numbers, take each value's distance from the median, then take the median of those distances. A robust analog of standard deviation. |
+| **Robust z-score** | $(x - \text{median}) / (1.4826 \times \text{MAD})$. Reads on the same scale as a standard z-score under normality, but doesn't blow up when a few extreme values are present. |
+| **BH-FDR** | Benjamini–Hochberg False Discovery Rate — a procedure for adjusting p-values when you're running many tests at once, so that no more than a fixed fraction of your "significant" flags are false alarms in expectation. |
+| **Isolation forest** | An unsupervised anomaly-detection algorithm that builds many random binary trees and scores points by how easily they get isolated (anomalies are isolated quickly). |
+| **Gini coefficient** | A 0-to-1 number measuring how unequally a quantity is distributed across units. 0 = perfect equality, 1 = one unit has everything. |
+| **Lorenz curve** | The graphical companion to Gini: plots the cumulative share held by the bottom *X*% of units. |
+| **DuckDB** | An in-process analytical database — like SQLite but optimised for analytics queries over large datasets. Reads CSVs and Parquets directly without loading them into memory. |
+| **Parquet** | A column-oriented binary file format, much smaller and faster to scan than CSV for analytic queries. |
+:::
+
+Concretely, the work has three phases:
+
+1. **Phase 1 — prep step.** Stream the 11 GB Medicaid Provider Spending CSV through DuckDB, aggregate to one row per (provider, billing code), join in NPPES (for specialty and state) and the Census ZCTA file (for geographic coordinates), then save the result as committed Parquet files. This phase is automated by [`prep.py`](prep.py); the notebook itself reads only the smaller, processed Parquets.
+2. **Phase 2 — outlier surfacing.** For every (provider, billing code) row, compute the robust z-score relative to peer providers billing the same code. Rank the providers by FDR-adjusted q-value. Cross-check the ranking against an isolation forest fit on a joint feature space.
+3. **Phase 3 — geographic atlas.** Bucket every billing code into one of 12 spending categories using a rule-based classifier, then map county-level paid-per-beneficiary as a 12-panel interactive choropleth. Pair the maps with Gini concentration numbers and state-by-state hotspot tables.
 
 ::: {.callout-note}
 ## Data sources
@@ -58,7 +92,7 @@ This notebook does three things end-to-end:
 - **NUCC Health Care Provider Taxonomy** — National Uniform Claim Committee. <https://taxonomy.nucc.org/>
 - **ZCTA Gazetteer (2020)** — US Census Bureau. <https://www.census.gov/geographies/reference-files/time-series/geo/gazetteer-files.html>
 
-Raw files stay local (11 GB + 45 GB NPPES); the [`prep.py`](prep.py) script runs one DuckDB pipeline to produce three committed Parquets this notebook reads.
+The raw files stay local on disk (11 GB Medicaid + 45 GB NPPES, far too large to commit). The [`prep.py`](prep.py) script runs one DuckDB pipeline that produces seven committed Parquet artifacts under `data/processed/`; this notebook reads only those.
 :::
 
 ---
@@ -123,7 +157,9 @@ from sklearn.preprocessing import StandardScaler
 plt.rcParams.update({"figure.dpi": 110})
 ```
 
-## Cohort sketch
+## Step 1 — what does the dataset actually contain?
+
+Before any analysis, look at the raw shape of the data: how many providers, how many billing codes, how much money in total, how many candidate "outlier" rows the prep step already flagged for closer inspection. Doing this *first* catches obvious data-quality problems (missing files, truncated reads, accidentally-empty columns) before they propagate through the rest of the analysis.
 
 ```{r cohort-sketch}
 summary_tbl <- tibble::tibble(
@@ -142,9 +178,14 @@ knitr::kable(
 )
 ```
 
-## Exploratory data analysis — what the prep step actually produced
+## Step 2 — exploratory data analysis
 
-The DuckDB pipeline emits seven Parquet artifacts. Before any modeling claim, four sanity checks: **are the artifacts the size and shape we expect, are the heavy-tailed distributions actually heavy-tailed, what's the join coverage between provider ZIPs and county FIPS, and how does the robust-z null distribution sit relative to the ≥ 5 flagging threshold?**
+This is the diagnostic phase. We're asking four questions before trusting any downstream model:
+
+1. **Are the seven Parquet files the size and shape we expect?** If a join failed or a file got truncated in the prep step, we want to know now.
+2. **Is the spending distribution actually heavy-tailed?** This is the key empirical claim that motivates using the *robust* z-score instead of a regular z-score. If the data were close to a bell curve, the regular z-score would be fine and the extra machinery would be unnecessary.
+3. **How complete is the geocoding join?** If most provider addresses didn't resolve to a county centroid, a county-level map will be hollow even where the data has signal.
+4. **Where does the observed robust-z distribution sit relative to the conventional `z ≥ 5` flag threshold?** (The histogram below shows the *empirical* distribution of robust-z — actual data, including any real outliers. It is *not* the "null distribution," which would be the hypothetical distribution if every provider were exactly typical. The shape and tail of the observed distribution tells us how aggressive our flag threshold is.)
 
 ```{r eda-artifact-shape}
 #| label: eda-artifact-shape
@@ -261,7 +302,12 @@ The geo-coverage line is the join-quality check that any geographic claim downst
 
 ### Overdispersion and zero-inflation diagnostics
 
-Two formal checks before any future modeling on the count-like features. The variance-to-mean ratio (VMR) tests whether Poisson is even on the table — a VMR much greater than 1 means the variance grows faster than the mean and you need negative binomial (or quasi-Poisson). Pairing VMR with the % zero count is what motivates a **zero-inflated NB** rather than a plain NB.
+Some of the columns in our data are *counts* — number of beneficiaries served, number of claims billed, number of months active. If we ever wanted to *model* these counts (predict them as a function of provider characteristics), we'd need to pick a probability distribution to assume. The simplest count model, the **Poisson**, has the curious property that its variance equals its mean — which is rarely true in real data. Two diagnostics check whether Poisson is even worth considering:
+
+- The **variance-to-mean ratio (VMR)** computes $\text{Var}(X)/E[X]$. Under Poisson this ratio is 1; a VMR much greater than 1 means the data are *overdispersed* and a negative binomial (NB) distribution would fit better.
+- The **fraction of zeros** tells us whether the count distribution has more zeros than even NB can produce — in which case a *zero-inflated NB* model would be appropriate.
+
+We're not actually fitting a count model here (the outlier-flagging is a different task), but documenting these diagnostics is good practice: it tells any future modeller exactly what they're walking into.
 
 ```{r eda-overdispersion}
 #| label: eda-overdispersion
@@ -316,7 +362,7 @@ The Poisson distribution with rate $\lambda$ has the curious property that its v
 
 ### Within-flagged-set selection bias
 
-The outliers parquet is itself a non-random sample of the full DuckDB output (kept rows are those with `robust_z >= 2` OR billed under the top-20 spending HCPCS codes). We can't directly compare against the dropped rows without re-running the 11 GB DuckDB pipeline, but we *can* check whether the **high-z subset** (`robust_z >= 5`, the program-integrity threshold) systematically differs from the **moderate-z subset** (`2 <= robust_z < 5`) on the variables we'd otherwise model — a "what makes the flagged-flagged set different from the merely flagged" check.
+The outliers parquet is itself a non-random sample of the full DuckDB output (kept rows are those with `robust_z >= 2` OR billed under the top-20 spending HCPCS codes). We can't directly compare against the dropped rows without re-running the 11 GB DuckDB pipeline, but we *can* check whether the **high-z subset** (`robust_z >= 5`, the program-integrity threshold) systematically differs from the **moderate-z subset** (`2 <= robust_z < 5`) on the variables we'd otherwise model — a "what makes the flagged-flagged set different from the merely flagged" check. The seven tests below are descriptive: independence assumptions are mildly violated (some NPIs appear in multiple rows on different HCPCS), and we do not apply a multiplicity correction across the seven, so the p-values should be read as evidence of *direction* rather than as calibrated significance tests.
 
 ```{r eda-within-cohort-bias}
 #| label: eda-within-cohort-bias
@@ -387,11 +433,20 @@ ggplot(hcpcs_totals, aes(rank_pct, cum_share)) +
   geom_hline(yintercept = 0.8, linetype = "dashed", color = "#FF2E00") +
   scale_x_continuous(labels = percent_format()) +
   scale_y_continuous(labels = percent_format()) +
-  labs(x = "HCPCS codes ranked by total paid (ascending)",
+  labs(x = "Fraction of HCPCS codes (sorted from top to bottom spender)",
        y = "Cumulative share of total paid")
 ```
 
-## Peer-group outlier surfacing (R) — exploratory
+## Step 3 — peer-group outlier surfacing (exploratory)
+
+This is the analytical heart of the notebook. Our goal is to identify (provider, billing-code) pairs where the payment per patient is much higher than what other providers billing the same code received — controlling for the fact that we're running this comparison for hundreds of thousands of rows, so some will look extreme just by chance.
+
+The recipe is:
+
+1. **For each billing code (HCPCS)**, compute the median paid-per-beneficiary across all providers billing that code. This is the peer-group reference value.
+2. **For each provider-billing-code row**, compute a *robust z-score*: how many normal-scale "standard deviations" above the peer median is this row, using the median absolute deviation (MAD) as the scale.
+3. **Convert each robust z-score into a tail probability** using the standard normal distribution as a reference.
+4. **Apply the Benjamini–Hochberg correction** to control the expected false-discovery proportion across all the rows being tested.
 
 > **In one sentence.** Compute a MAD-based robust z per (NPI × HCPCS) row, then apply Benjamini–Hochberg FDR ≤ 0.01 instead of a hard z-cutoff so the flag list comes with a multiplicity guarantee, not just an arbitrary threshold.
 
@@ -443,7 +498,9 @@ Use BH whenever you're testing many hypotheses simultaneously — genomics, neur
 Two facts power BH. First, **under the null, p-values are uniformly distributed on $[0,1]$**, so among $m_0$ true nulls, the expected number with $p \leq t$ is exactly $m_0 t$. Second, the BH cutoff is set so that *if we reject the smallest $i$ p-values, the expected count of false rejections among them is at most $\alpha i$*. The algorithm: sort p-values $p_{(1)} \leq p_{(2)} \leq \cdots \leq p_{(m)}$, find the largest $i^*$ with $p_{(i^*)} \leq (i^*/m) \cdot \alpha$, and reject everything up to $i^*$. Equivalently, define the q-value $q_{(i)} = \min_{j \geq i} m \cdot p_{(j)}/j$ and reject all tests with $q \leq \alpha$. Under independence (or "positive regression dependency"), Benjamini & Hochberg proved $\text{FDR} = E[V / \max(R, 1)] \leq (m_0/m) \cdot \alpha \leq \alpha$, where $V$ is false discoveries and $R$ is total discoveries — a martingale argument on the ordered p-values. **Contrast with Bonferroni**: Bonferroni rejects $p \leq \alpha/m$ for every test, controlling the family-wise error rate (probability of *any* false rejection); much stricter, much less powerful. As a 10-test example with $\alpha = 0.05$: p-values $(0.001, 0.008, 0.012, 0.04, 0.05, 0.10, \ldots)$ compared against the cutoffs $(0.005, 0.010, 0.015, 0.020, 0.025, \ldots)$ — the first three pass the linear BH cutoff while the fourth ($p = 0.04 > 0.020$) does not. BH rejects 3 hypotheses; Bonferroni at the same $\alpha$ would reject only the very first ($p < 0.005$). BH finds 2 extra real discoveries while keeping the expected false-discovery proportion at 5%.
 :::
 
-The DuckDB prep computed a robust z-score per HCPCS using the median-of-absolute-deviations (MAD) scaled by 1.4826. Values ≥ 5 correspond roughly to "5σ from the peer median for this code," which is the threshold CMS Program Integrity uses as a first-pass screen — but at this scale of testing (hundreds of thousands of NPI × HCPCS rows), a fixed z-cutoff with no multiplicity control will produce many false positives by chance. We compute Benjamini–Hochberg false discovery rate adjusted q-values alongside the raw z, and use FDR ≤ 0.01 as the publishable flagging threshold.
+The DuckDB prep step computed a robust z-score per HCPCS using the median absolute deviation (MAD) scaled by 1.4826. Under *normality*, a robust z of 5 corresponds to roughly five standard deviations above the peer median — a common heuristic threshold for program-integrity screens. On heavy-tailed spending data the correspondence is approximate (extreme values are intrinsically more common than a normal would predict), so a fixed z-cutoff at any level is a heuristic rather than a calibrated test.
+
+To guard against false alarms from running hundreds of thousands of comparisons, we also compute Benjamini–Hochberg-adjusted q-values and flag at q ≤ 0.01. **Two caveats are essential to read these q-values correctly.** First, the p-values feeding BH come from a *standard-normal reference* applied to robust z's whose true null distribution is heavier-tailed than normal — so the p-values systematically *understate* tail probabilities, and the strict FDR-control guarantee doesn't hold at the nominal level. Second, the outliers parquet was *pre-filtered* upstream to keep rows with `robust_z ≥ 2` or membership in the top-20 spend codes; applying BH within this pre-filtered family controls the false-discovery proportion *given the filter*, not over the full population of providers. The honest reading: the q-values rank rows by extremity in a multiplicity-aware way, and the resulting list is a defensible *prioritisation* for human review — not a calibrated detector.
 
 ```{r bh-fdr-flagging}
 #| label: bh-fdr-flagging
@@ -451,19 +508,24 @@ The DuckDB prep computed a robust z-score per HCPCS using the median-of-absolute
 flagged <- outliers |>
   dplyr::filter(!is.na(robust_z), beneficiaries >= 30) |>
   dplyr::mutate(
-    # Two-sided p from a normal approximation on the robust z. This is
-    # an approximation — the MAD-z null distribution isn't exactly
-    # normal, but a normal reference is the standard CMS PI starting
-    # point and gives a conservative FDR.
-    p_value  = 2 * stats::pnorm(-abs(robust_z)),
+    # One-sided upper-tail p-value from a standard-normal reference,
+    # consistent with our one-sided flag (only over-billing is of
+    # interest). pnorm(-z) = Pr(Z > z) for standard normal Z.
+    # Caveat: the true null distribution of robust z on heavy-tailed
+    # spending data has fatter tails than normal, so this approximation
+    # UNDERSTATES the true tail probability for large z. The reported
+    # q-values are therefore not strictly FDR-controlling at the nominal
+    # level on the global universe of all NPI x HCPCS rows; they are
+    # an empirical prioritisation score, not calibrated p-values.
+    p_value  = stats::pnorm(-robust_z),
     q_value  = stats::p.adjust(p_value, method = "BH"),
     flag_z5  = robust_z >= 5,
-    flag_fdr = q_value <= 0.01 & robust_z > 0
+    flag_fdr = q_value <= 0.01
   )
 
 flagging_summary <- data.frame(
   Rule                 = c("Raw z >= 5",
-                            "BH-FDR <= 0.01 (one-sided)",
+                            "BH-FDR q <= 0.01 (one-sided)",
                             "Both rules agree (intersection)"),
   Flagged              = c(sum(flagged$flag_z5),
                             sum(flagged$flag_fdr),
@@ -475,7 +537,7 @@ flagging_summary$`% of tested` <- sprintf("%.2f%%",
 pretty_kable(
   flagging_summary,
   caption = sprintf(
-    "Flagging counts for %s NPI x HCPCS rows tested. The raw z >= 5 cutoff is what CMS uses as a first-pass screen but applies no multiplicity control. The BH-FDR rule guarantees no more than 1%% of flagged rows are false positives in expectation. The intersection is the highest-confidence subset for downstream review.",
+    "Flagging counts for %s NPI x HCPCS rows tested (after the beneficiaries >= 30 minimum-sample filter and the upstream prep-step filter of robust_z >= 2 OR top-20 spend codes). The raw z >= 5 cutoff is a common program-integrity heuristic. The BH-FDR rule controls the expected false-discovery proportion *within this pre-filtered family*; because the family was selected on the test statistic, the q-values are not globally calibrated, and we treat them as a prioritisation score rather than calibrated probabilities. The intersection is the highest-confidence subset for downstream review.",
     format(nrow(flagged), big.mark = ",")
   )
 )
@@ -540,7 +602,7 @@ ggplot(box_df, aes(specialty_name)) +
   labs(x = NULL, y = "Paid per beneficiary (log scale)")
 ```
 
-## Unsupervised comparison (Python)
+## Step 4 — a second opinion: unsupervised anomaly detection
 
 ::: {.callout-note}
 ## Why an isolation forest as a second opinion?
@@ -560,11 +622,19 @@ $$c(\psi) = 2\,H(\psi - 1) - \tfrac{2(\psi - 1)}{\psi}, \quad H(i) = \ln(i) + 0.
 The anomaly score $s(x, \psi) = 2^{-E[h(x)]/c(\psi)}$ then maps the unbounded path length onto $[0, 1]$ — values near 1 indicate strong anomalies (isolated near the root), values near 0 indicate likely inliers, and ~0.5 means average-depth (no signal). The `contamination=0.01` parameter isn't a property of the data; it's an *alert budget* — flag the top 1% of scores for human review. Set higher when reviews are cheap, lower when false positives are expensive. Concrete numbers: with the default $\psi = 256$, $c(256) \approx 10.25$; a row with average path length 4 across 100 trees scores $2^{-4/10.25} \approx 0.76$ (strong anomaly), while a row with path length 12 scores $\approx 0.45$ (inlier-ish).
 :::
 
-A peer-group z-score is simple and auditable but scale-sensitive. An unsupervised model sees the joint distribution of features and can flag records that look unusual across multiple axes at once. We fit an isolation forest on the top 20 HCPCS by total spend, standardize, and score.
+The robust-z method asks one question per row: *is this row's paid-per-beneficiary unusually far from the peer median for its billing code?* That's a one-dimensional check — it only looks at one variable at a time. A row could look perfectly typical on paid-per-beneficiary alone but still be unusual in the *joint* pattern of (paid, beneficiaries, claims, months-active) considered together.
 
-### Feature collinearity, briefly
+This step adds a second opinion: an **isolation forest**, an unsupervised tree-based anomaly detector that scores each row on how unusual it looks in the joint feature space. We fit it on the top 20 billing codes by total spend (where peer groups are large enough to be informative), standardise the features so they're on comparable scales, and then look at the overlap between rows flagged by the isolation forest and rows flagged by the robust-z rule.
 
-Isolation forests are tree-based and don't inflate standard errors the way a linear model would, but heavy collinearity still costs the ensemble *tree diversity* — the splits become redundant across features that move together. A two-minute check before fitting:
+The two methods are doing different things: the robust-z is a *deterministic, auditable per-code rule* and the isolation forest is an *unsupervised, joint-feature, probabilistic model*. Where they agree, we have higher confidence; where they disagree, there's usually something interesting going on (a row that's extreme on one variable but typical on the others, for example).
+
+### Feature collinearity: a brief check before fitting
+
+When two features are nearly perfect substitutes for each other (e.g., total claims and total beneficiaries — each claim usually covers about one beneficiary, so the two numbers move in lock-step), we say they are **collinear**. For a linear model, collinearity inflates the standard errors of the affected coefficients — the model can't tell which feature is "doing the work." Tree-based models like the isolation forest don't have this problem in the same way: trees just pick whichever feature to split on, and substitutability doesn't break inference. But heavy collinearity still has a subtler cost: it reduces *tree diversity* in the ensemble, because many trees will pick essentially the same split. Three diagnostics give a quick read on how bad the collinearity is:
+
+- **Pearson correlation matrix** — pairwise linear association, $r \in [-1, 1]$. Values near $\pm 1$ flag perfectly substitutable variables.
+- **Condition number $\kappa$** — the ratio of the largest to smallest singular value of the standardised design matrix. Conventional thresholds: $\kappa < 10$ clean, $10$–$30$ moderate, $> 30$ problematic.
+- **Variance inflation factor (VIF)** per feature — for each feature, regress it on all the others; VIF $= 1/(1-R^2)$. The same idea as the condition number, but localised to each feature.
 
 ```{python iforest-collinearity}
 from sklearn.linear_model import LinearRegression
@@ -640,17 +710,17 @@ plt.tight_layout()
 plt.show()
 ```
 
-## Where does the dollar go? A Medicaid category cost atlas
+## Step 5 — where does the dollar go? A geographic atlas
 
-> **In one sentence.** A county-level interactive choropleth across all 12 HCPCS spending categories, shaded by within-category decile of paid-per-beneficiary — coloring is comparable inside a category, not across them.
+> **In one sentence.** A county-level interactive map across all 12 spending categories, shaded by where each county sits within the distribution for *its* category — colours are comparable inside a category but not across them.
 
-A provider-outlier list is a fraud-review input. Most policy audiences, though, want the opposite question: **which categories of care cost the most, and where do those costs concentrate geographically?** Switching from "who" to "what and where" requires three pieces we've now built upstream in [`prep.py`](prep.py):
+Up to this point the analysis has answered "*who* bills atypically?" — useful for a Program Integrity team. A different audience (policy researchers, state Medicaid administrators, journalists) wants the inverted question: "**which kinds of care cost the most, and where geographically does the money flow?**" Answering that requires three additional pieces of data engineering that the [`prep.py`](prep.py) script already produced:
 
-1. A rule-based **HCPCS → category** classifier that buckets every procedure, drug, DME, and Medicaid-specific T-code into one of 12 spending categories.
-2. A **Census 2020 ZCTA → county** crosswalk so every provider's practice ZIP resolves to a county FIPS.
-3. A county × category aggregate with **within-category quintile rankings** so a single color scale reads consistently across panels: darker = this county is in the top 20% of cost-per-beneficiary for *that* category.
+1. A **HCPCS → category classifier** that buckets every billing code into one of 12 spending categories (Behavioral Health, Dental, Dialysis & ESRD, Prescription Drugs, and so on). The classifier is a deterministic rule-based map; the code lives below for transparency.
+2. A **Census 2020 ZIP → county crosswalk** that translates every provider's practice ZIP into the standard 5-digit county FIPS code, allowing county-level aggregation.
+3. A **county × category aggregate** with within-category ranking so that the colour scale reads consistently across the 12 panels: darker shades always mean "high spend *relative to other counties in this same category*."
 
-These buckets are a mix of clinical areas (Behavioral Health, Dental, Dialysis & ESRD, Prescription Drugs) and service-type groupings that the HCPCS code system itself organizes by (Surgery & Procedures, Radiology, Laboratory, DME, Transportation, LTSS, E&M) — not a true disease taxonomy. Reading the atlas as "categories of Medicaid spend" is more honest than reading it as "diseases": HCPCS doesn't carry diagnosis, so the closest we can get without ICD is spending-category geography.
+Two important interpretive caveats up front: (1) The 12 categories are mostly **service-type groupings** that the HCPCS code system itself organises by — *not* disease categories. HCPCS codes don't carry diagnoses. Reading the atlas as "where Medicaid spends on Behavioral Health *services*" is supportable; reading it as "where Medicaid spends on depression" is not. (2) The within-category colour scale is *relative* — the darkest navy in the Dental panel and the darkest navy in the Behavioral Health panel both mean "this county is among the highest in *its* category," but they are not directly comparable dollar levels across categories.
 
 ::: {.callout-note}
 ## Why county, not HSA or ZIP3?
@@ -820,11 +890,11 @@ lmap |>
   )
 ```
 
-## Category explorer
+## Step 6 — category explorer
 
-> **In one sentence.** Three companion views of the atlas — top 5 HCPCS per category, spatial Gini concentration, and state hotspot table — that answer the three follow-up questions a policy reviewer always asks next.
+> **In one sentence.** Three companion views of the atlas — top 5 billing codes per category, a Gini concentration number per category, and a state hotspot table — that answer the three follow-up questions a policy reader always asks next.
 
-The choropleth shows *where* a category is expensive. The three views below answer three follow-up questions policy audiences almost always ask next: **what HCPCS codes drive the spend inside each category, how spatially concentrated is that spend across counties, and which states sit at the top of the ladder?** Every chunk iterates over all 12 categories — no cherry-picking — so the honest shape of Medicaid dollar flow is visible in one sweep.
+The choropleth shows *where* spending in each category concentrates. The three views below answer three follow-up questions that policy audiences ask almost reflexively: (1) **what specific billing codes are driving the spend inside each category?** (2) **how concentrated is that spend across counties — is it spread evenly across the country, or does it collapse onto a handful of counties?** (3) **which states sit at the top of the per-beneficiary spending ladder for each category?** Each of the chunks below iterates over all 12 categories — no cherry-picking — so the full picture is visible in a single sweep.
 
 ```{r hcpcs-classifier}
 #| code-fold: show
@@ -933,6 +1003,15 @@ spatial_conc <- county_atlas |>
   filter(disease_group %in% top_categories) |>
   group_by(category = disease_group) |>
   summarise(
+    # NOTE on denominator: Gini and top-10 share are computed over the
+    # subset of counties that have ANY billing in this category. Counties
+    # with zero billing in this category are absent, not included as
+    # zeros. This means the reported concentration is "concentration
+    # among billing counties," not "concentration over all 3,100+ US
+    # counties." For sparse categories (e.g., Dialysis & ESRD, billed
+    # in ~500 counties), the *national* geographic concentration is
+    # therefore higher than the Gini number alone suggests; the grey
+    # baseline in the choropleth makes the absence visible to the eye.
     counties_n    = dplyr::n(),
     gini_paid     = gini(total_paid),
     top10_share   = sum(sort(total_paid, decreasing = TRUE)[seq_len(min(10, dplyr::n()))],
@@ -992,7 +1071,9 @@ pretty_kable(
 )
 ```
 
-## State-level intensity
+## Step 7 — state-level intensity
+
+A final view rolls the per-provider "excess spend" all the way up to the state level. For each provider–code row, the prep step pre-computed `excess_paid` as the dollars billed *above* what the peer-group median would predict; summing that across all providers in a state gives a state-level "above-median excess" total. Read this chart with the caveat that "excess" here is just a deviation from the peer median, not a per-capita rate — large states will naturally have more total excess, so the ranking blends *intensity* (above-median per provider) with *volume* (number of providers in the state). A per-beneficiary-adjusted version would be a better intensity measure but isn't computed here.
 
 ```{r state-intensity}
 #| fig-cap: "Peer-group-excess Medicaid spending by state. Height is the sum of paid dollars above each HCPCS's peer median, aggregated at prep time across all providers billing in that state."
@@ -1008,7 +1089,7 @@ ggplot(state_excess, aes(reorder(state, excess_paid), excess_paid)) +
   labs(x = NULL, y = "Paid above HCPCS peer median ($)")
 ```
 
-## Conclusions
+## What we learned
 
 The seven-step pipeline (DuckDB aggregate → robust z → NPPES enrichment → ZCTA-county join → category classifier → atlas → explorer) supports five conclusions that each tie back to a specific diagnostic on this page:
 
