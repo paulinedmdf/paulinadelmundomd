@@ -1,0 +1,22 @@
+---
+title: "Writing"
+subtitle: "Evidence synthesis methods, applied to clinical AI."
+description: "Study teardowns, framework drafts, case-study companions."
+page-layout: article
+toc: false
+listing:
+  contents: "2*.qmd"
+  sort: "date desc"
+  type: default
+  fields: [date, title, description, categories]
+  field-display-names:
+    categories: "Tags"
+  feed:
+    title: "Paulina Del Mundo — Writing"
+    description: "Evidence synthesis methods, applied to clinical AI."
+    items: 20
+  categories: numbered
+  sort-ui: false
+  filter-ui: true
+  page-size: 25
+---

@@ -1,0 +1,10 @@
+format:
+  html:
+    page-layout: article
+    toc: true
+    toc-location: right
+    toc-title: "Contents"
+    toc-depth: 3
+    title-block-style: default
+    title-block-banner: false
+    date-format: "long"

@@ -1,0 +1,38 @@
+---
+title: "About"
+subtitle: "Physician. Clinical data scientist. Working at the intersection of evidence synthesis and clinical AI."
+description: "About Paulina Del Mundo Del Fierro, MD, MPH — physician + Hopkins epi/biostats writing on evidence synthesis methods applied to clinical AI."
+page-layout: article
+toc: false
+body-classes: about-page
+---
+
+I'm a physician with an MPH in epidemiology and biostatistics from Johns Hopkins Bloomberg School of Public Health, and a Public Health Economics graduate certificate to go with it. I currently work as a Clinical Data Scientist at the Institute for Health Metrics in Manchester, MA, where I build analyses on real-world data — EHR, claims, and social-determinants measures — across 24.6M+ patient encounters from 50+ community hospitals.
+
+Before moving full-time into data science I practiced general and occupational medicine in the Philippines, led a systematic review whose findings shaped the Philippine Department of Health's Wilms tumor chemotherapy guidelines, and ran a national advocacy program that integrated medical certification of cause of death into the country's medical school curriculum. I keep one foot in each world — clinic, dataset, policy — because the questions worth modeling are the ones clinicians and patients actually live.
+
+## What I'm working on now
+
+::: {.now-list}
+- Drafting v0.1 of a risk-of-bias framework for AI training corpora, in the spirit of Cochrane RoB 2 and ROBINS-I.
+- Writing companion narrative posts for the project analyses on this site (the Medicare Part D insulin DiD is up next).
+- Series of teardown posts that read recent clinical AI studies through GRADE, PROBAST, and decision-curve analysis side by side.
+- Available for selected consulting and contract work on real-world evidence study design, evidence synthesis, and clinical-AI evaluation.
+:::
+
+## Toolkit
+
+I work fluently in R (tidyverse, data.table, survminer, Shiny), Python, and SQL on AWS, with Stata and SAS in reach. I'm comfortable across ICD-10, RxNorm, LOINC, and SNOMED-CT, and methods I reach for routinely include negative-binomial and ordinal-logistic regression, Markov ICERs, PCA-based SDoH composites, k-means clustering, and predictive modeling for mortality and readmission risk. On the synthesis side: GRADE, PRISMA, Cochrane RoB 2, ROBINS-I, AMSTAR, TRIPOD-AI, PROBAST, decision-curve analysis, calibration.
+
+The full record — publications, training, professional memberships — is on the [CV](cv.qmd).
+
+## Contact
+
+::: {.contact-list}
+- [Email]{.contact-label} [pauline.del.mundo@gmail.com](mailto:pauline.del.mundo@gmail.com)
+- [Phone]{.contact-label} [+1 (609) 509-2411](tel:+16095092411)
+- [LinkedIn]{.contact-label} [linkedin.com/in/paulinedelmundo](https://linkedin.com/in/paulinedelmundo)
+- [Based in]{.contact-label} Audubon, New Jersey
+:::
+
+I reply within a few business days. Open to conversations on real-world evidence, evidence synthesis for clinical AI, health-equity research, and physician-scientist collaborations.

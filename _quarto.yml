@@ -1,0 +1,69 @@
+project:
+  type: website
+  output-dir: _site
+  render:
+    - "index.qmd"
+    - "about.qmd"
+    - "cv.qmd"
+    - "writing/"
+    - "!index-legacy.html"
+    - "!projects/"
+  resources:
+    - "projects/**"
+    - "script.js"
+    - "styles.css"
+
+website:
+  title: "Paulina Del Mundo"
+  description: "Evidence synthesis methods, applied to clinical AI."
+  site-url: "https://paulinadelmundomd.com"
+  open-graph: true
+  twitter-card: true
+  reader-mode: false
+  search: false
+  navbar:
+    pinned: true
+    background: light
+    title: "PDM"
+    left:
+      - text: "Writing"
+        href: writing/index.qmd
+      - text: "Projects"
+        href: projects/
+      - text: "About"
+        href: about.qmd
+      - text: "CV"
+        href: cv.qmd
+    right:
+      - text: "Subscribe"
+        href: "index.html#subscribe"
+  page-footer:
+    border: false
+    left: |
+      © 2026 Paulina Del Mundo Del Fierro, MD MPH
+    right:
+      - text: "Email"
+        href: "mailto:pauline.del.mundo@gmail.com"
+      - text: "LinkedIn"
+        href: "https://linkedin.com/in/paulinedelmundo"
+      - text: "RSS"
+        href: "writing/index.xml"
+
+format:
+  html:
+    theme:
+      - styles.scss
+    css: []
+    toc: false
+    page-layout: article
+    title-block-style: none
+    anchor-sections: false
+    smooth-scroll: true
+    link-external-newwindow: true
+    link-external-icon: false
+    fontsize: 1.05rem
+    grid:
+      body-width: 720px
+      sidebar-width: 220px
+      margin-width: 220px
+      gutter-width: 1.5rem

@@ -1,0 +1,280 @@
+---
+title: "Paulina Del Mundo Del Fierro, MD, MPH"
+subtitle: "Physician · Clinical Data Scientist · Public Health Researcher"
+description: "CV of Paulina Del Mundo Del Fierro, MD, MPH — physician and clinical data scientist working in real-world evidence, evidence synthesis, and clinical AI."
+page-layout: article
+toc: true
+toc-location: right
+toc-title: "Contents"
+toc-depth: 2
+body-classes: cv-page
+---
+
+::: {.cv-page}
+
+I'm a physician with an MPH in Epidemiology & Biostatistics from Johns Hopkins, currently working as a Clinical Data Scientist at the Institute for Health Metrics. My work sits at the intersection of clinical practice, evidence synthesis, and real-world data — designing RWE studies, building predictive models on EHR and claims, and translating findings for pharma, biotech, and federal-grant audiences. Reachable at [pauline.del.mundo@gmail.com](mailto:pauline.del.mundo@gmail.com) · [+1 (609) 509-2411](tel:+16095092411) · [LinkedIn](https://linkedin.com/in/paulinedelmundo) · Audubon, New Jersey.
+
+::: {.cv-stats}
+::: {.cv-stat}
+[Encounters analyzed]{.cv-stat-label}
+[24.6M+]{.cv-stat-value}
+:::
+::: {.cv-stat}
+[Community hospitals]{.cv-stat-label}
+[50+]{.cv-stat-value}
+:::
+::: {.cv-stat}
+[First-author papers]{.cv-stat-label}
+[2]{.cv-stat-value}
+:::
+::: {.cv-stat}
+[MPH GPA, Hopkins]{.cv-stat-label}
+[3.90]{.cv-stat-value}
+:::
+:::
+
+## Experience
+
+::: {.cv-role}
+::: {.cv-role-meta}
+[Jan 2024 – Present]{.cv-dates}
+[Institute for Health Metrics · Manchester, MA]{.cv-org}
+:::
+::: {.cv-role-body}
+### Clinical Data Scientist
+
+- Processed and analyzed real-world data — EMR, claims, and SDoH measures across 24.6M+ patient encounters and 50+ community hospitals — using ICD-10, RxNorm, LOINC, and SNOMED-CT for cleaning, anonymization, classification, imputation, analysis, visualization, and interactive dashboards.
+- Built R and Python ML pipelines for predictive modeling of mortality and readmission risk, comorbidity analysis, LLM-based SDoH analysis, and geocoding for spatial analysis of access patterns.
+- Merged ACS and CDC data with clinical records into composite SDoH indices via PCA, enriching predictive models with community-level variables.
+- Benchmarked a proprietary EHR database against the National Inpatient Sample to assess representativeness; performed k-means clustering and regression-based imputation to preserve dataset integrity.
+- Supported 5+ pharma, biotech, and research consulting clients via cohort analyses; authored NIH and AHRQ grant proposals for health-equity projects.
+:::
+:::
+
+::: {.cv-role}
+::: {.cv-role-meta}
+[Oct 2023 – Mar 2024]{.cv-dates}
+[Johns Hopkins Center for Communication Programs · Baltimore, MD]{.cv-org}
+:::
+::: {.cv-role-body}
+### Graduate Research Data Analyst
+
+- Evaluated USAID-funded ReachHealth Philippines and Philippine DOH COVID-19 campaigns using Stata and Python regression analyses within public-health communication frameworks to inform campaign strategy.
+:::
+:::
+
+::: {.cv-role}
+::: {.cv-role-meta}
+[Oct 2022 – May 2023]{.cv-dates}
+[Philippine Children's Medical Center · Quezon City]{.cv-org}
+:::
+::: {.cv-role-body}
+### Evidence Review Expert
+
+- Conducted a systematic review establishing DOH-supported oncology CPGs for Wilms tumor; achieved expert consensus on loss-of-heterozygosity 1p/16q testing, influencing national chemotherapy protocols and insurer coverage discussions.
+:::
+:::
+
+::: {.cv-role}
+::: {.cv-role-meta}
+[Jun 2020 – Aug 2022]{.cv-dates}
+[University of the Philippines · Manila]{.cv-org}
+:::
+::: {.cv-role-body}
+### Advocacy Officer & Policy Consultant
+
+- Secured legislative integration of Medical Certification of Cause of Death (MCCOD) into national medical education standards, with endorsements from APMC, PRC, and CHED — improving mortality data accuracy across 30 medical schools.
+- Designed a DOH-funded stakeholder engagement program reaching 108 deans and faculty nationwide; published PRECEDE-PROCEED research on implementation outcomes.
+- Developed telemedicine policy recommendations and organized an FMEA workshop producing Tableau sentiment dashboards on national telehealth implementation risks.
+:::
+:::
+
+::: {.cv-role}
+::: {.cv-role-meta}
+[Nov 2020 – Jun 2022]{.cv-dates}
+[Docquity, Inc. · Pasig City]{.cv-org}
+:::
+::: {.cv-role-body}
+### Medical Consultant & Writer
+
+- Cross-border health-system analysis across the Philippines, Singapore, India, and Indonesia; developed CME content for the Philippine Pediatric Society and Philippine College of Surgeons.
+:::
+:::
+
+::: {.cv-role}
+::: {.cv-role-meta}
+[Mar 2020 – Nov 2020]{.cv-dates}
+[Enago · New York, NY]{.cv-org}
+:::
+::: {.cv-role-body}
+### Medical Editor
+
+- Elevated medical writing across clinical, pharmaceutical, and molecular-medicine domains, ensuring publishable quality in international peer-reviewed journals.
+:::
+:::
+
+::: {.cv-role}
+::: {.cv-role-meta}
+[Oct 2019 – Sep 2020]{.cv-dates}
+[Unilever · Pasig City]{.cv-org}
+:::
+::: {.cv-role-body}
+### Occupational Medicine Physician
+
+- Supervised occupational health for 300 employees; implemented COVID-19 safety protocols in partnership with OSH and HR teams.
+:::
+:::
+
+::: {.cv-role}
+::: {.cv-role-meta}
+[Apr 2019 – Oct 2019]{.cv-dates}
+[Manila, Philippines]{.cv-org}
+:::
+::: {.cv-role-body}
+### General Practice Locum Tenens · Consultant
+:::
+:::
+
+::: {.cv-role}
+::: {.cv-role-meta}
+[Jul 2017 – Jun 2018]{.cv-dates}
+[Amang Rodriguez Memorial Medical Center · Marikina]{.cv-org}
+:::
+::: {.cv-role-body}
+### Post-Graduate Medical Intern
+
+- Diagnosed and treated patients across high-volume medical, surgical, obstetric, and pediatric inpatient, outpatient, emergency, and community settings.
+:::
+:::
+
+::: {.cv-role}
+::: {.cv-role-meta}
+[Mar 2015 – May 2015]{.cv-dates}
+[University of the Philippines, National Telehealth Center · Manila]{.cv-org}
+:::
+::: {.cv-role-body}
+### Research Assistant
+:::
+:::
+
+## Education
+
+::: {.cv-role}
+::: {.cv-role-meta}
+[Jun 2022 – Dec 2023]{.cv-dates}
+[Johns Hopkins Bloomberg School of Public Health · Baltimore, MD]{.cv-org}
+:::
+::: {.cv-role-body}
+### Master of Public Health — Epidemiology & Biostatistics
+
+- GPA 3.90; Public Health Economics Graduate Certificate.
+- Capstone: *Factors Associated with the Retention of Medical Graduates in Clinical Practice in the Philippines* — novel social-media survey methods, statistical sampling design, regression model refinement, IRB approval.
+- Modeled ACS, HRSA, and CDC data with negative-binomial regression on healthcare-worker shortage and ICD-10 mortality rates; ordinal logistic regression on MEPS data; Markov models for digital-health ICERs.
+:::
+:::
+
+::: {.cv-role}
+::: {.cv-role-meta}
+[Jun 2011 – May 2017]{.cv-dates}
+[University of Perpetual Help / Ateneo School of Medicine & Public Health · Las Piñas, Philippines]{.cv-org}
+:::
+::: {.cv-role-body}
+### Doctor of Medicine
+
+- GPA 3.03; Top 13.
+- First place, Annual Clinico-Pathologic Conference diagnostic competition, 2016.
+- 5th place poster, *Predictors of Newborn Screening Utilization in Quezon City*.
+:::
+:::
+
+::: {.cv-role}
+::: {.cv-role-meta}
+[Jun 2007 – Apr 2011]{.cv-dates}
+[Ateneo de Manila University · Quezon City]{.cv-org}
+:::
+::: {.cv-role-body}
+### BS in Health Sciences
+
+- GPA 3.24; full-tuition college scholarship; dean's list 2008–2010.
+:::
+:::
+
+## Licensure
+
+- United States Medical Licensure Examinations — Steps 1, 2, and 3.
+- Philippine Physician Licensure Exam — 84.92nd percentile.
+
+## Publications & presentations
+
+### First-author peer-reviewed
+
+1. **Del Mundo MPFA**, et al. *A PRECEDE-PROCEED Approach in the Advocacy for Computer-based Education on Correct Medical Certification of Cause of Death among Physician-Learners.* Acta Medica Philippina 2023; 57(8). [doi:10.47895/amp.vi0.4639](https://doi.org/10.47895/amp.vi0.4639)
+2. **Del Mundo MPFA**, et al. *Predictors of Newborn Screening Utilization in Quezon City, Philippines.* International Journal of Health, Wellness and Society 2022; 10(4). [doi:10.18848/2156-8960/CGP/v10i04/61-76](https://doi.org/10.18848/2156-8960/CGP/v10i04/61-76)
+
+### Conference presentations
+
+- Borda H, Zolotor A, **Del Mundo P**. *Characterizing Cardiovascular Disease Patients in US Community Hospitals Using insightsDB.* Poster, ISPOR 2024, Atlanta, GA.
+
+### Contract speaking engagements
+
+- *Public Health and Education Data Analytics Online Course.* RTI International / USAID. May–Sep 2022.
+- *International & Country-Specific Strategies in eHealth & Public Health Informatics.* Riverside College. Apr 2022.
+- *COVID-19 Updates.* White Cloak Technologies Inc. May 2021.
+- *Digital Healthcare in the Philippines: Are We Ready?* CareGo Vaccination Booking Platform. Sep 2020.
+
+## Leadership & service
+
+::: {.cv-role}
+::: {.cv-role-meta}
+[Dec 2021 – Present]{.cv-dates}
+[Philippine Society of Public Health Physicians · Manila]{.cv-org}
+:::
+::: {.cv-role-body}
+### Technical & Policy Committee Member
+
+Led the Digital Health Technical Working Group, increasing peer involvement in digital-health advancements and fostering cross-organization collaboration.
+:::
+:::
+
+::: {.cv-role}
+::: {.cv-role-meta}
+[Mar 2023 – Aug 2023]{.cv-dates}
+[HealthAI Switzerland · Geneva]{.cv-org}
+:::
+::: {.cv-role-body}
+### Communications & Collaborations Committee Co-Lead
+
+Co-led a WHO initiative to develop a global digital-health and AI capacity-building framework for course creators, employers, and learners.
+:::
+:::
+
+::: {.cv-role}
+::: {.cv-role-meta}
+[Jun 2013 – Apr 2014]{.cv-dates}
+[Ateneo School of Medicine & Public Health · Manila]{.cv-org}
+:::
+::: {.cv-role-body}
+### Co-Founder & President, Think Tank ASMPH
+
+Founded the first health-research student organization at ASMPH; won Best Organization Project for the High5Life Forum, connecting NGO and government health experts to 150+ attendees.
+:::
+:::
+
+### Professional memberships
+
+- International Society for Pharmacoeconomics & Outcomes Research — Real-World Evidence Special Interest Group
+- American Medical Informatics Association
+- Philippine Society of Public Health Physicians — Digital Health Committee Head; Technical & Policy Committee Member
+- Philippine College of Occupational Medicine
+
+## Toolkit
+
+**Languages & stacks.** R (tidyverse, data.table, ggplot2, survminer, officer, Shiny), Python, SQL (AWS), Stata, SAS.
+
+**Clinical terminologies.** ICD-10, RxNorm, LOINC, SNOMED-CT.
+
+**Methods.** RWE study design, NIS benchmarking, SDoH composite indexing via PCA, predictive modeling, geospatial analytics, LLM-based analytics, negative-binomial and ordinal-logistic regression, Markov ICERs, k-means clustering, regression-based imputation.
+
+**Evidence synthesis.** GRADE, PRISMA, Cochrane RoB 2, ROBINS-I, AMSTAR, TRIPOD-AI, PROBAST, decision-curve analysis, calibration.
+
+:::

@@ -1,0 +1,765 @@
+/*-- scss:defaults --*/
+
+// Publication aesthetic — austere, near-monochrome, single-serif.
+// Reference points: Asterisk Mag, Works in Progress, Statecraft.
+//
+// Type system: Source Serif 4 carries everything (body + headings) so the
+// site reads with one voice. Inter handles small chrome (navbar, eyebrows,
+// dates, section labels) where uppercase tracking demands a sans. JetBrains
+// Mono shows up only for data and tag chips.
+//
+// Color system: deep navy ink on warm off-white paper, with one restrained
+// blue accent reserved for links. No buttons except the primary CTA on the
+// subscribe block.
+
+// --- Palette ---
+$ink:         #14181f;
+$ink-soft:    #4a5160;
+$ink-faint:   #8a909c;
+$paper:       #fbfaf7;
+$paper-tint:  #f3f1ec;
+$rule:        #d9d6cd;
+$rule-soft:   #e8e5dd;
+$accent:      #1f4f99;
+$accent-soft: rgba(31, 79, 153, 0.35);
+
+// --- Fonts ---
+$font-serif: "Source Serif 4", "Source Serif Pro", Georgia, "Times New Roman", serif;
+$font-sans:  "Inter", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+$font-mono:  "JetBrains Mono", ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+
+// --- Bootstrap overrides ---
+$body-bg:               $paper;
+$body-color:            $ink;
+$body-secondary-color:  $ink-soft;
+
+$font-family-base:        $font-serif;
+$font-family-sans-serif:  $font-sans;
+$font-family-monospace:   $font-mono;
+
+$headings-font-family:   $font-serif;
+$headings-color:         $ink;
+$headings-font-weight:   600;
+
+$link-color:                $accent;
+$link-hover-color:          $ink;
+$link-decoration:           underline;
+$link-decoration-thickness: 1px;
+$link-underline-offset:     3px;
+
+$h1-font-size: 2.4rem;
+$h2-font-size: 1.45rem;
+$h3-font-size: 1.15rem;
+$h4-font-size: 1rem;
+
+$line-height-base:         1.65;
+$paragraph-margin-bottom:  1.1rem;
+
+$border-color:   $rule;
+$border-radius:  0;
+
+$navbar-padding-y: 1rem;
+
+/*-- scss:rules --*/
+
+@import url("https://fonts.googleapis.com/css2?family=Source+Serif+4:ital,opsz,wght@0,8..60,400;0,8..60,500;0,8..60,600;0,8..60,700;1,8..60,400;1,8..60,500&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap");
+
+// --- Page baseline ---
+
+html, body {
+  background: $paper;
+  color: $ink;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+body {
+  font-family: $font-serif;
+  font-size: 1.05rem;
+  line-height: 1.65;
+  font-feature-settings: "kern", "liga", "calt", "onum";
+}
+
+main p {
+  max-width: 38rem;
+}
+
+// --- Navbar ---
+
+.navbar {
+  background: $paper !important;
+  border-bottom: 1px solid $rule-soft;
+  padding-top: 1.1rem;
+  padding-bottom: 1.1rem;
+  font-family: $font-sans;
+  min-height: auto;
+
+  .navbar-brand {
+    font-family: $font-serif;
+    font-weight: 600;
+    font-size: 1rem;
+    letter-spacing: -0.005em;
+    color: $ink !important;
+    padding: 0;
+  }
+
+  .navbar-title {
+    font-family: $font-serif;
+    font-weight: 600;
+    color: $ink;
+  }
+
+  .nav-link {
+    font-family: $font-sans;
+    font-size: 0.76rem;
+    font-weight: 500;
+    text-transform: uppercase;
+    letter-spacing: 0.14em;
+    color: $ink-soft !important;
+    padding: 0.4rem 0.95rem !important;
+
+    &:hover,
+    &.active,
+    &:focus {
+      color: $ink !important;
+    }
+  }
+
+  .navbar-nav .nav-item:last-child .nav-link {
+    color: $ink !important;
+    border: 1px solid $rule;
+    margin-left: 0.4rem;
+    padding-left: 0.95rem !important;
+    padding-right: 0.95rem !important;
+
+    &:hover {
+      background: $ink;
+      color: $paper !important;
+      border-color: $ink;
+    }
+  }
+}
+
+// --- Headings ---
+
+h1, h2, h3, h4, h5, h6 {
+  font-family: $font-serif;
+  color: $ink;
+  letter-spacing: -0.018em;
+  line-height: 1.18;
+}
+
+h1 { font-weight: 600; margin-top: 0; }
+h2 { font-weight: 600; margin-top: 2.2rem; margin-bottom: 1rem; }
+h3 { font-weight: 600; margin-top: 1.6rem; }
+
+.subtitle {
+  font-family: $font-serif;
+  font-style: italic;
+  font-weight: 400;
+  color: $ink-soft;
+  font-size: 1.15rem;
+  letter-spacing: 0;
+  max-width: 38rem;
+}
+
+// --- Links ---
+
+a {
+  color: $accent;
+  text-decoration: underline;
+  text-decoration-thickness: 1px;
+  text-underline-offset: 3px;
+  text-decoration-color: $accent-soft;
+  transition: color 0.12s ease, text-decoration-color 0.12s ease;
+}
+
+a:hover {
+  color: $ink;
+  text-decoration-color: $ink;
+}
+
+.navbar a,
+.nav-link,
+.footer a,
+.nav-footer a {
+  text-decoration: none;
+}
+
+// --- Eyebrow / meta type ---
+
+.eyebrow,
+.meta,
+.section-label {
+  font-family: $font-sans;
+  font-size: 0.74rem;
+  text-transform: uppercase;
+  letter-spacing: 0.16em;
+  color: $ink-soft;
+  font-weight: 500;
+}
+
+// --- Hero ---
+
+.hero {
+  padding: 5.5rem 0 3rem;
+  border-bottom: 1px solid $rule-soft;
+  margin-bottom: 0;
+}
+
+.hero-title {
+  font-family: $font-serif;
+  font-size: clamp(2.3rem, 4.5vw, 3.6rem);
+  font-weight: 600;
+  line-height: 1.05;
+  letter-spacing: -0.028em;
+  margin: 0 0 1.6rem;
+  color: $ink;
+  max-width: 22ch;
+}
+
+.hero-lede {
+  font-family: $font-serif;
+  font-size: 1.2rem;
+  line-height: 1.55;
+  color: $ink;
+  max-width: 36rem;
+  margin: 0 0 2rem;
+}
+
+.hero-cta {
+  display: flex;
+  gap: 1.6rem;
+  align-items: center;
+  margin: 0 0 2.6rem;
+  font-family: $font-serif;
+  font-size: 1.05rem;
+  flex-wrap: wrap;
+
+  a {
+    color: $ink;
+    text-decoration: underline;
+    text-decoration-color: $ink;
+    text-decoration-thickness: 1px;
+    text-underline-offset: 4px;
+  }
+  a:hover {
+    color: $accent;
+    text-decoration-color: $accent;
+  }
+}
+
+.trust-strip {
+  border-top: 1px solid $rule-soft;
+  padding-top: 1.2rem;
+  margin-top: 0.4rem;
+  font-family: $font-sans;
+  font-size: 0.76rem;
+  text-transform: uppercase;
+  letter-spacing: 0.15em;
+  color: $ink-soft;
+  line-height: 1.4;
+
+  span + span::before {
+    content: "·";
+    margin: 0 0.7rem;
+    color: $ink-faint;
+  }
+}
+
+// --- Section heads (Recent Writing, Selected Work) ---
+
+.section-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  margin: 4rem 0 1.6rem;
+  padding-bottom: 0.7rem;
+  border-bottom: 1px solid $rule-soft;
+
+  .section-label {
+    font-family: $font-sans;
+    font-size: 0.76rem;
+    text-transform: uppercase;
+    letter-spacing: 0.16em;
+    color: $ink-soft;
+    font-weight: 500;
+  }
+
+  .section-more {
+    font-family: $font-sans;
+    font-size: 0.76rem;
+    color: $ink-soft;
+    text-decoration: none;
+    text-transform: uppercase;
+    letter-spacing: 0.14em;
+
+    &:hover { color: $ink; }
+  }
+}
+
+// --- Recent writing list ---
+
+.writing-feed {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.writing-item {
+  display: grid;
+  grid-template-columns: 6rem 1fr;
+  gap: 1.6rem;
+  padding: 1.5rem 0;
+  border-bottom: 1px solid $rule-soft;
+  margin: 0;
+
+  &:last-child { border-bottom: none; }
+}
+
+.writing-date {
+  font-family: $font-sans;
+  font-size: 0.76rem;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  color: $ink-soft;
+  padding-top: 0.22rem;
+  font-weight: 500;
+}
+
+.writing-title {
+  font-family: $font-serif;
+  font-size: 1.2rem;
+  font-weight: 600;
+  letter-spacing: -0.018em;
+  color: $ink;
+  margin: 0 0 0.4rem;
+  line-height: 1.22;
+
+  a {
+    color: $ink;
+    text-decoration: none;
+    background-image: linear-gradient(to right, $rule, $rule);
+    background-size: 0 1px;
+    background-repeat: no-repeat;
+    background-position: 0 100%;
+    transition: background-size 0.18s ease, color 0.12s ease;
+  }
+  a:hover {
+    background-size: 100% 1px;
+    color: $accent;
+  }
+}
+
+.writing-summary {
+  font-family: $font-serif;
+  font-size: 0.98rem;
+  line-height: 1.5;
+  color: $ink-soft;
+  margin: 0 0 0.5rem;
+  max-width: 38rem;
+}
+
+.writing-tags {
+  font-family: $font-mono;
+  font-size: 0.74rem;
+  color: $ink-faint;
+  letter-spacing: 0;
+
+  span + span { margin-left: 0.7rem; }
+}
+
+@media (max-width: 560px) {
+  .writing-item { grid-template-columns: 1fr; gap: 0.45rem; }
+  .writing-date { padding-top: 0; }
+}
+
+// --- Selected work grid ---
+
+.work-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 1.2rem;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.work-card {
+  border: 1px solid $rule;
+  padding: 1.4rem 1.4rem 1.3rem;
+  background: $paper;
+  display: flex;
+  flex-direction: column;
+
+  .work-num {
+    font-family: $font-mono;
+    font-size: 0.76rem;
+    color: $ink-faint;
+    letter-spacing: 0.04em;
+    margin-bottom: 0.3rem;
+  }
+
+  h3 {
+    font-family: $font-serif;
+    font-size: 1.08rem;
+    font-weight: 600;
+    margin: 0 0 0.5rem;
+    letter-spacing: -0.014em;
+    line-height: 1.22;
+  }
+
+  p {
+    font-size: 0.94rem;
+    color: $ink-soft;
+    line-height: 1.5;
+    margin: 0 0 1rem;
+    max-width: none;
+  }
+
+  .work-link {
+    margin-top: auto;
+    font-family: $font-sans;
+    font-size: 0.74rem;
+    text-transform: uppercase;
+    letter-spacing: 0.14em;
+    color: $ink;
+    text-decoration: none;
+    border-bottom: 1px solid $ink;
+    padding-bottom: 2px;
+    align-self: flex-start;
+  }
+  .work-link:hover {
+    color: $accent;
+    border-bottom-color: $accent;
+  }
+}
+
+@media (max-width: 640px) {
+  .work-grid { grid-template-columns: 1fr; }
+}
+
+// --- Subscribe block ---
+
+.subscribe-block {
+  margin: 5rem 0 4rem;
+  padding: 2.6rem;
+  border: 1px solid $rule;
+  background: $paper-tint;
+
+  h3 {
+    font-family: $font-serif;
+    font-size: 1.3rem;
+    font-weight: 600;
+    margin: 0 0 0.4rem;
+    letter-spacing: -0.014em;
+  }
+
+  p {
+    font-size: 0.95rem;
+    color: $ink-soft;
+    margin: 0 0 1.2rem;
+    max-width: 32rem;
+  }
+}
+
+.subscribe-form {
+  display: flex;
+  gap: 0.6rem;
+  max-width: 30rem;
+  flex-wrap: wrap;
+
+  input[type="email"] {
+    flex: 1;
+    min-width: 14rem;
+    padding: 0.7rem 0.85rem;
+    font-family: $font-serif;
+    font-size: 1rem;
+    color: $ink;
+    background: $paper;
+    border: 1px solid $rule;
+    border-radius: 0;
+
+    &:focus {
+      outline: none;
+      border-color: $ink;
+    }
+  }
+
+  button {
+    padding: 0.7rem 1.3rem;
+    font-family: $font-sans;
+    font-size: 0.76rem;
+    text-transform: uppercase;
+    letter-spacing: 0.14em;
+    color: $paper;
+    background: $ink;
+    border: 1px solid $ink;
+    cursor: pointer;
+    font-weight: 500;
+
+    &:hover {
+      background: $accent;
+      border-color: $accent;
+    }
+  }
+}
+
+// --- Quarto-generated listing pages (writing/index.html) ---
+
+.quarto-listing {
+  margin-top: 2rem;
+}
+
+.quarto-listing-category {
+  font-family: $font-mono;
+  font-size: 0.74rem;
+  color: $ink-faint;
+  background: transparent;
+  border: 1px solid $rule-soft;
+  padding: 0.15rem 0.5rem;
+  margin: 0 0.3rem 0.4rem 0;
+  border-radius: 0;
+  text-transform: lowercase;
+  letter-spacing: 0;
+
+  &:hover,
+  &.active {
+    color: $ink;
+    border-color: $ink;
+    background: transparent;
+  }
+}
+
+.quarto-listing-default .listing-item,
+.quarto-post {
+  border-bottom: 1px solid $rule-soft;
+  padding: 1.6rem 0;
+  display: grid;
+  grid-template-columns: 6rem 1fr;
+  gap: 1.6rem;
+}
+
+.quarto-post .metadata,
+.listing-date {
+  font-family: $font-sans;
+  font-size: 0.76rem;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  color: $ink-soft;
+}
+
+.quarto-post .listing-title,
+.listing-title {
+  font-family: $font-serif;
+  font-size: 1.25rem;
+  font-weight: 600;
+  letter-spacing: -0.018em;
+  line-height: 1.22;
+  margin-bottom: 0.4rem;
+
+  a { color: $ink; text-decoration: none; }
+  a:hover { color: $accent; }
+}
+
+.quarto-post .listing-description,
+.listing-description {
+  font-family: $font-serif;
+  font-size: 0.98rem;
+  color: $ink-soft;
+  line-height: 1.5;
+  margin-bottom: 0.5rem;
+}
+
+// --- CV-page: dense, structured, still publication-feel ---
+
+.cv-page {
+  font-size: 1rem;
+
+  h1 {
+    font-size: 2.1rem;
+    margin-bottom: 0.3rem;
+  }
+
+  h2 {
+    font-size: 0.78rem;
+    text-transform: uppercase;
+    letter-spacing: 0.15em;
+    font-weight: 500;
+    color: $ink-soft;
+    font-family: $font-sans;
+    margin-top: 3rem;
+    margin-bottom: 1.4rem;
+    padding-bottom: 0.6rem;
+    border-bottom: 1px solid $rule-soft;
+  }
+
+  h3 {
+    font-family: $font-serif;
+    font-size: 1.08rem;
+    font-weight: 600;
+    margin: 1.4rem 0 0.3rem;
+    letter-spacing: -0.012em;
+  }
+
+  .cv-role {
+    display: grid;
+    grid-template-columns: 12rem 1fr;
+    gap: 1.6rem;
+    padding: 1.3rem 0;
+    border-bottom: 1px solid $rule-soft;
+  }
+
+  .cv-role:last-child { border-bottom: none; }
+
+  .cv-role-meta {
+    font-family: $font-sans;
+    font-size: 0.82rem;
+    color: $ink-soft;
+
+    .cv-dates {
+      font-weight: 500;
+      letter-spacing: 0.04em;
+      text-transform: uppercase;
+      font-size: 0.74rem;
+      margin-bottom: 0.3rem;
+    }
+
+    .cv-org {
+      font-family: $font-serif;
+      font-size: 0.94rem;
+      color: $ink;
+      font-weight: 500;
+      line-height: 1.35;
+    }
+  }
+
+  .cv-role-body {
+    h3 {
+      margin-top: 0;
+      margin-bottom: 0.5rem;
+      font-size: 1.05rem;
+    }
+
+    ul {
+      margin: 0;
+      padding-left: 1.1rem;
+      font-size: 0.96rem;
+      line-height: 1.55;
+      color: $ink;
+    }
+
+    li { margin-bottom: 0.35rem; }
+  }
+
+  .cv-stats {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 1.4rem;
+    margin: 1.6rem 0 2rem;
+    padding: 1.3rem 0;
+    border-top: 1px solid $rule-soft;
+    border-bottom: 1px solid $rule-soft;
+  }
+
+  .cv-stat {
+    .cv-stat-label {
+      font-family: $font-sans;
+      font-size: 0.7rem;
+      text-transform: uppercase;
+      letter-spacing: 0.12em;
+      color: $ink-soft;
+      display: block;
+      margin-bottom: 0.3rem;
+    }
+    .cv-stat-value {
+      font-family: $font-serif;
+      font-size: 1.5rem;
+      font-weight: 600;
+      letter-spacing: -0.018em;
+      color: $ink;
+    }
+  }
+
+  @media (max-width: 720px) {
+    .cv-role { grid-template-columns: 1fr; gap: 0.4rem; }
+    .cv-stats { grid-template-columns: repeat(2, 1fr); }
+  }
+}
+
+// --- About page ---
+
+.about-page {
+  .about-lede {
+    font-family: $font-serif;
+    font-size: 1.18rem;
+    line-height: 1.55;
+    color: $ink;
+    margin-bottom: 1.4rem;
+    max-width: 36rem;
+  }
+
+  .now-list {
+    list-style: none;
+    padding: 0;
+    margin: 0.4rem 0 1.6rem;
+    border-left: 1px solid $rule;
+  }
+  .now-list li {
+    padding: 0.5rem 0 0.5rem 1rem;
+    font-size: 0.98rem;
+    color: $ink;
+  }
+
+  .contact-list {
+    list-style: none;
+    padding: 0;
+    margin: 1rem 0;
+    font-size: 0.98rem;
+
+    li {
+      padding: 0.4rem 0;
+      display: grid;
+      grid-template-columns: 6rem 1fr;
+      gap: 1rem;
+      border-bottom: 1px solid $rule-soft;
+    }
+
+    .contact-label {
+      font-family: $font-sans;
+      font-size: 0.74rem;
+      text-transform: uppercase;
+      letter-spacing: 0.13em;
+      color: $ink-soft;
+      padding-top: 0.18rem;
+    }
+  }
+}
+
+// --- Footer ---
+
+.nav-footer,
+.footer {
+  font-family: $font-sans;
+  font-size: 0.78rem;
+  color: $ink-soft;
+  border-top: 1px solid $rule-soft;
+  padding: 2rem 0 !important;
+  margin-top: 5rem;
+  background: $paper;
+
+  a { color: $ink-soft; }
+  a:hover { color: $ink; }
+}
+
+// --- Selection ---
+::selection {
+  background: rgba(31, 79, 153, 0.18);
+  color: $ink;
+}
+
+// --- Hide Quarto title block on homepage where we use a custom hero ---
+.no-title .quarto-title-block,
+.no-title #title-block-header {
+  display: none;
+}

@@ -1,0 +1,25 @@
+---
+title: "Why this site exists"
+description: "Cochrane and GRADE have been grading clinical evidence for decades. That toolkit hasn't been imported into the conversation about clinical AI in any organized way. This is my attempt."
+date: "2026-05-14"
+author: "Paulina Del Mundo"
+categories: [manifesto, evidence-synthesis]
+---
+
+Most writing about clinical AI right now talks about it the way physicians talk about a new drug at a sponsored dinner: lots of mechanism, a few cherry-picked endpoints, and very little discussion of what the evidence base would have to look like to actually trust it in clinic on Monday.
+
+That's a strange way to talk about clinical AI, because we already know how to talk about clinical evidence. Cochrane and GRADE have been doing it for decades. PRISMA tells you how to report a synthesis. ROBINS-I extends risk-of-bias grading to non-randomized studies. PROBAST and TRIPOD-AI tell you how to read prediction models. None of these tools are new. They just haven't been imported into the conversation about clinical AI in any organized way.
+
+This site is my attempt to do that. I'm a physician with an MPH in epidemiology and biostatistics from Johns Hopkins. I spent a chunk of my training doing systematic reviews — including one that shaped Wilms tumor chemotherapy guidelines for the Philippines. I now work as a clinical data scientist with EHR, claims, and SDoH data at scale. Evidence synthesis is the lens I already use to read studies. I want to apply it, in public, to clinical AI.
+
+## What I plan to write
+
+- **Study teardowns.** A new clinical AI paper comes out — I read it three ways. With the trial-evaluation toolkit (GRADE, RoB 2). With the prediction-model toolkit (PROBAST, TRIPOD-AI). With the implementation toolkit (decision-curve analysis, calibration, cost-effectiveness). The question isn't "is the model good." The question is "what claim does this evidence actually support."
+- **Framework drafts.** Cochrane RoB 2 was built for randomized trials. ROBINS-I extended risk-of-bias grading to observational studies. What does an equivalent tool look like for what an LLM "read" during training? I'm going to publish v0.1s and let the rough edges show, then revise in public.
+- **Case-study companions.** Each of the project notebooks on this site already has the analytic detail. What's missing is the narrative — methods choices, what I'd do differently, what the analysis can and can't claim. I'll write those next to the code.
+
+## Who this is for
+
+If you read clinical AI papers and find yourself wishing someone would just *grade the evidence*, you're the reader I'm writing for. That includes clinicians evaluating AI vendor pitches, the PMs and operators on the other side of those pitches, MPH and med students learning evidence synthesis for the first time, and the policy and journalism people who have to translate clinical AI into something coherent for a non-specialist audience.
+
+The newsletter goes out every two weeks. The archive is below.

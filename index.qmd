@@ -1,0 +1,84 @@
+---
+title: ""
+pagetitle: "Paulina Del Mundo — Evidence synthesis methods, applied to clinical AI"
+description: "Physician + MPH (Hopkins epi/biostats) writing on risk of bias, evidence synthesis, and what clinical AI is actually synthesizing."
+page-layout: article
+toc: false
+listing:
+  - id: recent-writing
+    contents: "writing/2*.qmd"
+    sort: "date desc"
+    max-items: 3
+    type: default
+    fields: [date, title, description, categories]
+    field-display-names:
+      categories: "Tags"
+    feed: false
+    categories: false
+    sort-ui: false
+    filter-ui: false
+---
+
+::: {.hero}
+
+<h1 class="hero-title">Evidence synthesis methods,<br>applied to clinical AI.</h1>
+
+<p class="hero-lede">I'm Paulina — physician, MPH epi/biostats from Hopkins, clinical data scientist working with EHR and claims at scale. I write about what clinical AI is actually synthesizing, and whether the evidence underneath it holds up.</p>
+
+::: {.hero-cta}
+[Read the latest →](writing/) &nbsp;&nbsp;&nbsp; [Subscribe](#subscribe)
+:::
+
+::: {.trust-strip}
+[MD]{} [MPH Hopkins]{} [24.6M+ encounters analyzed]{} [4 case studies]{}
+:::
+
+:::
+
+::: {.section-head}
+[Recent writing]{.section-label}
+[All writing →](writing/){.section-more}
+:::
+
+::: {#recent-writing}
+:::
+
+::: {.section-head}
+[Selected work]{.section-label}
+[All projects →](projects/){.section-more}
+:::
+
+::: {.work-grid}
+
+::: {.work-card}
+[04]{.work-num}
+
+### Medicare Part D insulin cap — a difference-in-differences read
+
+What did the \$35 insulin cap actually shift in claims data, and how confident should we be in the answer?
+
+[View analysis →](projects/04-medicare-part-d-insulin-cap/analysis.html){.work-link}
+:::
+
+::: {.work-card}
+[02]{.work-num}
+
+### Medicaid outlier detection
+
+Spotting anomalous billing patterns in Medicaid claims without flagging the wrong thing — a method comparison.
+
+[View analysis →](projects/02-medicaid-outliers/analysis.html){.work-link}
+:::
+
+:::
+
+::: {.subscribe-block #subscribe}
+### Subscribe
+
+One essay every two weeks on evidence synthesis methods in clinical AI. Risk of bias, study teardowns, framework drafts. No spam, easy unsubscribe.
+
+<form class="subscribe-form" action="https://buttondown.email/api/emails/embed-subscribe/paulinadelmundomd" method="post" target="popupwindow" onsubmit="window.open('https://buttondown.email/paulinadelmundomd', 'popupwindow')">
+  <input type="email" name="email" placeholder="your@email.com" required />
+  <button type="submit">Subscribe</button>
+</form>
+:::
