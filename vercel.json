@@ -3,5 +3,6 @@
   "buildCommand": "bash build.sh",
   "outputDirectory": "_site",
   "framework": null,
-  "trailingSlash": false
+  "trailingSlash": false,
+  "cleanUrls": true
 }
